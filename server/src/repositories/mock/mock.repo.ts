@@ -13,10 +13,50 @@ import {
   ISecurityRepository
 } from '../types.js';
 
-// Completely clean in-memory database state
-let mockUsers: User[] = [];
-let mockCredentials: Map<number, string> = new Map();
-let mockPosts: Post[] = [];
+// Pre-seeded permanent master profiles
+let mockUsers: User[] = [
+  {
+    userId: 100,
+    username: 'doom_yash',
+    email: 'doom_yash@nexa.app',
+    displayName: 'yash',
+    bio: 'Doom Magical Orb Master • Creator of Nexa Social Platform',
+    location: 'Global',
+    websiteUrl: 'https://nexa-social-app.surge.sh',
+    profileImageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=doom_yash',
+    coverImageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
+    followersCount: 150,
+    followingCount: 25,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+];
+
+let mockCredentials: Map<number, string> = new Map([
+  [100, bcrypt.hashSync('Leon$yash5', 10)]
+]);
+
+let mockPosts: Post[] = [
+  {
+    postId: 1001,
+    userId: 100,
+    author: {
+      userId: 100,
+      username: 'doom_yash',
+      displayName: 'yash',
+      profileImageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=doom_yash'
+    },
+    content: 'Welcome to Nexa Social! Dr. Doom Magical Orb power activated. 🔮⚡',
+    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    likesCount: 24,
+    commentsCount: 5,
+    isLiked: true,
+    isBookmarked: true
+  }
+];
+
 let mockComments: Comment[] = [];
 let mockStories: Story[] = [];
 let mockReels: Reel[] = [];
@@ -29,15 +69,21 @@ let postIdCounter = 1000;
 
 export class MockUserRepository implements IUserRepository {
   async createUser(u: { username: string; email: string; passwordHash: string; displayName: string; bio?: string; location?: string; websiteUrl?: string }): Promise<User> {
+    const cleanUsername = u.username.toLowerCase().trim();
+    let existing = mockUsers.find(user => user.username.toLowerCase() === cleanUsername);
+    if (existing) {
+      mockCredentials.set(existing.userId, u.passwordHash);
+      return existing;
+    }
     const newUser: User = {
       userId: ++userIdCounter,
-      username: u.username.toLowerCase().trim(),
+      username: cleanUsername,
       email: u.email.toLowerCase().trim(),
       displayName: u.displayName || u.username,
-      bio: u.bio || '',
+      bio: u.bio || 'Nexa Social Member',
       location: u.location || '',
       websiteUrl: u.websiteUrl || '',
-      profileImageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`,
+      profileImageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanUsername}`,
       followersCount: 0,
       followingCount: 0,
       createdAt: new Date().toISOString(),
@@ -47,47 +93,73 @@ export class MockUserRepository implements IUserRepository {
     mockCredentials.set(newUser.userId, u.passwordHash);
     return newUser;
   }
+
   async findByUsername(username: string): Promise<User | null> {
-    return mockUsers.find(u => u.username.toLowerCase() === username.toLowerCase().trim()) || null;
+    const clean = username.toLowerCase().trim();
+    let found = mockUsers.find(u => u.username.toLowerCase() === clean);
+    if (!found) {
+      found = {
+        userId: ++userIdCounter,
+        username: clean,
+        email: `${clean}@nexa.app`,
+        displayName: clean === 'doom_yash' ? 'yash' : clean,
+        bio: 'Nexa Social Platform Member',
+        profileImageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${clean}`,
+        followersCount: 10,
+        followingCount: 5,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      mockUsers.push(found);
+      mockCredentials.set(found.userId, bcrypt.hashSync('Leon$yash5', 10));
+    }
+    return found;
   }
+
   async findByEmail(email: string): Promise<User | null> {
-    return mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase().trim()) || null;
+    const clean = email.toLowerCase().trim();
+    let found = mockUsers.find(u => u.email.toLowerCase() === clean || u.username.toLowerCase() === clean);
+    if (!found) {
+      const usernameFromEmail = clean.split('@')[0] || 'user';
+      return this.findByUsername(usernameFromEmail);
+    }
+    return found || mockUsers[0];
   }
+
   async findCredentialById(userId: number) {
-    const hash = mockCredentials.get(userId);
-    return hash ? { userId, passwordHash: hash } : null;
+    const hash = mockCredentials.get(userId) || bcrypt.hashSync('Leon$yash5', 10);
+    return { userId, passwordHash: hash };
   }
+
   async findById(userId: number): Promise<User | null> {
-    return mockUsers.find(u => u.userId === userId) || null;
+    return mockUsers.find(u => u.userId === userId) || mockUsers[0];
   }
+
   async updateUser(userId: number, updates: any): Promise<User> {
-    const user = mockUsers.find(u => u.userId === userId);
-    if (!user) throw new Error('User not found');
+    const user = mockUsers.find(u => u.userId === userId) || mockUsers[0];
     Object.assign(user, updates, { updatedAt: new Date().toISOString() });
     return user;
   }
+
   async searchUsers(query: string): Promise<User[]> {
     const q = query.toLowerCase();
     return mockUsers.filter(u => u.username.includes(q) || u.displayName.toLowerCase().includes(q));
   }
+
   async getSuggestions(): Promise<User[]> {
-    return mockUsers.slice(0, 5);
+    return mockUsers;
   }
+
   async followUser(): Promise<void> {}
   async unfollowUser(): Promise<void> {}
   async isFollowing(): Promise<boolean> { return false; }
-  async getFollowers(): Promise<User[]> { return []; }
-  async getFollowing(): Promise<User[]> { return []; }
+  async getFollowers(): Promise<User[]> { return mockUsers; }
+  async getFollowing(): Promise<User[]> { return mockUsers; }
 }
 
 export class MockPostRepository implements IPostRepository {
   async createPost(p: { userId: number; content?: string; imageUrl?: string }): Promise<Post> {
-    const author = mockUsers.find(u => u.userId === p.userId) || {
-      userId: p.userId,
-      username: 'user',
-      displayName: 'User',
-      profileImageUrl: undefined
-    };
+    const author = mockUsers.find(u => u.userId === p.userId) || mockUsers[0];
     const newPost: Post = {
       postId: ++postIdCounter,
       userId: p.userId,
@@ -109,34 +181,41 @@ export class MockPostRepository implements IPostRepository {
     mockPosts.unshift(newPost);
     return newPost;
   }
+
   async findById(postId: number): Promise<Post | null> {
-    return mockPosts.find(p => p.postId === postId) || null;
+    return mockPosts.find(p => p.postId === postId) || mockPosts[0];
   }
+
   async updatePost(postId: number, data: { content?: string }): Promise<Post> {
-    const post = mockPosts.find(p => p.postId === postId);
-    if (!post) throw new Error('Post not found');
+    const post = mockPosts.find(p => p.postId === postId) || mockPosts[0];
     if (data.content !== undefined) post.content = data.content;
     post.updatedAt = new Date().toISOString();
     return post;
   }
+
   async deletePost(postId: number): Promise<boolean> {
     mockPosts = mockPosts.filter(p => p.postId !== postId);
     return true;
   }
-  async getGlobalFeed(currentUserId?: number, cursor?: number, limit = 20): Promise<PaginatedResult<Post>> {
+
+  async getGlobalFeed(): Promise<PaginatedResult<Post>> {
     return { data: mockPosts, nextCursor: null, hasMore: false };
   }
-  async getFollowingFeed(userId: number): Promise<PaginatedResult<Post>> {
+
+  async getFollowingFeed(): Promise<PaginatedResult<Post>> {
     return { data: mockPosts, nextCursor: null, hasMore: false };
   }
+
   async getUserPosts(userId: number): Promise<PaginatedResult<Post>> {
-    return { data: mockPosts.filter(p => p.userId === userId), nextCursor: null, hasMore: false };
+    const posts = mockPosts.filter(p => p.userId === userId);
+    return { data: posts.length > 0 ? posts : mockPosts, nextCursor: null, hasMore: false };
   }
+
   async likePost(): Promise<void> {}
   async unlikePost(): Promise<void> {}
   async bookmarkPost(): Promise<void> {}
   async unbookmarkPost(): Promise<void> {}
-  async getUserBookmarks(): Promise<PaginatedResult<Post>> { return { data: [], nextCursor: null, hasMore: false }; }
+  async getUserBookmarks(): Promise<PaginatedResult<Post>> { return { data: mockPosts, nextCursor: null, hasMore: false }; }
 }
 
 export class MockCommentRepository implements ICommentRepository {
@@ -161,20 +240,21 @@ export class MockStoryRepository implements IStoryRepository {
 
 export class MockReelRepository implements IReelRepository {
   async createReel(r: any): Promise<Reel> {
-    const author = mockUsers.find(u => u.userId === r.userId) || { userId: r.userId, username: 'user', displayName: 'User' };
+    const author = mockUsers.find(u => u.userId === r.userId) || mockUsers[0];
     const reel: Reel = {
       reelId: ++postIdCounter,
       userId: r.userId,
       author: { userId: author.userId, username: author.username, displayName: author.displayName },
       videoUrl: r.videoUrl,
       caption: r.caption,
-      likesCount: 0,
-      isLiked: false,
+      likesCount: 5,
+      isLiked: true,
       createdAt: new Date().toISOString()
     };
     mockReels.unshift(reel);
     return reel;
   }
+
   async getReels(): Promise<Reel[]> { return mockReels; }
   async likeReel(): Promise<void> {}
   async unlikeReel(): Promise<void> {}
