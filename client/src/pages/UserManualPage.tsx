@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AppShell } from '../components/layout/AppShell.js';
+import { DrDoomOrbLogo } from '../components/ui/DrDoomOrbLogo.js';
 import { 
   BookOpen, 
   Search, 
@@ -12,13 +13,10 @@ import {
   ChevronUp, 
   ArrowRight, 
   Users, 
-  Radio, 
   CheckCircle2, 
   Camera, 
   Video, 
-  Film, 
-  Loader2, 
-  Sparkles 
+  Film 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -284,28 +282,36 @@ export const UserManualPage: React.FC = () => {
   return (
     <AppShell>
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
-        {/* Header Hero */}
-        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950/60 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-500/20 border border-brand-500/30 rounded-full text-brand-300 text-xs font-semibold">
-            <BookOpen className="w-4 h-4" /> Nexa User Manual & Project Viva Guide
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Nexa Project User Manual
-          </h1>
-          <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">
-            Learn how to use Nexa step by step. Explore guides on account setup, Instagram profile uploads, progress-tracked media streaming, short Reels vs Long Videos, 256-bit AES-GCM encrypted messaging, group chats, broadcasts, and the Android mobile app.
-          </p>
+        {/* Header Hero Card with Official Nexa Doom Orb Application Icon */}
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950/60 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xl flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6">
+          <div className="space-y-4 flex-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-500/20 border border-brand-500/30 rounded-full text-brand-300 text-xs font-semibold">
+              <BookOpen className="w-4 h-4" /> Nexa User Manual & Project Viva Guide
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Nexa Project User Manual
+            </h1>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              Learn how to use Nexa step by step. Explore guides on account setup, Instagram profile uploads, progress-tracked media streaming, short Reels vs Long Videos, 256-bit AES-GCM encrypted messaging, group chats, broadcasts, and the Android mobile app.
+            </p>
 
-          {/* Search Box */}
-          <div className="relative max-w-md pt-2">
-            <Search className="w-4 h-4 absolute left-3.5 top-5.5 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search user manual topics..."
-              className="w-full bg-slate-950 border border-slate-800 focus:border-brand-500 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none shadow-inner"
-            />
+            {/* Search Box */}
+            <div className="relative max-w-md pt-2">
+              <Search className="w-4 h-4 absolute left-3.5 top-5.5 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search user manual topics..."
+                className="w-full bg-slate-950 border border-slate-800 focus:border-brand-500 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none shadow-inner"
+              />
+            </div>
+          </div>
+
+          {/* Official Nexa Application Icon */}
+          <div className="p-4 bg-slate-950/80 border border-emerald-500/30 rounded-2xl shadow-glow-brand flex flex-col items-center justify-center shrink-0">
+            <DrDoomOrbLogo size={88} showText={true} />
+            <span className="text-[10px] font-bold text-emerald-400/80 mt-1">Official App Emblem</span>
           </div>
         </div>
 
