@@ -58,6 +58,9 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:32.7.2"))
     implementation("com.google.firebase:firebase-messaging-ktx")
 
+    // Socket.IO Client for Real-time Messaging
+    implementation("io.socket:socket.io-client:2.1.1")
+
     // Networking & Retrofit
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")

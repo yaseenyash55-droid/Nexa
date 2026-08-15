@@ -88,6 +88,15 @@ data class GroupMessage(
     @SerializedName("createdAt") val createdAt: String?
 )
 
+data class Broadcast(
+    @SerializedName("broadcastId") val broadcastId: Int,
+    @SerializedName("senderId") val senderId: Int,
+    @SerializedName("title") val title: String?,
+    @SerializedName("content") val content: String,
+    @SerializedName("recipientsCount") val recipientsCount: Int,
+    @SerializedName("createdAt") val createdAt: String?
+)
+
 data class MediaUploadResponse(
     @SerializedName("assetId") val assetId: String?,
     @SerializedName("publicUrl") val publicUrl: String?,

@@ -3,6 +3,7 @@ package com.nexa.social.ui
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -21,7 +22,15 @@ class ConversationsActivity : AppCompatActivity() {
     private lateinit var prefManager: PreferenceManager
     private lateinit var adapter: ConversationsAdapter
 
-    private var activeTab: Int = 0 // 0 = Direct, 1 = Groups
+    private var activeTab: Int = 0 // 0 = Direct, 1 = Groups, 2 = Broadcasts
+
+    private val actionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            loadData()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,7 +42,7 @@ class ConversationsActivity : AppCompatActivity() {
         setupToolbar()
         setupRecyclerView()
         setupTabLayout()
-        setupFab()
+        setupFabs()
         setupSwipeRefresh()
 
         loadData()
@@ -62,6 +71,13 @@ class ConversationsActivity : AppCompatActivity() {
                     }
                     startActivity(intent)
                 }
+                is ConversationItem.BroadcastList -> {
+                    val builder = AlertDialog.Builder(this)
+                    builder.setTitle(item.broadcast.title ?: "Broadcast Log")
+                    builder.setMessage("Dispatched to ${item.broadcast.recipientsCount} recipients:\n\n${item.broadcast.content}")
+                    builder.setPositiveButton("Close") { dialog, _ -> dialog.dismiss() }
+                    builder.show()
+                }
             }
         }
 
@@ -86,9 +102,13 @@ class ConversationsActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupFab() {
+    private fun setupFabs() {
+        binding.fabCreateGroup.setOnClickListener {
+            actionLauncher.launch(Intent(this, CreateGroupActivity::class.java))
+        }
+
         binding.fabBroadcast.setOnClickListener {
-            showBroadcastDialog()
+            actionLauncher.launch(Intent(this, CreateBroadcastActivity::class.java))
         }
     }
 
@@ -96,21 +116,33 @@ class ConversationsActivity : AppCompatActivity() {
         binding.swipeRefresh.isRefreshing = true
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                if (activeTab == 0) {
-                    val res = NexaApiClient.authApi.getSuggestions()
-                    val users = res.body()?.data ?: emptyList()
-                    val items = users.map { ConversationItem.Direct(it) }
-                    withContext(Dispatchers.Main) {
-                        adapter.submitList(items)
-                        binding.swipeRefresh.isRefreshing = false
+                when (activeTab) {
+                    0 -> {
+                        val res = NexaApiClient.authApi.getSuggestions()
+                        val users = res.body()?.data ?: emptyList()
+                        val items = users.map { ConversationItem.Direct(it) }
+                        withContext(Dispatchers.Main) {
+                            adapter.submitList(items)
+                            binding.swipeRefresh.isRefreshing = false
+                        }
                     }
-                } else {
-                    val res = NexaApiClient.groupApi.getUserGroups()
-                    val groups = res.body()?.data ?: emptyList()
-                    val items = groups.map { ConversationItem.GroupChat(it) }
-                    withContext(Dispatchers.Main) {
-                        adapter.submitList(items)
-                        binding.swipeRefresh.isRefreshing = false
+                    1 -> {
+                        val res = NexaApiClient.groupApi.getUserGroups()
+                        val groups = res.body()?.data ?: emptyList()
+                        val items = groups.map { ConversationItem.GroupChat(it) }
+                        withContext(Dispatchers.Main) {
+                            adapter.submitList(items)
+                            binding.swipeRefresh.isRefreshing = false
+                        }
+                    }
+                    else -> {
+                        val res = NexaApiClient.messageApi.getUserBroadcasts()
+                        val broadcasts = res.body()?.data ?: emptyList()
+                        val items = broadcasts.map { ConversationItem.BroadcastList(it) }
+                        withContext(Dispatchers.Main) {
+                            adapter.submitList(items)
+                            binding.swipeRefresh.isRefreshing = false
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -120,17 +152,5 @@ class ConversationsActivity : AppCompatActivity() {
                 }
             }
         }
-    }
-
-    private fun showBroadcastDialog() {
-        val builder = AlertDialog.Builder(this)
-        builder.setTitle("New Message Broadcast")
-        builder.setMessage("Broadcast message will be sent as individual 1-on-1 direct messages to contacts.")
-        builder.setPositiveButton("Dispatch") { dialog, _ ->
-            dialog.dismiss()
-            Toast.makeText(this, "Broadcast feature active. Open a conversation or web portal to select target list.", Toast.LENGTH_LONG).show()
-        }
-        builder.setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-        builder.show()
     }
 }

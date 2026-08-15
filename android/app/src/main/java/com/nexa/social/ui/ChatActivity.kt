@@ -1,6 +1,11 @@
 package com.nexa.social.ui
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -8,6 +13,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.nexa.social.NexaApiClient
 import com.nexa.social.databinding.ActivityChatBinding
 import com.nexa.social.utils.AndroidE2EE
+import com.nexa.social.utils.NexaSocketManager
 import com.nexa.social.utils.PreferenceManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -16,7 +22,7 @@ import kotlinx.coroutines.withContext
 class ChatActivity : AppCompatActivity() {
 
     companion object {
-        const val EXTRA_CHAT_TYPE = "extra_chat_type" // "direct" or "group"
+        const val EXTRA_CHAT_TYPE = "extra_chat_type"
         const val EXTRA_TARGET_ID = "extra_target_id"
         const val EXTRA_TARGET_NAME = "extra_target_name"
     }
@@ -28,6 +34,10 @@ class ChatActivity : AppCompatActivity() {
     private var chatType: String = "direct"
     private var targetId: Int = 0
     private var targetName: String = "Chat"
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var stopTypingRunnable: Runnable? = null
+    private var isEmittingTyping = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,8 +53,15 @@ class ChatActivity : AppCompatActivity() {
         setupToolbar()
         setupRecyclerView()
         setupSendButton()
+        setupTypingListeners()
+        setupTextWatcher()
 
         loadMessages()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        NexaSocketManager.removeTypingListeners()
     }
 
     private fun setupToolbar() {
@@ -64,6 +81,50 @@ class ChatActivity : AppCompatActivity() {
             stackFromEnd = true
         }
         binding.rvMessages.adapter = adapter
+    }
+
+    private fun setupTypingListeners() {
+        NexaSocketManager.setTypingListeners(
+            onStart = { userId, username ->
+                if (chatType == "direct" && userId == targetId) {
+                    binding.tvTypingIndicator.text = "${username ?: targetName} is typing..."
+                    binding.tvTypingIndicator.visibility = View.VISIBLE
+                }
+            },
+            onStop = { userId ->
+                if (chatType == "direct" && userId == targetId) {
+                    binding.tvTypingIndicator.visibility = View.GONE
+                }
+            }
+        )
+    }
+
+    private fun setupTextWatcher() {
+        binding.etMessage.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (chatType != "direct" || targetId == 0) return
+
+                if (!s.isNullOrEmpty()) {
+                    if (!isEmittingTyping) {
+                        isEmittingTyping = true
+                        NexaSocketManager.emitTypingStart(targetId)
+                    }
+
+                    stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
+                    stopTypingRunnable = Runnable {
+                        NexaSocketManager.emitTypingStop(targetId)
+                        isEmittingTyping = false
+                    }
+                    mainHandler.postDelayed(stopTypingRunnable!!, 2000)
+                } else {
+                    stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
+                    NexaSocketManager.emitTypingStop(targetId)
+                    isEmittingTyping = false
+                }
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
     }
 
     private fun setupSendButton() {
@@ -129,6 +190,12 @@ class ChatActivity : AppCompatActivity() {
     private fun sendMessage(content: String) {
         val currentUserId = prefManager.userId
         binding.etMessage.setText("")
+
+        if (chatType == "direct") {
+            stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
+            NexaSocketManager.emitTypingStop(targetId)
+            isEmittingTyping = false
+        }
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {

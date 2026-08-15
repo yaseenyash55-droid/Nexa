@@ -81,6 +81,18 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- Native Create Group Activity -->
+        <activity
+            android:name=".ui.CreateGroupActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Native Create Broadcast Activity -->
+        <activity
+            android:name=".ui.CreateBroadcastActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Firebase Cloud Messaging Service -->
         <service
             android:name=".service.NexaFirebaseMessagingService"

@@ -77,6 +77,9 @@ class LoginActivity : AppCompatActivity() {
             val result = authRepository.login(username, password)
             setLoading(false)
             result.onSuccess { user ->
+                tokenManager.accessToken?.let { token ->
+                    com.nexa.social.utils.SocketManager.connect(token)
+                }
                 Toast.makeText(this@LoginActivity, "Welcome back, ${user.displayName}!", Toast.LENGTH_SHORT).show()
                 val intent = Intent(this@LoginActivity, MainActivity::class.java)
                 startActivity(intent)

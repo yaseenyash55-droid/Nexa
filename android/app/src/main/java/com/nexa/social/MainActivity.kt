@@ -108,6 +108,11 @@ class MainActivity : AppCompatActivity() {
         setupRetryButton()
         setupNetworkMonitoring()
 
+        val tokenManager = TokenManager(this)
+        tokenManager.accessToken?.let { token ->
+            SocketManager.connect(token)
+        }
+
         handleNotificationIntent(intent)
     }
 

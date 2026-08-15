@@ -1,6 +1,7 @@
 package com.nexa.social.data.api
 
 import com.nexa.social.data.models.ApiResponse
+import com.nexa.social.data.models.Broadcast
 import com.nexa.social.data.models.Message
 import retrofit2.Response
 import retrofit2.http.Body
@@ -30,4 +31,7 @@ interface MessageApi {
     suspend fun createBroadcast(
         @Body body: Map<String, Any>
     ): Response<ApiResponse<Map<String, Any>>>
+
+    @GET("broadcasts")
+    suspend fun getUserBroadcasts(): Response<ApiResponse<List<Broadcast>>>
 }
