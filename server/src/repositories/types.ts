@@ -140,3 +140,16 @@ export interface ISecurityRepository {
     deviceSummary?: string;
   }): Promise<void>;
 }
+
+export interface IRepositoryManager {
+  userRepo: IUserRepository;
+  postRepo: IPostRepository;
+  commentRepo: ICommentRepository;
+  notificationRepo: INotificationRepository;
+  storyRepo: IStoryRepository;
+  reelRepo: IReelRepository;
+  messageRepo: IMessageRepository;
+  authRepo: IAuthRepository;
+  securityRepo: ISecurityRepository;
+}
+

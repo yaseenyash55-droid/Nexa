@@ -8,7 +8,8 @@ import {
   IReelRepository,
   IMessageRepository,
   IAuthRepository,
-  ISecurityRepository
+  ISecurityRepository,
+  IRepositoryManager
 } from '../types.js';
 import { User, Post, Comment, Notification, Story, Reel, Message, PaginatedResult } from '../../types/index.js';
 
@@ -324,3 +325,16 @@ export class MockSecurityRepository implements ISecurityRepository {
   async revokeOtherSessions(userId: number, currentSessionId: string): Promise<void> {}
   async logSecurityEvent(event: { userId: number; sessionId?: string; eventType: string; outcome: 'SUCCESS' | 'FAILURE'; deviceSummary?: string }): Promise<void> {}
 }
+
+export const mockRepositoryManager: IRepositoryManager = {
+  userRepo: new MockUserRepository(),
+  postRepo: new MockPostRepository(),
+  commentRepo: new MockCommentRepository(),
+  notificationRepo: new MockNotificationRepository(),
+  storyRepo: new MockStoryRepository(),
+  reelRepo: new MockReelRepository(),
+  messageRepo: new MockMessageRepository(),
+  authRepo: new MockAuthRepository(),
+  securityRepo: new MockSecurityRepository()
+};
+
