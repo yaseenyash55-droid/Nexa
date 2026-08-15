@@ -1,0 +1,239 @@
+import React, { useState, useRef } from 'react';
+import { Image as ImageIcon, Sparkles, X, Upload, CheckCircle2, AlertCircle, Crop as CropIcon, HelpCircle, Film } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext.js';
+import { Avatar } from '../ui/Avatar.js';
+import { Button } from '../ui/Button.js';
+import { ImageCropperModal } from '../ui/ImageCropperModal.js';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { postsApi } from '../../api/posts.api.js';
+import { readMediaAsDataUrl } from '../../utils/mediaUpload.js';
+
+interface PostComposerProps {
+  onPostCreated?: () => void;
+}
+
+export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [content, setContent] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [selectedRawImage, setSelectedRawImage] = useState<string | null>(null);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [showPostingGuide, setShowPostingGuide] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const createPostMutation = useMutation({
+    mutationFn: () => postsApi.createPost({ content, imageUrl }),
+    onSuccess: () => {
+      setContent('');
+      setImageUrl('');
+      setFeedback({ type: 'success', text: 'Post published successfully!' });
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      if (onPostCreated) onPostCreated();
+      setTimeout(() => setFeedback(null), 5000);
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Failed to publish post';
+      setFeedback({ type: 'error', text: msg });
+    }
+  });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const dataUrl = await readMediaAsDataUrl(file);
+      if (file.type.startsWith('video/')) {
+        setImageUrl(dataUrl);
+      } else {
+        setSelectedRawImage(dataUrl);
+        setIsCropperOpen(true);
+      }
+    } catch (err: any) {
+      setFeedback({ type: 'error', text: err.message || 'Media file validation failed' });
+    }
+  };
+
+  if (!user) return null;
+
+  const characterCount = content.length;
+  const maxCharacters = 2000;
+  const isOverLimit = characterCount > maxCharacters;
+  const isValid = (content.trim().length > 0 || imageUrl.trim().length > 0) && !isOverLimit;
+
+  const isVideoMedia = imageUrl && (
+    imageUrl.startsWith('data:video/') || 
+    imageUrl.includes('/uploads/videos/') || 
+    /\.(mp4|webm|mov|mkv|avi)$/i.test(imageUrl)
+  );
+
+  return (
+    <div className="p-4 bg-background-card/80 border border-slate-800/80 rounded-2xl shadow-xl space-y-4">
+      {/* Feedback Banner Popup */}
+      {feedback && (
+        <div
+          className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between transition-all ${
+            feedback.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+              : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {feedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            )}
+            <span>{feedback.text}</span>
+          </div>
+          <button onClick={() => setFeedback(null)} className="opacity-80 hover:opacity-100">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      <div className="flex items-start gap-3">
+        <Avatar src={user.profileImageUrl} name={user.displayName} size="md" />
+        <div className="flex-1 space-y-3">
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="What's happening in your network?"
+            rows={3}
+            className="w-full bg-transparent border-none text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-0 resize-none"
+          />
+
+          {/* Hidden File Picker Input - Accepts BOTH Images AND Videos */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*,video/*,.mp4,.webm,.mov,.mkv,.avi"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+
+          {/* Local File Media Preview (Image or Video) */}
+          {imageUrl && (
+            <div className="relative rounded-xl overflow-hidden max-h-64 border border-brand-500/50 group bg-slate-950">
+              {isVideoMedia ? (
+                <video src={imageUrl} controls className="w-full max-h-64 object-cover" />
+              ) : (
+                <img src={imageUrl} alt="Uploaded local preview" className="w-full h-full object-cover" />
+              )}
+              
+              <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
+                {!isVideoMedia && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedRawImage(imageUrl);
+                      setIsCropperOpen(true);
+                    }}
+                    className="px-2.5 py-1 bg-slate-900/90 text-slate-200 hover:text-white hover:bg-brand-600 rounded-lg text-xs font-semibold flex items-center gap-1 backdrop-blur-md transition-colors border border-slate-700/80 shadow-lg"
+                    title="Adjust Aspect Ratio & Crop"
+                  >
+                    <CropIcon className="w-3.5 h-3.5 text-brand-400" />
+                    <span>Adjust Ratio</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setImageUrl('')}
+                  className="p-1.5 bg-slate-900/90 text-white hover:bg-rose-600 rounded-full transition-colors backdrop-blur-md shadow-lg"
+                  title="Remove media"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Expandable Posting Media Guide Widget */}
+      {showPostingGuide && (
+        <div className="p-3.5 bg-slate-900/90 rounded-xl border border-brand-500/30 text-xs space-y-2 text-slate-300">
+          <div className="flex items-center justify-between font-bold text-white border-b border-slate-800 pb-1.5">
+            <span className="flex items-center gap-1.5 text-brand-300">
+              <Film className="w-4 h-4 text-brand-400" /> Footage & Media Posting Guide
+            </span>
+            <button onClick={() => setShowPostingGuide(false)} className="text-slate-400 hover:text-white">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] pt-1">
+            <div className="p-2 bg-slate-950/60 rounded-lg border border-slate-800">
+              <span className="font-semibold text-slate-100 block">1:1 Square Ratio</span>
+              <span className="text-slate-400">Best for Instagram-style Grid posts (600x600px).</span>
+            </div>
+            <div className="p-2 bg-slate-950/60 rounded-lg border border-slate-800">
+              <span className="font-semibold text-slate-100 block">4:5 Mobile Portrait</span>
+              <span className="text-slate-400">Maximizes vertical feed space on smartphones (600x750px).</span>
+            </div>
+            <div className="p-2 bg-slate-950/60 rounded-lg border border-slate-800">
+              <span className="font-semibold text-slate-100 block">16:9 Landscape Video</span>
+              <span className="text-slate-400">Best for wide video footages & cinema clips (800x450px).</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Composer Action Toolbar */}
+      <div className="flex items-center justify-between pt-3 border-t border-slate-800/60">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/60 bg-slate-900/40 border border-slate-800"
+          >
+            <Upload className="w-4 h-4 text-brand-400" />
+            <span>Upload Image / Footage</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowPostingGuide(!showPostingGuide)}
+            className="p-2 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-brand-300 hover:bg-slate-800/60"
+            title="Posting & Media Advice"
+          >
+            <HelpCircle className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline">Posting Guide</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className={`text-xs ${isOverLimit ? 'text-rose-400 font-bold' : 'text-slate-500'}`}>
+            {characterCount} / {maxCharacters}
+          </span>
+
+          <Button
+            size="sm"
+            onClick={() => createPostMutation.mutate()}
+            isLoading={createPostMutation.isPending}
+            disabled={!isValid}
+            rightIcon={<Sparkles className="w-4 h-4" />}
+          >
+            Post
+          </Button>
+        </div>
+      </div>
+
+      {/* Media Cropper Modal */}
+      {selectedRawImage && (
+        <ImageCropperModal
+          isOpen={isCropperOpen}
+          onClose={() => setIsCropperOpen(false)}
+          imageSrc={selectedRawImage}
+          title="Adjust Aspect Ratio & Crop Footage"
+          initialAspectRatio="1:1"
+          onCropComplete={(croppedUrl) => {
+            setImageUrl(croppedUrl);
+          }}
+        />
+      )}
+    </div>
+  );
+};
