@@ -118,7 +118,7 @@ export class PostService {
     }
 
     if (this.postRepo.updatePost) {
-      return this.postRepo.updatePost(postId, { content: updatedContent });
+      return this.postRepo.updatePost(postId, { content: updatedContent ?? undefined });
     }
     return { ...post, content: updatedContent };
   }
