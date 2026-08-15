@@ -1,12 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { Image as ImageIcon, Sparkles, X, Upload, CheckCircle2, AlertCircle, Crop as CropIcon, HelpCircle, Film } from 'lucide-react';
+import { Image as ImageIcon, Sparkles, X, Upload, CheckCircle2, AlertCircle, HelpCircle, Film, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.js';
 import { Avatar } from '../ui/Avatar.js';
 import { Button } from '../ui/Button.js';
-import { ImageCropperModal } from '../ui/ImageCropperModal.js';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { postsApi } from '../../api/posts.api.js';
-import { readMediaAsDataUrl } from '../../utils/mediaUpload.js';
+import { mediaApi } from '../../api/media.api.js';
+import { getMediaUrl, handleImageError } from '../../utils/media.js';
 
 interface PostComposerProps {
   onPostCreated?: () => void;
@@ -17,8 +17,9 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [selectedRawImage, setSelectedRawImage] = useState<string | null>(null);
-  const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   const [showPostingGuide, setShowPostingGuide] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,15 +45,21 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
     if (!file) return;
 
     try {
-      const dataUrl = await readMediaAsDataUrl(file);
-      if (file.type.startsWith('video/')) {
-        setImageUrl(dataUrl);
-      } else {
-        setSelectedRawImage(dataUrl);
-        setIsCropperOpen(true);
-      }
+      setIsUploading(true);
+      setUploadProgress(0);
+      setFeedback(null);
+
+      const kind = file.type.startsWith('video/') ? 'video' : 'photo';
+      const uploadedUrl = await mediaApi.uploadFile(file, kind, (percent) => {
+        setUploadProgress(percent);
+      });
+
+      setImageUrl(uploadedUrl);
+      setFeedback({ type: 'success', text: 'Media file uploaded successfully!' });
     } catch (err: any) {
-      setFeedback({ type: 'error', text: err.message || 'Media file validation failed' });
+      setFeedback({ type: 'error', text: err.message || 'Media upload failed' });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -61,12 +68,12 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
   const characterCount = content.length;
   const maxCharacters = 2000;
   const isOverLimit = characterCount > maxCharacters;
-  const isValid = (content.trim().length > 0 || imageUrl.trim().length > 0) && !isOverLimit;
+  const isValid = (content.trim().length > 0 || imageUrl.trim().length > 0) && !isOverLimit && !isUploading;
 
-  const isVideoMedia = imageUrl && (
-    imageUrl.startsWith('data:video/') || 
-    imageUrl.includes('/uploads/videos/') || 
-    /\.(mp4|webm|mov|mkv|avi)$/i.test(imageUrl)
+  const resolvedMediaUrl = getMediaUrl(imageUrl);
+  const isVideoMedia = resolvedMediaUrl && (
+    resolvedMediaUrl.includes('/uploads/videos/') || 
+    /\.(mp4|webm|mov|mkv|avi)$/i.test(resolvedMediaUrl)
   );
 
   return (
@@ -105,7 +112,7 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
             className="w-full bg-transparent border-none text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-0 resize-none"
           />
 
-          {/* Hidden File Picker Input - Accepts BOTH Images AND Videos */}
+          {/* Hidden File Picker Input */}
           <input
             type="file"
             ref={fileInputRef}
@@ -114,31 +121,40 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
             onChange={handleFileUpload}
           />
 
-          {/* Local File Media Preview (Image or Video) */}
-          {imageUrl && (
-            <div className="relative rounded-xl overflow-hidden max-h-64 border border-brand-500/50 group bg-slate-950">
+          {/* Upload Progress Bar */}
+          {isUploading && (
+            <div className="space-y-1.5 p-3 bg-slate-900/90 border border-brand-500/30 rounded-xl">
+              <div className="flex items-center justify-between text-xs text-brand-300 font-semibold">
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-brand-400" />
+                  Uploading media...
+                </span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-brand-500 to-aurora-cyan transition-all duration-200"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Media Preview Card */}
+          {resolvedMediaUrl && !isUploading && (
+            <div className="relative rounded-xl overflow-hidden max-h-64 border border-slate-800 group bg-slate-950">
               {isVideoMedia ? (
-                <video src={imageUrl} controls className="w-full max-h-64 object-cover" />
+                <video src={resolvedMediaUrl} controls className="w-full max-h-64 object-cover" />
               ) : (
-                <img src={imageUrl} alt="Uploaded local preview" className="w-full h-full object-cover" />
+                <img
+                  src={resolvedMediaUrl}
+                  alt="Uploaded media preview"
+                  onError={handleImageError}
+                  className="w-full h-full object-cover"
+                />
               )}
               
-              <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
-                {!isVideoMedia && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedRawImage(imageUrl);
-                      setIsCropperOpen(true);
-                    }}
-                    className="px-2.5 py-1 bg-slate-900/90 text-slate-200 hover:text-white hover:bg-brand-600 rounded-lg text-xs font-semibold flex items-center gap-1 backdrop-blur-md transition-colors border border-slate-700/80 shadow-lg"
-                    title="Adjust Aspect Ratio & Crop"
-                  >
-                    <CropIcon className="w-3.5 h-3.5 text-brand-400" />
-                    <span>Adjust Ratio</span>
-                  </button>
-                )}
-
+              <div className="absolute top-2 right-2 z-10">
                 <button
                   type="button"
                   onClick={() => setImageUrl('')}
@@ -167,15 +183,15 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] pt-1">
             <div className="p-2 bg-slate-950/60 rounded-lg border border-slate-800">
               <span className="font-semibold text-slate-100 block">1:1 Square Ratio</span>
-              <span className="text-slate-400">Best for Instagram-style Grid posts (600x600px).</span>
+              <span className="text-slate-400">Best for Instagram-style Grid posts.</span>
             </div>
             <div className="p-2 bg-slate-950/60 rounded-lg border border-slate-800">
               <span className="font-semibold text-slate-100 block">4:5 Mobile Portrait</span>
-              <span className="text-slate-400">Maximizes vertical feed space on smartphones (600x750px).</span>
+              <span className="text-slate-400">Maximizes vertical feed space.</span>
             </div>
             <div className="p-2 bg-slate-950/60 rounded-lg border border-slate-800">
               <span className="font-semibold text-slate-100 block">16:9 Landscape Video</span>
-              <span className="text-slate-400">Best for wide video footages & cinema clips (800x450px).</span>
+              <span className="text-slate-400">Best for wide video footages & cinema clips.</span>
             </div>
           </div>
         </div>
@@ -187,10 +203,11 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
             className="p-2 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/60 bg-slate-900/40 border border-slate-800"
           >
             <Upload className="w-4 h-4 text-brand-400" />
-            <span>Upload Image / Footage</span>
+            <span>{isUploading ? 'Uploading...' : 'Upload Image / Footage'}</span>
           </button>
 
           <button
@@ -220,20 +237,6 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
           </Button>
         </div>
       </div>
-
-      {/* Media Cropper Modal */}
-      {selectedRawImage && (
-        <ImageCropperModal
-          isOpen={isCropperOpen}
-          onClose={() => setIsCropperOpen(false)}
-          imageSrc={selectedRawImage}
-          title="Adjust Aspect Ratio & Crop Footage"
-          initialAspectRatio="1:1"
-          onCropComplete={(croppedUrl) => {
-            setImageUrl(croppedUrl);
-          }}
-        />
-      )}
     </div>
   );
 };

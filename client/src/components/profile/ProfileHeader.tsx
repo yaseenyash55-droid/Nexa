@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext.js';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '../../api/users.api.js';
+import { getMediaUrl, handleImageError } from '../../utils/media.js';
 
 interface ProfileHeaderProps {
   user: User;
@@ -34,15 +35,18 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user, onEditClick 
   });
 
   const joinedDate = user.createdAt ? new Date(user.createdAt) : new Date();
+  const coverUrl = getMediaUrl(user.coverImageUrl);
+  const avatarUrl = getMediaUrl(user.profileImageUrl);
 
   return (
     <div className="border-b border-slate-800/80 bg-background-card/20 pb-4">
       {/* Cover Banner */}
-      <div className="h-44 sm:h-56 w-full bg-gradient-to-r from-slate-900 via-brand-900/40 to-slate-900 relative">
-        {user.coverImageUrl && (
+      <div className="h-44 sm:h-56 w-full bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 relative overflow-hidden">
+        {coverUrl && (
           <img
-            src={user.coverImageUrl.startsWith('/uploads') && window.location.origin.includes('surge.sh') ? `https://pick-sims-regions-plaza.trycloudflare.com${user.coverImageUrl}` : user.coverImageUrl}
+            src={coverUrl}
             alt="Cover banner"
+            onError={handleImageError}
             className="w-full h-full object-cover"
           />
         )}
@@ -52,10 +56,10 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user, onEditClick 
       <div className="px-4 sm:px-6 relative flex justify-between items-end -mt-16 sm:-mt-20 mb-4">
         <div className="relative">
           <Avatar
-            src={user.profileImageUrl}
+            src={avatarUrl}
             name={user.displayName}
             size="xl"
-            className="ring-4 ring-background shadow-2xl"
+            className="ring-4 ring-slate-950 shadow-2xl"
           />
         </div>
 
