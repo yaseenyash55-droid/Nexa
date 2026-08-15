@@ -13,12 +13,12 @@ import {
   ArrowRight, 
   Users, 
   Radio, 
-  Lock, 
   CheckCircle2, 
-  Heart, 
-  Bookmark, 
-  Phone, 
-  Video 
+  Camera, 
+  Video, 
+  Film, 
+  Loader2, 
+  Sparkles 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -47,90 +47,152 @@ export const UserManualPage: React.FC = () => {
   const sections: ManualSection[] = [
     {
       id: 'getting-started',
-      title: '1. Getting Started (Account & Profile)',
+      title: '1. Getting Started & Account Setup',
       category: 'Account',
       icon: UserPlus,
       color: 'text-indigo-400',
       bg: 'bg-indigo-500/10 border-indigo-500/20',
-      summary: 'Learn how to create an account, log in securely, and customize your user profile.',
+      summary: 'Learn how to create an account, log in securely, and start using Nexa.',
       targetRoute: '/settings',
       actionLabel: 'Edit Profile Settings',
       steps: [
         {
-          title: 'Step 1: Create an Account',
-          desc: 'Click "Sign up" on the login screen, enter your desired username, email, and password, then submit to register.'
+          title: 'Step 1: Account Registration',
+          desc: 'Click "Sign up" on the login screen, enter your username, email, and password, then submit to register.'
         },
         {
-          title: 'Step 2: Log In to Your Session',
-          desc: 'Use your registered username or email and password. JWT access and refresh tokens will be stored securely.'
+          title: 'Step 2: Session Authentication',
+          desc: 'Log in with your registered username or email. JWT access tokens (15-min expiry) and HTTP-only refresh tokens will be stored securely.'
         },
         {
-          title: 'Step 3: Customize Profile & Avatar',
-          desc: 'Navigate to Profile or Settings -> Account Profile to upload your profile avatar image, add a bio, and specify location.'
+          title: 'Step 3: User Dashboard Navigation',
+          desc: 'Use the left sidebar navigation (or bottom navigation bar on mobile) to access Home Feed, Explore, Messages, User Manual, Profile, and Settings.'
+        }
+      ]
+    },
+    {
+      id: 'profile-uploads',
+      title: '2. Instagram-Style Profile Photo & Banner Uploads',
+      category: 'Profile',
+      icon: Camera,
+      color: 'text-cyan-400',
+      bg: 'bg-cyan-500/10 border-cyan-500/20',
+      summary: 'Upload profile photos and cover banners using FormData file streaming and instant previews.',
+      targetRoute: '/profile/vash_ofzl',
+      actionLabel: 'Open Profile Editor',
+      steps: [
+        {
+          title: 'Step 1: Open Edit Profile Modal',
+          desc: 'Navigate to your Profile page and click the "Edit Profile" button to launch the Instagram-style profile editor.'
+        },
+        {
+          title: 'Step 2: Change Profile Photo',
+          desc: 'Hover over the circular avatar card and click "Change Photo". Pick a 1:1 square image (JPEG/PNG/WebP). An instant circular preview will display.'
+        },
+        {
+          title: 'Step 3: Change Cover Banner',
+          desc: 'Hover over the wide cover banner area and click "Change Banner". Select a wide image (3:1 or 16:9 ratio).'
+        },
+        {
+          title: 'Step 4: Multipart FormData Streaming',
+          desc: 'Files stream directly to `/api/media/upload` using FormData. The backend saves static files under `/uploads/` and returns public URLs. No large base64 strings bloat the database.'
         }
       ]
     },
     {
       id: 'posts-and-feed',
-      title: '2. Posts & Feed Management',
+      title: '3. Publishing Posts & Feed Management',
       category: 'Feed',
       icon: Edit3,
-      color: 'text-cyan-400',
-      bg: 'bg-cyan-500/10 border-cyan-500/20',
-      summary: 'How to create posts, upload media, like, comment, and bookmark posts.',
+      color: 'text-emerald-400',
+      bg: 'bg-emerald-500/10 border-emerald-500/20',
+      summary: 'How to create text and media posts, like, comment, bookmark, and switch feed views.',
       targetRoute: '/explore',
       actionLabel: 'Explore Feed Now',
       steps: [
         {
           title: 'Step 1: Create a Post',
-          desc: 'Click "Create Post" in the sidebar or mobile action bar. Type text (up to 2,200 characters) and attach images or video.'
+          desc: 'Click "Create Post" at the top of the feed or in the sidebar. Type text up to 2,000 characters and optionally attach media.'
         },
         {
-          title: 'Step 2: Like & Comment',
-          desc: 'Tap the Heart icon on any post card to like it. Click the Comment icon to participate in discussions.'
+          title: 'Step 2: Like, Comment & Share',
+          desc: 'Tap the Heart icon on any post card to like it. Click the Comment icon to open the interactive discussion drawer.'
         },
         {
-          title: 'Step 3: Bookmark Content',
-          desc: 'Click the Bookmark icon on posts to save them to your private collection under Settings -> Bookmarks.'
+          title: 'Step 3: Bookmark Posts',
+          desc: 'Click the Bookmark icon on any post card to save it to your private bookmarks collection in Settings -> Bookmarks.'
         },
         {
-          title: 'Step 4: Switch Global vs Following Feed',
-          desc: 'Use top tabs on Home Feed to switch between global posts and updates strictly from users you follow.'
+          title: 'Step 4: Global vs Following Feed Tabs',
+          desc: 'Use top tabs on Home Feed to switch between global community updates and posts strictly from users you follow.'
         }
       ]
     },
     {
-      id: 'direct-messages',
-      title: '3. Direct Messages & WebRTC Calls',
+      id: 'progress-media-and-videos',
+      title: '4. Progress-Tracked Media & Long Video Uploads',
+      category: 'Media',
+      icon: Video,
+      color: 'text-purple-400',
+      bg: 'bg-purple-500/10 border-purple-500/20',
+      summary: 'Stream images and videos with live percentage progress bars (0% -> 100%) and automatic duration detection.',
+      targetRoute: '/reels',
+      actionLabel: 'Upload Reel / Video',
+      steps: [
+        {
+          title: 'Step 1: File Size & Format Validation',
+          desc: 'The upload pipeline enforces strict validation: photos up to 50MB and videos up to 500MB (MP4, WebM, MOV, MKV).'
+        },
+        {
+          title: 'Step 2: Real-Time Percentage Progress Bar',
+          desc: 'While files stream via `FormData` to `/api/media/upload`, Axios `onUploadProgress` updates a live percentage bar (0% -> 100%).'
+        },
+        {
+          title: 'Step 3: Automatic Video Duration Detection',
+          desc: 'When selecting a video file, the system inspects video metadata (`video.duration`):'
+        },
+        {
+          title: 'Short Reels (< 60 seconds)',
+          desc: 'Videos under 60 seconds are automatically labeled as "Short Reel" and formatted for vertical 9:16 viewing.'
+        },
+        {
+          title: 'Long Videos (≥ 60 seconds)',
+          desc: 'Videos 60 seconds or longer are automatically labeled as "Long Video" with expanded playback controls.'
+        }
+      ]
+    },
+    {
+      id: 'direct-messages-e2ee',
+      title: '5. Direct Messages & 256-bit AES-GCM Encryption',
       category: 'Messaging',
       icon: MessageSquare,
       color: 'text-emerald-400',
       bg: 'bg-emerald-500/10 border-emerald-500/20',
-      summary: 'Send 1-on-1 end-to-end encrypted direct messages and start phone or video calls.',
+      summary: 'Send 1-on-1 direct messages encrypted in your browser before transmission.',
       targetRoute: '/messages',
       actionLabel: 'Open Direct Messages',
       steps: [
         {
-          title: 'Step 1: Select a Contact',
-          desc: 'Navigate to Messages and pick a contact from the sidebar list.'
+          title: 'Step 1: Client-Side Web Crypto API',
+          desc: 'Direct messages use native `window.crypto.subtle` in the browser or `javax.crypto.Cipher` on Android.'
         },
         {
-          title: 'Step 2: End-to-End Encryption (E2EE)',
-          desc: 'Direct messages are encrypted in your browser using 256-bit AES-GCM prior to transmission. A green lock icon verifies security.'
+          title: 'Step 2: Key Derivation (PBKDF2)',
+          desc: 'A 256-bit AES-GCM key is derived locally using PBKDF2 with HMAC-SHA-256 (100,000 iterations) from sorted conversation user IDs.'
         },
         {
-          title: 'Step 3: Real-Time Typing Indicators',
-          desc: 'When typing in the input field, the server broadcasts debounced typing indicators ("User is typing...").'
+          title: 'Step 3: Zero Plaintext Database Storage',
+          desc: 'Messages are stored in Oracle SQL as `E2EE::<iv_hex>::<ciphertext_hex>`. Server administrators cannot read private chat content.'
         },
         {
-          title: 'Step 4: Initiate WebRTC Voice / Video Calls',
-          desc: 'Click the "Phone Call" or "Video Call" buttons in the chat header to initiate peer-to-peer WebRTC calls.'
+          title: 'Step 4: Real-Time Typing Indicators',
+          desc: 'When typing in chat, Socket.IO broadcasts debounced typing start/stop events ("User is typing...").'
         }
       ]
     },
     {
       id: 'groups-and-broadcasts',
-      title: '4. Group Chats & Message Broadcasts',
+      title: '6. Group Chats & Message Broadcast Lists',
       category: 'Messaging',
       icon: Users,
       color: 'text-indigo-400',
@@ -144,52 +206,52 @@ export const UserManualPage: React.FC = () => {
           desc: 'In Messages, click "+ Group", enter a Group Name & description, select member contacts, and submit.'
         },
         {
-          title: 'Step 2: Chat in Group Room',
+          title: 'Step 2: Real-Time Group Messaging',
           desc: 'Group messages are delivered instantly via Socket.IO to all active group members.'
         },
         {
-          title: 'Step 3: Dispatch Broadcast Announcements',
-          desc: 'Click "Broadcast", select recipient contacts, write your message, and click "Dispatch".'
+          title: 'Step 3: Send Broadcast Announcements',
+          desc: 'Click "Broadcast", select recipient contacts, write your announcement, and click "Dispatch".'
         },
         {
-          title: 'Step 4: Privacy Guarantee',
-          desc: 'Broadcasts arrive as 1-on-1 direct messages for each recipient without exposing recipient lists.'
+          title: 'Step 4: WhatsApp-Style Fan-Out',
+          desc: 'Broadcasts arrive as individual 1-on-1 direct messages for each recipient without exposing recipient lists.'
         }
       ]
     },
     {
       id: 'security-and-privacy',
-      title: '5. Security, Privacy & E2EE Architecture',
+      title: '7. Security, Privacy & Academic Viva Reference Guide',
       category: 'Security',
       icon: ShieldCheck,
       color: 'text-emerald-400',
       bg: 'bg-emerald-500/10 border-emerald-500/20',
-      summary: 'Academic viva explanation of client-side cryptography, JWT tokens, and Oracle DB storage.',
+      summary: 'Key technical notes on Oracle SQL database design, Node.js controllers, and security architecture for project viva.',
       targetRoute: '/settings',
       actionLabel: 'Security Settings',
       steps: [
         {
-          title: 'Client-Side Web Crypto API',
-          desc: 'Nexa uses native `window.crypto.subtle` or Android `javax.crypto.Cipher` (AES-256-GCM + PBKDF2 with 100,000 iterations).'
+          title: 'Oracle 19c/21c Database Schema',
+          desc: 'Primary keys use identity columns (`NUMBER GENERATED BY DEFAULT AS IDENTITY`). Boolean flags use `NUMBER(1) CHECK (col IN (0,1))`.'
         },
         {
-          title: 'Zero Plaintext Storage',
-          desc: 'The database server only stores ciphertext formatted as `E2EE::<iv>::<cipher>`. Administrators cannot inspect message content.'
+          title: 'Layered Backend Architecture',
+          desc: 'Strict separation: Routes -> Validation Middleware -> Controller -> Service -> Repository -> Data Source (Oracle / Mock).'
         },
         {
-          title: 'Authentication Security',
-          desc: 'JWT access tokens expire after 15 minutes, supported by HTTP-only refresh tokens and EncryptedSharedPreferences on Android.'
+          title: 'Sanitized Static Media URLs',
+          desc: 'All static uploads resolve via `getMediaUrl(url)` with fallback SVG graphics to prevent broken image links.'
         }
       ]
     },
     {
       id: 'android-app-guide',
-      title: '6. Nexa Android Mobile Application',
+      title: '8. Nexa Native Android Mobile Application',
       category: 'Mobile',
       icon: Smartphone,
       color: 'text-purple-400',
       bg: 'bg-purple-500/10 border-purple-500/20',
-      summary: 'How to install and use the native Android (.apk) mobile application.',
+      summary: 'Features, APK installation, Socket.IO client, push notifications, and offline connectivity.',
       targetRoute: '/help',
       actionLabel: 'Download Android APK',
       steps: [
@@ -198,16 +260,16 @@ export const UserManualPage: React.FC = () => {
           desc: 'Click the "Android App (Download APK)" link in the sidebar or download `nexa-social-app.apk`.'
         },
         {
-          title: 'Step 2: Native Bottom Navigation',
-          desc: 'Use bottom navigation tabs for Home, Explore, Messages, Reels, and Profile.'
+          title: 'Step 2: Official Socket.IO Java Client',
+          desc: 'Integrates `io.socket:socket.io-client:2.1.1` with JWT token handshake authentication for real-time messages.'
         },
         {
-          title: 'Step 3: Background Push Notifications',
-          desc: 'System notifications alert you when new messages arrive while the app is in the background.'
+          title: 'Step 3: Native E2EE Cryptography',
+          desc: 'Uses native Java `javax.crypto.Cipher` (AES-256-GCM + PBKDF2 100,000 iterations) fully compatible with the web app.'
         },
         {
-          title: 'Step 4: Offline Detection & Auto-Reconnect',
-          desc: 'An integrated offline banner alerts you when network drops and automatically reloads content when connected.'
+          title: 'Step 4: Network Callback Offline Detection',
+          desc: 'Monitors Android `ConnectivityManager` callbacks. If connection drops, a native offline state banner displays with auto-reconnect.'
         }
       ]
     }
@@ -231,7 +293,7 @@ export const UserManualPage: React.FC = () => {
             Nexa Project User Manual
           </h1>
           <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">
-            Learn how to use Nexa step by step. Explore guides on account setup, post publishing, 256-bit AES-GCM End-to-End Encrypted messaging, group chats, broadcasts, and the Android mobile app.
+            Learn how to use Nexa step by step. Explore guides on account setup, Instagram profile uploads, progress-tracked media streaming, short Reels vs Long Videos, 256-bit AES-GCM encrypted messaging, group chats, broadcasts, and the Android mobile app.
           </p>
 
           {/* Search Box */}
