@@ -18,5 +18,14 @@ export const oracleRepositoryManager: IRepositoryManager = {
   reelRepo: new OracleReelRepository(),
   messageRepo: new OracleMessageRepository(),
   authRepo: new OracleAuthRepository(),
-  securityRepo: new OracleSecurityRepository()
+  securityRepo: new OracleSecurityRepository(),
+  get users() { return this.userRepo; },
+  get posts() { return this.postRepo; },
+  get comments() { return this.commentRepo; },
+  get notifications() { return this.notificationRepo; },
+  get stories() { return this.storyRepo; },
+  get reels() { return this.reelRepo; },
+  get messages() { return this.messageRepo; },
+  get auth() { return this.authRepo; },
+  get security() { return this.securityRepo; }
 };

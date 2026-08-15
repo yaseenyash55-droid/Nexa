@@ -232,5 +232,14 @@ export const mockRepositoryManager: IRepositoryManager = {
   reelRepo: new MockReelRepository(),
   messageRepo: new MockMessageRepository(),
   authRepo: new MockAuthRepository(),
-  securityRepo: new MockSecurityRepository()
+  securityRepo: new MockSecurityRepository(),
+  get users() { return this.userRepo; },
+  get posts() { return this.postRepo; },
+  get comments() { return this.commentRepo; },
+  get notifications() { return this.notificationRepo; },
+  get stories() { return this.storyRepo; },
+  get reels() { return this.reelRepo; },
+  get messages() { return this.messageRepo; },
+  get auth() { return this.authRepo; },
+  get security() { return this.securityRepo; }
 };

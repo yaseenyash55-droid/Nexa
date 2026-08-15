@@ -151,5 +151,14 @@ export interface IRepositoryManager {
   messageRepo: IMessageRepository;
   authRepo: IAuthRepository;
   securityRepo: ISecurityRepository;
+  users: IUserRepository;
+  posts: IPostRepository;
+  comments: ICommentRepository;
+  notifications: INotificationRepository;
+  stories: IStoryRepository;
+  reels: IReelRepository;
+  messages: IMessageRepository;
+  auth: IAuthRepository;
+  security: ISecurityRepository;
 }
 

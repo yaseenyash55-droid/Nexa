@@ -20,7 +20,7 @@ export class NexaRealtimeServer {
       return {
         userId: decoded.userId,
         username: decoded.username,
-        email: decoded.email
+        email: decoded.email || ''
       };
     } catch {
       return null;

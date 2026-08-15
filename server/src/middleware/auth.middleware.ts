@@ -1,33 +1,84 @@
 import { Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../types/index.js';
 import { verifyAccessToken } from '../utils/jwt.js';
-import { sendError } from '../utils/response.js';
+import { AuthenticatedRequest } from '../types/index.js';
 
 export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return sendError(res, 'UNAUTHORIZED', 'Authentication token required', 401);
+  try {
+    let token: string | undefined;
+
+    // 1. Check Authorization Bearer Header
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
+
+    // 2. Fallback to HttpOnly Cookie
+    if (!token && req.cookies?.accessToken) {
+      token = req.cookies.accessToken;
+    }
+
+    if (!token) {
+      return res.status(401).json({
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication token required',
+          details: []
+        }
+      });
+    }
+
+    // 3. Verify JWT Access Token
+    const decoded = verifyAccessToken(token);
+    if (!decoded) {
+      return res.status(401).json({
+        error: {
+          code: 'INVALID_TOKEN',
+          message: 'Invalid or expired access token',
+          details: []
+        }
+      });
+    }
+
+    req.user = {
+      userId: decoded.userId,
+      username: decoded.username,
+      email: decoded.email
+    };
+
+    return next();
+  } catch (err: any) {
+    return res.status(401).json({
+      error: {
+        code: 'INVALID_TOKEN',
+        message: 'Invalid or expired access token',
+        details: []
+      }
+    });
   }
-
-  const token = authHeader.substring(7);
-  const payload = verifyAccessToken(token);
-
-  if (!payload) {
-    return sendError(res, 'UNAUTHORIZED', 'Invalid or expired access token', 401);
-  }
-
-  req.user = payload;
-  next();
 }
 
 export function optionalAuth(req: AuthenticatedRequest, _res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7);
-    const payload = verifyAccessToken(token);
-    if (payload) {
-      req.user = payload;
+  try {
+    let token: string | undefined;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else if (req.cookies?.accessToken) {
+      token = req.cookies.accessToken;
     }
+
+    if (token) {
+      const decoded = verifyAccessToken(token);
+      if (decoded) {
+        req.user = {
+          userId: decoded.userId,
+          username: decoded.username,
+          email: decoded.email
+        };
+      }
+    }
+  } catch {
+    // Ignore invalid optional tokens
   }
-  next();
+  return next();
 }

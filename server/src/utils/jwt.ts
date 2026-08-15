@@ -1,12 +1,11 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { env } from '../config/env.js';
-import { AuthTokens } from '../types/index.js';
 
 export interface TokenPayload {
   userId: number;
   username: string;
-  email: string;
+  email?: string;
 }
 
 export function generateAccessToken(payload: TokenPayload): string {
@@ -15,13 +14,34 @@ export function generateAccessToken(payload: TokenPayload): string {
   });
 }
 
-export function generateRefreshToken(): string {
+export function signAccessToken(payload: TokenPayload): string {
+  return generateAccessToken(payload);
+}
+
+export function generateRefreshToken(payload?: TokenPayload): string {
+  if (payload) {
+    return jwt.sign(payload, env.JWT_REFRESH_SECRET, {
+      expiresIn: '7d'
+    });
+  }
   return crypto.randomBytes(40).toString('hex');
+}
+
+export function signRefreshToken(payload: TokenPayload): string {
+  return generateRefreshToken(payload);
 }
 
 export function verifyAccessToken(token: string): TokenPayload | null {
   try {
     return jwt.verify(token, env.JWT_ACCESS_SECRET) as TokenPayload;
+  } catch {
+    return null;
+  }
+}
+
+export function verifyRefreshToken(token: string): TokenPayload | null {
+  try {
+    return jwt.verify(token, env.JWT_REFRESH_SECRET) as TokenPayload;
   } catch {
     return null;
   }
