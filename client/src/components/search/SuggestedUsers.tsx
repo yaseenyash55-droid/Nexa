@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.js';
 
 export const SuggestedUsers: React.FC = () => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, requireAuth } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: suggestions, isLoading } = useQuery({
@@ -46,7 +46,7 @@ export const SuggestedUsers: React.FC = () => {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => followMutation.mutate(user.userId)}
+              onClick={() => requireAuth(() => followMutation.mutate(user.userId), `Log in to follow @${user.username}.`)}
               isLoading={followMutation.isPending}
             >
               Follow

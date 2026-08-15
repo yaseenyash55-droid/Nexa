@@ -16,6 +16,9 @@ export interface User {
   followersCount?: number;
   followingCount?: number;
   isFollowing?: boolean;
+  failedLoginAttempts?: number;
+  firstFailedAttemptAt?: string | null;
+  lockoutUntil?: string | null;
 }
 
 export interface Post {

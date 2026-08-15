@@ -29,6 +29,8 @@ export interface IUserRepository {
   isFollowing(followerId: number, followingId: number): Promise<boolean>;
   getFollowers(userId: number, currentUserId?: number): Promise<User[]>;
   getFollowing(userId: number, currentUserId?: number): Promise<User[]>;
+  updateLockoutState(userId: number, failedLoginAttempts: number, firstFailedAttemptAt: Date | null, lockoutUntil: Date | null): Promise<void>;
+  resetLockoutState(userId: number): Promise<void>;
 }
 
 export interface IPostRepository {

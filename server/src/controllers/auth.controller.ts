@@ -86,7 +86,7 @@ export class AuthController {
 
   async logout(req: Request, res: Response, next: NextFunction) {
     try {
-      const refreshToken = req.cookies.nexa_refresh_token || req.body.refreshToken;
+      const refreshToken = req.cookies?.nexa_refresh_token || req.body?.refreshToken;
       await authService.logout(refreshToken);
       res.clearCookie('nexa_refresh_token');
       return sendSuccess(res, null, 'Logged out successfully');

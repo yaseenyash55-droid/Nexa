@@ -130,8 +130,7 @@ export class PostService {
     }
     
     // Check if requesting user is post author or admin user (IDs 100, 101, 102)
-    const isAdmin = [100, 101, 102].includes(userId);
-    if (post.userId !== userId && !isAdmin) {
+    if (post.userId !== userId) {
       throw { statusCode: 403, code: 'FORBIDDEN', message: 'You can only delete your own posts' };
     }
 

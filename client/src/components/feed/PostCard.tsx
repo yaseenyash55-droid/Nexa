@@ -16,7 +16,7 @@ interface PostCardProps {
 }
 
 export const PostCard: React.FC<PostCardProps> = ({ post }) => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, requireAuth } = useAuth();
   const queryClient = useQueryClient();
   const [showComments, setShowComments] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -181,7 +181,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       <div className="mt-4 flex items-center justify-between pt-2 text-slate-400 text-xs border-t border-slate-800/50">
         <div className="flex items-center gap-6">
           <button
-            onClick={() => likeMutation.mutate()}
+            onClick={() => requireAuth(() => likeMutation.mutate(), 'Log in to like posts and show appreciation.')}
             className={`flex items-center gap-1.5 transition-colors ${
               isLiked ? 'text-rose-500 font-semibold' : 'hover:text-rose-400'
             }`}
@@ -213,7 +213,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
           </button>
 
           <button
-            onClick={() => bookmarkMutation.mutate()}
+            onClick={() => requireAuth(() => bookmarkMutation.mutate(), 'Log in to save posts to your bookmarks.')}
             className={`p-1.5 rounded-lg transition-colors ${
               isBookmarked ? 'text-brand-400' : 'hover:text-brand-400'
             }`}

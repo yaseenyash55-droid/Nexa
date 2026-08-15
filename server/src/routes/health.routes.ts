@@ -10,9 +10,13 @@ const router = Router();
  * Fast process check for Kubernetes / PM2 liveness probe.
  * Does NOT perform DB queries or expose credentials.
  */
-router.get('/', (_req, res) => {
+router.get('/', async (_req, res) => {
+  const isOracle = env.DATA_SOURCE === 'oracle';
+  const dbHealth = isOracle ? await checkOracleHealth() : { reachable: true, details: 'Running in MOCK mode' };
   return sendSuccess(res, {
     status: 'ok',
+    mode: env.DATA_SOURCE,
+    database: { reachable: dbHealth.reachable },
     timestamp: new Date().toISOString()
   }, 'Process liveness check');
 });

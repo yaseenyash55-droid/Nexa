@@ -69,15 +69,20 @@ export const ReelsPage: React.FC = () => {
             </h1>
             <p className="text-xs text-slate-400">Discover trending video reels and clips</p>
           </div>
-          {user && (
-            <Button
-              size="sm"
-              onClick={() => setIsAddReelOpen(true)}
-              leftIcon={<Plus className="w-4 h-4" />}
-            >
-              Create Reel
-            </Button>
-          )}
+          <Button
+            size="sm"
+            onClick={() => {
+              if (user) {
+                setIsAddReelOpen(true);
+              } else {
+                alert('🔒 Authentication Required\n\nPlease log in to upload and share video reels.');
+                window.location.href = '/login';
+              }
+            }}
+            leftIcon={<Plus className="w-4 h-4" />}
+          >
+            Create Reel
+          </Button>
         </div>
 
         {/* Reels Vertical Scroll Feed */}
@@ -92,11 +97,19 @@ export const ReelsPage: React.FC = () => {
             <p className="text-xs text-slate-400 max-w-sm">
               Be the first in your network to record and share a video reel!
             </p>
-            {user && (
-              <Button size="sm" onClick={() => setIsAddReelOpen(true)}>
-                Upload First Reel
-              </Button>
-            )}
+            <Button
+              size="sm"
+              onClick={() => {
+                if (user) {
+                  setIsAddReelOpen(true);
+                } else {
+                  alert('🔒 Authentication Required\n\nPlease log in to upload video reels.');
+                  window.location.href = '/login';
+                }
+              }}
+            >
+              Upload First Reel
+            </Button>
           </div>
         ) : (
           <div className="space-y-8">
@@ -167,6 +180,7 @@ export const ReelsPage: React.FC = () => {
 };
 
 const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => void }> = ({ reel, isMuted, onToggleMute }) => {
+  const { requireAuth } = useAuth();
   const queryClient = useQueryClient();
   const [isLiked, setIsLiked] = useState(reel.isLiked || false);
   const [likesCount, setLikesCount] = useState(reel.likesCount || 0);
@@ -219,7 +233,7 @@ const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => voi
       {/* Right Side Action Floating Bar */}
       <div className="absolute right-4 bottom-12 z-20 flex flex-col items-center gap-5">
         <button
-          onClick={() => likeMutation.mutate()}
+          onClick={() => requireAuth(() => likeMutation.mutate(), 'Log in to like video reels.')}
           className="flex flex-col items-center gap-1 text-white group"
         >
           <div className={`p-3 rounded-full backdrop-blur-md transition-transform group-hover:scale-110 ${

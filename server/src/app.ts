@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
@@ -17,10 +18,17 @@ import { errorHandler } from './middleware/error.middleware.js';
 
 export const app = express();
 
+const ALLOWED_ORIGINS = [
+  'https://nexa-social-app.surge.sh',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+
 app.use(cors({
-  origin: true,
+  origin: ALLOWED_ORIGINS,
   credentials: true
 }));
+app.use(helmet());
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 app.use(cookieParser());

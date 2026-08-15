@@ -1,9 +1,11 @@
 import React from 'react';
-import { Sparkles, Search, Settings, ShieldCheck } from 'lucide-react';
+import { Sparkles, Search, Settings, ShieldCheck, LogIn } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext.js';
 
 export const TopBar: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   return (
     <header className="md:hidden sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 flex items-center justify-between">
@@ -46,6 +48,16 @@ export const TopBar: React.FC = () => {
         >
           <Settings className="w-5 h-5" />
         </button>
+
+        {!user && (
+          <button
+            onClick={() => navigate('/login')}
+            className="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Log in</span>
+          </button>
+        )}
       </div>
     </header>
   );

@@ -14,7 +14,7 @@ interface ProfileHeaderProps {
 }
 
 export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user, onEditClick }) => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, requireAuth } = useAuth();
   const queryClient = useQueryClient();
 
   const isSelf = currentUser?.userId === user.userId;
@@ -64,16 +64,14 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user, onEditClick 
             Edit Profile
           </Button>
         ) : (
-          currentUser && (
-            <Button
-              variant={isFollowing ? 'outline' : 'primary'}
-              size="sm"
-              onClick={() => followMutation.mutate()}
-              isLoading={followMutation.isPending}
-            >
-              {isFollowing ? 'Following' : 'Follow'}
-            </Button>
-          )
+          <Button
+            variant={isFollowing ? 'outline' : 'primary'}
+            size="sm"
+            onClick={() => requireAuth(() => followMutation.mutate(), `Log in to follow @${user.username}.`)}
+            isLoading={followMutation.isPending}
+          >
+            {isFollowing ? 'Following' : 'Follow'}
+          </Button>
         )}
       </div>
 

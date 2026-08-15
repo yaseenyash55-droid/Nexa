@@ -36,10 +36,18 @@ export const MobileBottomNavigation: React.FC<MobileBottomNavigationProps> = ({ 
       ))}
 
       {/* Center Create Post Action */}
-      {user && onOpenComposer && (
+      {onOpenComposer && (
         <button
-          onClick={onOpenComposer}
+          onClick={() => {
+            if (user) {
+              onOpenComposer();
+            } else {
+              alert('🔒 Authentication Required\n\nPlease log in to create posts.');
+              window.location.href = '/login';
+            }
+          }}
           className="p-3 bg-brand-600 text-white rounded-full shadow-lg shadow-brand-600/40 transform -translate-y-2"
+          title={user ? 'Create Post' : 'Log in to create post'}
         >
           <PlusCircle className="w-6 h-6" />
         </button>

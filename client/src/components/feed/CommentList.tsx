@@ -4,8 +4,9 @@ import { postsApi } from '../../api/posts.api.js';
 import { Avatar } from '../ui/Avatar.js';
 import { Button } from '../ui/Button.js';
 import { useAuth } from '../../contexts/AuthContext.js';
-import { Trash2, Send } from 'lucide-react';
+import { Trash2, Send, LogIn } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { Link } from 'react-router-dom';
 
 export const CommentList: React.FC<{ postId: number }> = ({ postId }) => {
   const { user: currentUser } = useAuth();
@@ -38,8 +39,8 @@ export const CommentList: React.FC<{ postId: number }> = ({ postId }) => {
 
   return (
     <div className="space-y-4">
-      {/* Comment Input */}
-      {currentUser && (
+      {/* Comment Input or Unauthenticated Banner */}
+      {currentUser ? (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -64,6 +65,17 @@ export const CommentList: React.FC<{ postId: number }> = ({ postId }) => {
             <Send className="w-3.5 h-3.5" />
           </Button>
         </form>
+      ) : (
+        <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between gap-3 text-xs">
+          <span className="text-slate-400">Log in or sign up to join the conversation and comment.</span>
+          <Link
+            to="/login"
+            className="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-lg shrink-0 transition-colors flex items-center gap-1"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Log in</span>
+          </Link>
+        </div>
       )}
 
       {/* Comments List */}

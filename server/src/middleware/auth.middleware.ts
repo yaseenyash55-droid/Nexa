@@ -32,7 +32,7 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
     if (!decoded) {
       return res.status(401).json({
         error: {
-          code: 'INVALID_TOKEN',
+          code: 'UNAUTHORIZED',
           message: 'Invalid or expired access token',
           details: []
         }

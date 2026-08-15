@@ -78,19 +78,23 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onOpenComp
         </nav>
 
         {/* Create Post Button */}
-        {user && onOpenComposer && (
-          <button
-            onClick={onOpenComposer}
-            className="w-full py-2.5 px-4 bg-gradient-to-r from-brand-600 to-aurora-cyan hover:from-brand-500 hover:to-aurora-cyan text-white font-medium rounded-xl shadow-glow-brand flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] text-xs"
-          >
-            <PlusSquare className="w-4 h-4" />
-            <span>Create Post</span>
-          </button>
-        )}
+        <button
+          onClick={() => {
+            if (user) {
+              onOpenComposer?.();
+            } else {
+              navigate('/login');
+            }
+          }}
+          className="w-full py-2.5 px-4 bg-gradient-to-r from-brand-600 to-aurora-cyan hover:from-brand-500 hover:to-aurora-cyan text-white font-medium rounded-xl shadow-glow-brand flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] text-xs"
+        >
+          <PlusSquare className="w-4 h-4" />
+          <span>Create Post</span>
+        </button>
       </div>
 
-      {/* User Profile Footer */}
-      {user && (
+      {/* User Profile / Auth Footer */}
+      {user ? (
         <div className="p-3 border border-slate-800/80 rounded-2xl bg-background-card/60 flex items-center justify-between">
           <div className="flex items-center gap-3 overflow-hidden cursor-pointer" onClick={() => navigate(`/profile/${user.username}`)}>
             <Avatar src={user.profileImageUrl} name={user.displayName} size="md" />
@@ -106,6 +110,24 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onOpenComp
           >
             <LogOut className="w-4 h-4" />
           </button>
+        </div>
+      ) : (
+        <div className="p-3 border border-slate-800/80 rounded-2xl bg-background-card/60 space-y-2">
+          <p className="text-xs font-medium text-slate-300 text-center">Join Nexa Community</p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/login')}
+              className="flex-1 py-2 px-3 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-semibold text-center transition-colors shadow-sm"
+            >
+              Log in
+            </button>
+            <button
+              onClick={() => navigate('/register')}
+              className="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold text-center transition-colors"
+            >
+              Sign up
+            </button>
+          </div>
         </div>
       )}
     </aside>

@@ -28,8 +28,8 @@ export class OracleAuthRepository implements IAuthRepository {
     const row = res.rows[0];
     return {
       userId: row.USER_ID,
-      revokedAt: row.REVOKED_AT || null,
-      expiresAt: row.EXPIRES_AT
+      revokedAt: row.REVOKED_AT ? new Date(row.REVOKED_AT) : null,
+      expiresAt: new Date(row.EXPIRES_AT)
     };
   }
 

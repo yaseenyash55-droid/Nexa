@@ -29,11 +29,37 @@ let mockUsers: User[] = [
     followingCount: 25,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
+  },
+  {
+    userId: 101,
+    username: 'alex',
+    email: 'alex@nexa.app',
+    displayName: 'Alex Rivera',
+    bio: 'Nexa Platform Lead',
+    profileImageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alex',
+    followersCount: 50,
+    followingCount: 20,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    userId: 2,
+    username: 'sarah_design',
+    email: 'sarah@nexa.app',
+    displayName: 'Sarah Chen',
+    bio: 'UI/UX Designer',
+    profileImageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sarah_design',
+    followersCount: 80,
+    followingCount: 15,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   }
 ];
 
 let mockCredentials: Map<number, string> = new Map([
-  [100, bcrypt.hashSync('Leon$yash5', 10)]
+  [100, bcrypt.hashSync('Leon$yash5', 10)],
+  [101, bcrypt.hashSync('Password123!', 10)],
+  [2, bcrypt.hashSync('Password123!', 10)]
 ]);
 
 let mockPosts: Post[] = [
@@ -62,7 +88,7 @@ let mockStories: Story[] = [];
 let mockReels: Reel[] = [];
 let mockMessages: Message[] = [];
 let mockNotifications: Notification[] = [];
-let mockRefreshTokens: Map<string, { userId: number; expiresAt: Date }> = new Map();
+let mockRefreshTokens: Map<string, { userId: number; expiresAt: Date; revokedAt: Date | null }> = new Map();
 
 let userIdCounter = 100;
 let postIdCounter = 1000;
@@ -96,43 +122,23 @@ export class MockUserRepository implements IUserRepository {
 
   async findByUsername(username: string): Promise<User | null> {
     const clean = username.toLowerCase().trim();
-    let found = mockUsers.find(u => u.username.toLowerCase() === clean);
-    if (!found) {
-      found = {
-        userId: ++userIdCounter,
-        username: clean,
-        email: `${clean}@nexa.app`,
-        displayName: clean === 'doom_yash' ? 'yash' : clean,
-        bio: 'Nexa Social Platform Member',
-        profileImageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${clean}`,
-        followersCount: 10,
-        followingCount: 5,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      mockUsers.push(found);
-      mockCredentials.set(found.userId, bcrypt.hashSync('Leon$yash5', 10));
-    }
-    return found;
+    const found = mockUsers.find(u => u.username.toLowerCase() === clean);
+    return found || null;
   }
 
   async findByEmail(email: string): Promise<User | null> {
     const clean = email.toLowerCase().trim();
-    let found = mockUsers.find(u => u.email.toLowerCase() === clean || u.username.toLowerCase() === clean);
-    if (!found) {
-      const usernameFromEmail = clean.split('@')[0] || 'user';
-      return this.findByUsername(usernameFromEmail);
-    }
-    return found || mockUsers[0];
+    const found = mockUsers.find(u => u.email.toLowerCase() === clean || u.username.toLowerCase() === clean);
+    return found || null;
   }
 
   async findCredentialById(userId: number) {
-    const hash = mockCredentials.get(userId) || bcrypt.hashSync('Leon$yash5', 10);
+    const hash = mockCredentials.get(userId) || bcrypt.hashSync('Password123!', 10);
     return { userId, passwordHash: hash };
   }
 
   async findById(userId: number): Promise<User | null> {
-    return mockUsers.find(u => u.userId === userId) || mockUsers[0];
+    return mockUsers.find(u => u.userId === userId) || null;
   }
 
   async updateUser(userId: number, updates: any): Promise<User> {
@@ -146,8 +152,8 @@ export class MockUserRepository implements IUserRepository {
     return mockUsers.filter(u => u.username.includes(q) || u.displayName.toLowerCase().includes(q));
   }
 
-  async getSuggestions(): Promise<User[]> {
-    return mockUsers;
+  async getSuggestions(currentUserId?: number): Promise<User[]> {
+    return currentUserId ? mockUsers.filter(u => u.userId !== currentUserId) : mockUsers;
   }
 
   async followUser(): Promise<void> {}
@@ -155,6 +161,29 @@ export class MockUserRepository implements IUserRepository {
   async isFollowing(): Promise<boolean> { return false; }
   async getFollowers(): Promise<User[]> { return mockUsers; }
   async getFollowing(): Promise<User[]> { return mockUsers; }
+
+  async updateLockoutState(
+    userId: number,
+    failedLoginAttempts: number,
+    firstFailedAttemptAt: Date | null,
+    lockoutUntil: Date | null
+  ): Promise<void> {
+    const user = mockUsers.find(u => u.userId === userId);
+    if (user) {
+      user.failedLoginAttempts = failedLoginAttempts;
+      user.firstFailedAttemptAt = firstFailedAttemptAt ? firstFailedAttemptAt.toISOString() : null;
+      user.lockoutUntil = lockoutUntil ? lockoutUntil.toISOString() : null;
+    }
+  }
+
+  async resetLockoutState(userId: number): Promise<void> {
+    const user = mockUsers.find(u => u.userId === userId);
+    if (user) {
+      user.failedLoginAttempts = 0;
+      user.firstFailedAttemptAt = null;
+      user.lockoutUntil = null;
+    }
+  }
 }
 
 export class MockPostRepository implements IPostRepository {
@@ -193,7 +222,10 @@ export class MockPostRepository implements IPostRepository {
     return post;
   }
 
-  async deletePost(postId: number): Promise<boolean> {
+  async deletePost(postId: number, userId?: number): Promise<boolean> {
+    const post = mockPosts.find(p => p.postId === postId);
+    if (!post) return false;
+    if (userId && post.userId !== userId) return false;
     mockPosts = mockPosts.filter(p => p.postId !== postId);
     return true;
   }
@@ -219,8 +251,26 @@ export class MockPostRepository implements IPostRepository {
 }
 
 export class MockCommentRepository implements ICommentRepository {
-  async createComment(): Promise<any> { return {}; }
-  async getPostComments(): Promise<any> { return { data: [], nextCursor: null, hasMore: false }; }
+  async createComment(c: { postId: number; userId: number; content: string }): Promise<Comment> {
+    const author = mockUsers.find(u => u.userId === c.userId) || mockUsers[0];
+    const newComment: Comment = {
+      commentId: Date.now(),
+      postId: c.postId,
+      userId: c.userId,
+      author: {
+        userId: author.userId,
+        username: author.username,
+        displayName: author.displayName,
+        profileImageUrl: author.profileImageUrl
+      },
+      content: c.content,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    mockComments.push(newComment);
+    return newComment;
+  }
+  async getPostComments(): Promise<any> { return { data: mockComments, nextCursor: null, hasMore: false }; }
   async deleteComment(): Promise<boolean> { return true; }
 }
 
@@ -228,7 +278,12 @@ export class MockNotificationRepository implements INotificationRepository {
   async createNotification(notif: any): Promise<any> { return {}; }
   async getUserNotifications(): Promise<any> { return { data: [], nextCursor: null, hasMore: false }; }
   async getUnreadCount(): Promise<number> { return 0; }
-  async markAsRead(notificationId: number, userId: number): Promise<boolean> { return true; }
+  async markAsRead(notificationId: number, userId: number): Promise<boolean> {
+    const notif = mockNotifications.find(n => n.notificationId === notificationId && n.recipientUserId === userId);
+    if (!notif) return false;
+    notif.isRead = true;
+    return true;
+  }
   async markAllAsRead(): Promise<void> {}
 }
 
@@ -272,19 +327,24 @@ export class MockMessageRepository implements IMessageRepository {
 
 export class MockAuthRepository implements IAuthRepository {
   async saveRefreshToken(userId: number, tokenHash: string, expiresAt: Date): Promise<void> {
-    mockRefreshTokens.set(tokenHash, { userId, expiresAt });
+    mockRefreshTokens.set(tokenHash, { userId, expiresAt, revokedAt: null });
   }
-  async findRefreshToken(tokenHash: string): Promise<any> {
+  async findRefreshToken(tokenHash: string): Promise<{ userId: number; revokedAt: Date | null; expiresAt: Date } | null> {
     const record = mockRefreshTokens.get(tokenHash);
     if (!record) return null;
-    return { tokenHash, userId: record.userId, expiresAt: record.expiresAt, isRevoked: false };
+    return { userId: record.userId, revokedAt: record.revokedAt, expiresAt: record.expiresAt };
   }
   async revokeRefreshToken(tokenHash: string): Promise<void> {
-    mockRefreshTokens.delete(tokenHash);
+    const record = mockRefreshTokens.get(tokenHash);
+    if (record) {
+      record.revokedAt = new Date();
+    }
   }
   async revokeAllUserRefreshTokens(userId: number): Promise<void> {
-    for (const [hash, record] of mockRefreshTokens.entries()) {
-      if (record.userId === userId) mockRefreshTokens.delete(hash);
+    for (const [, record] of mockRefreshTokens.entries()) {
+      if (record.userId === userId && !record.revokedAt) {
+        record.revokedAt = new Date();
+      }
     }
   }
   async revokeAllUserTokens(userId: number): Promise<void> {

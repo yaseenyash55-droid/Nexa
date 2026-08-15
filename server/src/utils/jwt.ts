@@ -20,7 +20,7 @@ export function signAccessToken(payload: TokenPayload): string {
 
 export function generateRefreshToken(payload?: TokenPayload): string {
   if (payload) {
-    return jwt.sign(payload, env.JWT_REFRESH_SECRET, {
+    return jwt.sign({ ...payload, jti: crypto.randomUUID() }, env.JWT_REFRESH_SECRET, {
       expiresIn: '7d'
     });
   }

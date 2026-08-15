@@ -10,6 +10,7 @@ interface AuthContextType {
   register: (data: any) => Promise<void>;
   logout: () => Promise<void>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  requireAuth: (onSuccess: () => void, customMsg?: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   });
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const setUser: React.Dispatch<React.SetStateAction<User | null>> = (action) => {
     setUserState((prev) => {
@@ -45,34 +46,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    let isMounted = true;
     async function initAuth() {
       const token = getAccessToken();
-      if (token) {
-        try {
-          const me = await authApi.me();
-          setUser(me);
-        } catch {
+      try {
+        if (token) {
           try {
+            const me = await authApi.me();
+            if (isMounted) setUser(me);
+          } catch {
             await authApi.refresh();
             const me = await authApi.me();
-            setUser(me);
-          } catch {
-            setUser(null);
-            setAccessToken(null);
+            if (isMounted) setUser(me);
           }
-        }
-      } else {
-        try {
+        } else {
           await authApi.refresh();
           const me = await authApi.me();
-          setUser(me);
-        } catch {
-          // Stay logged out
+          if (isMounted) setUser(me);
+        }
+      } catch {
+        if (isMounted) {
+          setUser(null);
+          setAccessToken(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
         }
       }
-      setIsLoading(false);
     }
     initAuth();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const login = async (credentials: any) => {
@@ -93,8 +99,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const requireAuth = (onSuccess: () => void, customMsg?: string): boolean => {
+    if (user) {
+      onSuccess();
+      return true;
+    }
+    const msg = customMsg || 'Please log in to perform this action.';
+    alert(`🔒 Authentication Required\n\n${msg}`);
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+    return false;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, setUser }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, setUser, requireAuth }}>
       {children}
     </AuthContext.Provider>
   );
@@ -107,3 +126,4 @@ export const useAuth = () => {
   }
   return context;
 };
+

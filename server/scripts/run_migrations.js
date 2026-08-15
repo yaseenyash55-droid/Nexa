@@ -15,7 +15,8 @@ const MIGRATION_FILES = [
   '07_migration_ledger.sql',
   '02_schema.sql',
   '05_security_privacy_migrations.sql',
-  '06_resumable_uploads_and_outbox_migrations.sql'
+  '06_resumable_uploads_and_outbox_migrations.sql',
+  '08_account_lockout_migrations.sql'
 ];
 
 async function calculateChecksum(filePath) {

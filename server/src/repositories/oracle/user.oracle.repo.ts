@@ -14,6 +14,9 @@ interface RawUserRow {
   COVER_IMAGE_URL?: string | null;
   LOCATION?: string | null;
   WEBSITE_URL?: string | null;
+  FAILED_LOGIN_ATTEMPTS?: number;
+  FIRST_FAILED_ATTEMPT_AT?: Date | null;
+  LOCKOUT_UNTIL?: Date | null;
   CREATED_AT: Date;
   UPDATED_AT: Date;
   FOLLOWERS_COUNT?: number;
@@ -34,6 +37,9 @@ export class OracleUserRepository implements IUserRepository {
       coverImageUrl: row.COVER_IMAGE_URL,
       location: row.LOCATION,
       websiteUrl: row.WEBSITE_URL,
+      failedLoginAttempts: row.FAILED_LOGIN_ATTEMPTS ? Number(row.FAILED_LOGIN_ATTEMPTS) : 0,
+      firstFailedAttemptAt: row.FIRST_FAILED_ATTEMPT_AT ? new Date(row.FIRST_FAILED_ATTEMPT_AT).toISOString() : null,
+      lockoutUntil: row.LOCKOUT_UNTIL ? new Date(row.LOCKOUT_UNTIL).toISOString() : null,
       createdAt: row.CREATED_AT ? row.CREATED_AT.toISOString() : new Date().toISOString(),
       updatedAt: row.UPDATED_AT ? row.UPDATED_AT.toISOString() : new Date().toISOString(),
       followersCount: Number(row.FOLLOWERS_COUNT || 0),
@@ -81,6 +87,9 @@ export class OracleUserRepository implements IUserRepository {
       bio: user.bio || null,
       location: user.location || null,
       websiteUrl: user.websiteUrl || null,
+      failedLoginAttempts: 0,
+      firstFailedAttemptAt: null,
+      lockoutUntil: null,
       createdAt: outBinds.createdAt[0].toISOString(),
       updatedAt: outBinds.updatedAt[0].toISOString(),
       followersCount: 0,
@@ -92,7 +101,8 @@ export class OracleUserRepository implements IUserRepository {
   async findByUsername(username: string): Promise<User | null> {
     const sql = `
       SELECT USER_ID, USERNAME, EMAIL, PASSWORD_HASH, DISPLAY_NAME, BIO, PROFILE_IMAGE_URL,
-             COVER_IMAGE_URL, LOCATION, WEBSITE_URL, CREATED_AT, UPDATED_AT,
+             COVER_IMAGE_URL, LOCATION, WEBSITE_URL, FAILED_LOGIN_ATTEMPTS, FIRST_FAILED_ATTEMPT_AT,
+             LOCKOUT_UNTIL, CREATED_AT, UPDATED_AT,
              (SELECT COUNT(*) FROM FOLLOWERS WHERE FOLLOWING_ID = u.USER_ID) AS FOLLOWERS_COUNT,
              (SELECT COUNT(*) FROM FOLLOWERS WHERE FOLLOWER_ID = u.USER_ID) AS FOLLOWING_COUNT
       FROM USERS u
@@ -106,7 +116,8 @@ export class OracleUserRepository implements IUserRepository {
   async findByEmail(email: string): Promise<User | null> {
     const sql = `
       SELECT USER_ID, USERNAME, EMAIL, PASSWORD_HASH, DISPLAY_NAME, BIO, PROFILE_IMAGE_URL,
-             COVER_IMAGE_URL, LOCATION, WEBSITE_URL, CREATED_AT, UPDATED_AT
+             COVER_IMAGE_URL, LOCATION, WEBSITE_URL, FAILED_LOGIN_ATTEMPTS, FIRST_FAILED_ATTEMPT_AT,
+             LOCKOUT_UNTIL, CREATED_AT, UPDATED_AT
       FROM USERS
       WHERE LOWER(EMAIL) = LOWER(:email)
     `;
@@ -291,5 +302,34 @@ export class OracleUserRepository implements IUserRepository {
 
     const res = await executeSql<RawUserRow>(sql, binds);
     return (res.rows || []).map((row: RawUserRow) => this.mapRowToUser(row));
+  }
+
+  async updateLockoutState(
+    userId: number,
+    failedLoginAttempts: number,
+    firstFailedAttemptAt: Date | null,
+    lockoutUntil: Date | null
+  ): Promise<void> {
+    const sql = `
+      UPDATE USERS
+      SET FAILED_LOGIN_ATTEMPTS = :failedLoginAttempts,
+          FIRST_FAILED_ATTEMPT_AT = :firstFailedAttemptAt,
+          LOCKOUT_UNTIL = :lockoutUntil,
+          UPDATED_AT = SYSTIMESTAMP
+      WHERE USER_ID = :userId
+    `;
+    await executeSql(sql, { userId, failedLoginAttempts, firstFailedAttemptAt, lockoutUntil });
+  }
+
+  async resetLockoutState(userId: number): Promise<void> {
+    const sql = `
+      UPDATE USERS
+      SET FAILED_LOGIN_ATTEMPTS = 0,
+          FIRST_FAILED_ATTEMPT_AT = NULL,
+          LOCKOUT_UNTIL = NULL,
+          UPDATED_AT = SYSTIMESTAMP
+      WHERE USER_ID = :userId
+    `;
+    await executeSql(sql, { userId });
   }
 }

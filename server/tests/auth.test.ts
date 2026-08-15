@@ -107,4 +107,94 @@ describe('Auth & Session Integration API', () => {
     expect(meRes.status).toBe(200);
     expect(meRes.body.data.username).toBe('alex');
   });
+
+  it('should rotate refresh token on /api/auth/refresh and revoke old token on logout', async () => {
+    // 1. Login
+    const loginRes = await request.post('/api/auth/login').send({
+      emailOrUsername: 'alex',
+      password: 'Password123!'
+    });
+    expect(loginRes.status).toBe(200);
+
+    const initialRefreshToken = loginRes.body.data.refreshToken;
+    expect(initialRefreshToken).toBeDefined();
+
+    // 2. Refresh token -> should succeed and issue new tokens (rotation)
+    const refreshRes = await request
+      .post('/api/auth/refresh')
+      .send({ refreshToken: initialRefreshToken });
+
+    expect(refreshRes.status).toBe(200);
+    expect(refreshRes.body.data.accessToken).toBeDefined();
+    expect(refreshRes.body.data.refreshToken).toBeDefined();
+
+    const newRefreshToken = refreshRes.body.data.refreshToken;
+    expect(newRefreshToken).not.toBe(initialRefreshToken);
+
+    // 3. Attempting to reuse old refresh token -> should fail (revoked due to rotation)
+    const reuseRes = await request
+      .post('/api/auth/refresh')
+      .send({ refreshToken: initialRefreshToken });
+
+    expect(reuseRes.status).toBe(401);
+    expect(reuseRes.body.error.code).toBe('INVALID_REFRESH_TOKEN');
+
+    // 4. Logout with active new refresh token
+    const logoutRes = await request
+      .post('/api/auth/logout')
+      .send({ refreshToken: newRefreshToken });
+
+    expect(logoutRes.status).toBe(200);
+
+    // 5. Attempting to refresh with now-logout-revoked token -> should fail
+    const revokedRefreshRes = await request
+      .post('/api/auth/refresh')
+      .send({ refreshToken: newRefreshToken });
+
+    expect(revokedRefreshRes.status).toBe(401);
+    expect(revokedRefreshRes.body.error.code).toBe('INVALID_REFRESH_TOKEN');
+  });
+
+  it('should lock account after 5 consecutive failed login attempts and reset on successful login', async () => {
+    const timestamp = Date.now();
+    const username = `lockout_user_${timestamp}`;
+    const email = `${username}@nexa.app`;
+    const password = 'Password123!';
+
+    // Register user
+    const regRes = await request.post('/api/auth/register').send({
+      username,
+      email,
+      password,
+      displayName: 'Lockout User'
+    });
+    expect(regRes.status).toBe(201);
+
+    // 4 failed attempts -> should return 401 INVALID_CREDENTIALS
+    for (let i = 1; i <= 4; i++) {
+      const failRes = await request.post('/api/auth/login').send({
+        emailOrUsername: username,
+        password: 'WrongPassword!'
+      });
+      expect(failRes.status).toBe(401);
+      expect(failRes.body.error.code).toBe('INVALID_CREDENTIALS');
+    }
+
+    // 5th failed attempt -> should trigger lockout and return 423 ACCOUNT_LOCKED
+    const lockRes = await request.post('/api/auth/login').send({
+      emailOrUsername: username,
+      password: 'WrongPassword!'
+    });
+    expect(lockRes.status).toBe(423);
+    expect(lockRes.body.error.code).toBe('ACCOUNT_LOCKED');
+    expect(lockRes.body.error.message).toContain('Account is locked');
+
+    // 6th attempt (even with correct password) -> should remain locked out with 423
+    const blockedRes = await request.post('/api/auth/login').send({
+      emailOrUsername: username,
+      password: password
+    });
+    expect(blockedRes.status).toBe(423);
+    expect(blockedRes.body.error.code).toBe('ACCOUNT_LOCKED');
+  });
 });
