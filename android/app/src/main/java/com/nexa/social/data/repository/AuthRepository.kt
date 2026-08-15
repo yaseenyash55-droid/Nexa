@@ -3,16 +3,16 @@ package com.nexa.social.data.repository
 import com.nexa.social.NexaApiClient
 import com.nexa.social.data.models.LoginRequest
 import com.nexa.social.data.models.User
-import com.nexa.social.utils.PreferenceManager
+import com.nexa.social.utils.TokenManager
 
-class AuthRepository(private val prefManager: PreferenceManager) {
+class AuthRepository(private val tokenManager: TokenManager) {
 
     suspend fun login(username: String, password: String): Result<User> {
         return try {
             val response = NexaApiClient.authApi.login(LoginRequest(username, password))
             if (response.isSuccessful && response.body()?.data != null) {
                 val data = response.body()!!.data!
-                prefManager.saveUserSession(
+                tokenManager.saveTokens(
                     accessToken = data.accessToken,
                     refreshToken = data.refreshToken,
                     userId = data.user.userId,
@@ -23,7 +23,7 @@ class AuthRepository(private val prefManager: PreferenceManager) {
             } else {
                 val errorMsg = response.body()?.error?.message
                     ?: response.body()?.message
-                    ?: "Invalid credentials (${response.code()})"
+                    ?: "Invalid username/email or password (${response.code()})"
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
@@ -31,7 +31,17 @@ class AuthRepository(private val prefManager: PreferenceManager) {
         }
     }
 
-    fun logout() {
-        prefManager.clear()
+    suspend fun logout(): Result<Unit> {
+        val token = tokenManager.accessToken
+        return try {
+            if (!token.isNullOrEmpty()) {
+                NexaApiClient.authApi.logout("Bearer $token")
+            }
+            tokenManager.clear()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            tokenManager.clear()
+            Result.success(Unit)
+        }
     }
 }

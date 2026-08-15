@@ -10,14 +10,14 @@
         <item name="colorSecondaryVariant">@color/brand_emerald</item>
         <item name="colorOnSecondary">@color/text_white</item>
         <!-- Surface and Backgrounds -->
-        <item name="android:windowBackground">@color/background_light</item>
-        <item name="colorSurface">@color/background_card_day</item>
-        <item name="colorOnSurface">@color/text_dark_primary</item>
-        <item name="colorOnBackground">@color/text_dark_primary</item>
-        <item name="android:textColorPrimary">@color/text_dark_primary</item>
-        <item name="android:textColorSecondary">@color/text_dark_secondary</item>
-        <item name="android:statusBarColor">@color/background_light</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:navigationBarColor">@color/background_card_day</item>
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="colorSurface">@color/background_card</item>
+        <item name="colorOnSurface">@color/text_white</item>
+        <item name="colorOnBackground">@color/text_white</item>
+        <item name="android:textColorPrimary">@color/text_white</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:statusBarColor">@color/background_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/background_card</item>
     </style>
 </resources>

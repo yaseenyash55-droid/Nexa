@@ -8,24 +8,26 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.nexa.social.MainActivity
+import com.nexa.social.NexaApiClient
 import com.nexa.social.data.repository.AuthRepository
 import com.nexa.social.databinding.ActivityLoginBinding
-import com.nexa.social.utils.PreferenceManager
+import com.nexa.social.utils.TokenManager
 import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
     private lateinit var authRepository: AuthRepository
-    private lateinit var prefManager: PreferenceManager
+    private lateinit var tokenManager: TokenManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        prefManager = PreferenceManager(this)
-        authRepository = AuthRepository(prefManager)
+        NexaApiClient.init(this)
+        tokenManager = TokenManager(this)
+        authRepository = AuthRepository(tokenManager)
 
         binding.btnLogin.setOnClickListener {
             performLogin()

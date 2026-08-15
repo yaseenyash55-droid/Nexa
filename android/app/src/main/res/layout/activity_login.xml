@@ -23,11 +23,10 @@
             app:layout_constraintTop_toTopOf="parent">
 
             <ImageView
-                android:layout_width="56dp"
-                android:layout_height="56dp"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
                 android:contentDescription="Nexa Logo"
-                android:src="@android:drawable/ic_dialog_info"
-                app:tint="@color/brand_primary" />
+                android:src="@drawable/ic_nexa_splash_logo" />
 
             <TextView
                 android:layout_width="wrap_content"

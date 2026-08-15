@@ -11,12 +11,16 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!-- Push Notification Permission (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Media File Upload Permissions -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 
     <application
+        android:name=".NexaApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="Nexa Social"
@@ -24,6 +28,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Nexa"
         android:usesCleartextTraffic="false">
+
+        <!-- Default FCM Channel & Color Metadata -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="nexa_notifications_channel" />
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/brand_primary" />
 
         <!-- Splash Launcher Activity -->
         <activity
@@ -40,7 +53,8 @@
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
-            android:exported="false"
+            android:exported="true"
+            android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize" />
 
         <!-- Native Login Screen Activity -->
@@ -54,5 +68,14 @@
             android:name=".ui.CreatePostActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- Firebase Cloud Messaging Service -->
+        <service
+            android:name=".service.NexaFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

@@ -62,3 +62,7 @@ data class CreatePostRequest(
     @SerializedName("content") val content: String,
     @SerializedName("imageUrl") val imageUrl: String? = null
 )
+
+data class FcmTokenRequest(
+    @SerializedName("fcmToken") val fcmToken: String
+)

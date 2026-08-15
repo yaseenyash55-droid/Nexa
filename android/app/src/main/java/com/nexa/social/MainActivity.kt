@@ -20,26 +20,42 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import com.google.firebase.messaging.FirebaseMessaging
+import com.nexa.social.data.models.FcmTokenRequest
 import com.nexa.social.databinding.ActivityMainBinding
 import com.nexa.social.ui.CreatePostActivity
 import com.nexa.social.ui.LoginActivity
-import com.nexa.social.utils.NetworkUtils
+import com.nexa.social.utils.NetworkMonitor
+import com.nexa.social.utils.NotificationHelper
 import com.nexa.social.utils.PreferenceManager
+import com.nexa.social.utils.ThemeManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var prefManager: PreferenceManager
+    private lateinit var networkMonitor: NetworkMonitor
+
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var pendingPermissionRequest: PermissionRequest? = null
-
     private var currentTabId: Int = R.id.navigation_home
+    private var wasOffline: Boolean = false
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            fetchAndRegisterFcmToken()
+        }
+    }
 
     private val createPostLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
-            // Refresh feed after publishing a post
             binding.bottomNavigation.selectedItemId = R.id.navigation_home
             binding.webView.reload()
         }
@@ -78,6 +94,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         prefManager = PreferenceManager(this)
+        networkMonitor = NetworkMonitor(this)
+
+        NotificationHelper.createNotificationChannel(this)
+        requestNotificationPermission()
 
         setupBackNavigation()
         setupSwipeRefresh()
@@ -85,8 +105,83 @@ class MainActivity : AppCompatActivity() {
         setupBottomNavigation()
         setupFab()
         setupRetryButton()
+        setupNetworkMonitoring()
 
-        loadTab(R.id.navigation_home)
+        handleNotificationIntent(intent)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        networkMonitor.startMonitoring()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        networkMonitor.stopMonitoring()
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+    private fun setupNetworkMonitoring() {
+        networkMonitor.isOnline.observe(this) { isOnline ->
+            if (isOnline) {
+                binding.offlineBanner.visibility = View.GONE
+                if (wasOffline || binding.errorView.visibility == View.VISIBLE) {
+                    wasOffline = false
+                    showWebViewContent()
+                    loadTab(currentTabId)
+                }
+            } else {
+                wasOffline = true
+                if (binding.webView.url.isNullOrEmpty() || binding.errorView.visibility == View.VISIBLE) {
+                    showOfflineError()
+                } else {
+                    binding.offlineBanner.visibility = View.VISIBLE
+                }
+            }
+        }
+    }
+
+    private fun handleNotificationIntent(intent: Intent?) {
+        val targetUrl = intent?.getStringExtra(NotificationHelper.EXTRA_TARGET_URL)
+        if (!targetUrl.isNullOrEmpty()) {
+            loadUrl(targetUrl)
+        } else {
+            loadTab(R.id.navigation_home)
+        }
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                fetchAndRegisterFcmToken()
+            }
+        } else {
+            fetchAndRegisterFcmToken()
+        }
+    }
+
+    private fun fetchAndRegisterFcmToken() {
+        if (!prefManager.isLoggedIn) return
+
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (task.isSuccessful && task.result != null) {
+                val fcmToken = task.result
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        NexaApiClient.authApi.registerFcmToken(FcmTokenRequest(fcmToken))
+                    } catch (e: Exception) {
+                        // Ignore background notification sync errors
+                    }
+                }
+            }
+        }
     }
 
     private fun setupBackNavigation() {
@@ -110,7 +205,8 @@ class MainActivity : AppCompatActivity() {
             R.color.brand_emerald
         )
         binding.swipeRefreshLayout.setOnRefreshListener {
-            if (NetworkUtils.isNetworkAvailable(this)) {
+            val isConnected = networkMonitor.isOnline.value ?: false
+            if (isConnected) {
                 binding.webView.reload()
             } else {
                 binding.swipeRefreshLayout.isRefreshing = false
@@ -125,6 +221,11 @@ class MainActivity : AppCompatActivity() {
                 return@setOnItemSelectedListener true
             }
             loadTab(item.itemId)
+            true
+        }
+
+        binding.bottomNavigation.findViewById<View>(R.id.navigation_profile)?.setOnLongClickListener {
+            ThemeManager.showThemeSelectionDialog(this)
             true
         }
     }
@@ -161,7 +262,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadUrl(url: String) {
-        if (!NetworkUtils.isNetworkAvailable(this)) {
+        val isConnected = networkMonitor.isOnline.value ?: false
+        if (!isConnected) {
             showOfflineError()
         } else {
             showWebViewContent()
@@ -255,7 +357,8 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 binding.swipeRefreshLayout.isRefreshing = false
-                if (NetworkUtils.isNetworkAvailable(this@MainActivity)) {
+                val isConnected = networkMonitor.isOnline.value ?: false
+                if (isConnected) {
                     showWebViewContent()
                 }
             }
@@ -278,6 +381,7 @@ class MainActivity : AppCompatActivity() {
     private fun showOfflineError() {
         binding.errorView.visibility = View.VISIBLE
         binding.swipeRefreshLayout.visibility = View.GONE
+        binding.offlineBanner.visibility = View.GONE
         binding.progressBarHorizontal.visibility = View.GONE
     }
 

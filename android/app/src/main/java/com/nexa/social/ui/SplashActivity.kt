@@ -6,8 +6,9 @@ import android.os.Handler
 import android.os.Looper
 import androidx.appcompat.app.AppCompatActivity
 import com.nexa.social.MainActivity
+import com.nexa.social.NexaApiClient
 import com.nexa.social.R
-import com.nexa.social.utils.PreferenceManager
+import com.nexa.social.utils.TokenManager
 
 class SplashActivity : AppCompatActivity() {
 
@@ -15,11 +16,11 @@ class SplashActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_splash)
 
-        val prefManager = PreferenceManager(this)
+        NexaApiClient.init(this)
+        val tokenManager = TokenManager(this)
 
-        // Duration: 2.0 seconds (2000 ms)
         Handler(Looper.getMainLooper()).postDelayed({
-            val destination = if (prefManager.isLoggedIn) {
+            val destination = if (tokenManager.isLoggedIn) {
                 MainActivity::class.java
             } else {
                 LoginActivity::class.java

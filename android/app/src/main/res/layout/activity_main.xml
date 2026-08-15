@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_dark">
+    android:background="?attr/colorSurface">
 
     <!-- Top Loading Progress Indicator -->
     <ProgressBar
@@ -18,6 +18,41 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- Top Offline Connection Drop Banner -->
+    <LinearLayout
+        android:id="@+id/offlineBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/background_card_light"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/progressBarHorizontal">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:contentDescription="Offline Warning"
+            android:src="@drawable/ic_wifi_off"
+            app:tint="@color/brand_cyan" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:text="You are currently offline. Browsing cached content."
+            android:textColor="@color/text_white"
+            android:textSize="12sp"
+            android:textStyle="medium" />
+    </LinearLayout>
+
     <!-- Pull To Refresh Layout Wrapping WebView -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefreshLayout"
@@ -26,7 +61,7 @@
         app:layout_constraintBottom_toTopOf="@+id/bottomNavigation"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/progressBarHorizontal">
+        app:layout_constraintTop_toBottomOf="@+id/offlineBanner">
 
         <WebView
             android:id="@+id/webView"
@@ -34,12 +69,12 @@
             android:layout_height="match_parent" />
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-    <!-- Offline / Network Error Page View -->
+    <!-- Full-Screen Offline / Network Error Page View -->
     <LinearLayout
         android:id="@+id/errorView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="@color/background_dark"
+        android:background="?attr/android:windowBackground"
         android:gravity="center"
         android:orientation="vertical"
         android:padding="32dp"
@@ -47,22 +82,22 @@
         app:layout_constraintBottom_toTopOf="@+id/bottomNavigation"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintTop_toBottomOf="@+id/progressBarHorizontal">
 
         <ImageView
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:contentDescription="Offline Error"
-            android:src="@android:drawable/stat_sys_warning"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:contentDescription="No Internet Connection"
+            android:src="@drawable/ic_wifi_off"
             app:tint="@color/brand_cyan" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="Connection Unavailable"
-            android:textColor="@color/text_white"
-            android:textSize="20sp"
+            android:text="No Internet Connection"
+            android:textColor="?attr/android:textColorPrimary"
+            android:textSize="22sp"
             android:textStyle="bold" />
 
         <TextView
@@ -71,8 +106,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:gravity="center"
-            android:text="Unable to connect to Nexa Social network. Please check your internet connection and try again."
-            android:textColor="@color/text_secondary"
+            android:text="Please check your connection and try again"
+            android:textColor="?attr/android:textColorSecondary"
             android:textSize="14sp" />
 
         <com.google.android.material.button.MaterialButton
@@ -81,10 +116,12 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:backgroundTint="@color/brand_primary"
-            android:paddingStart="24dp"
-            android:paddingEnd="24dp"
+            android:paddingStart="28dp"
+            android:paddingEnd="28dp"
             android:text="Try Again"
             android:textColor="@color/text_white"
+            android:textSize="14sp"
+            android:textStyle="bold"
             app:cornerRadius="12dp" />
     </LinearLayout>
 
@@ -107,7 +144,7 @@
         android:id="@+id/bottomNavigation"
         android:layout_width="match_parent"
         android:layout_height="64dp"
-        android:background="@color/background_card"
+        android:background="?attr/colorSurface"
         app:elevation="8dp"
         app:itemIconTint="@color/bottom_nav_color_selector"
         app:itemRippleColor="@color/brand_primary_dark"

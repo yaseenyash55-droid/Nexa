@@ -1,7 +1,11 @@
 package com.nexa.social
 
+import android.content.Context
 import com.nexa.social.data.api.AuthApi
+import com.nexa.social.data.api.AuthInterceptor
 import com.nexa.social.data.api.PostApi
+import com.nexa.social.data.api.TokenAuthenticator
+import com.nexa.social.utils.TokenManager
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -11,23 +15,53 @@ import java.util.concurrent.TimeUnit
 object NexaApiClient {
     const val BASE_URL = "https://nexa-backend-in6s.onrender.com/api/"
 
+    private var tokenManager: TokenManager? = null
+
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .addInterceptor(loggingInterceptor)
-        .build()
+    private fun getOkHttpClient(context: Context): OkHttpClient {
+        val tm = tokenManager ?: TokenManager(context.applicationContext).also { tokenManager = it }
 
-    val retrofit: Retrofit = Retrofit.Builder()
-        .baseUrl(BASE_URL)
-        .client(okHttpClient)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
+        return OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor(AuthInterceptor(tm))
+            .authenticator(TokenAuthenticator(tm, BASE_URL))
+            .addInterceptor(loggingInterceptor)
+            .build()
+    }
 
-    val authApi: AuthApi = retrofit.create(AuthApi::class.java)
-    val postApi: PostApi = retrofit.create(PostApi::class.java)
+    fun init(context: Context) {
+        tokenManager = TokenManager(context.applicationContext)
+    }
+
+    val retrofit: Retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(
+                tokenManager?.let { tm ->
+                    OkHttpClient.Builder()
+                        .connectTimeout(30, TimeUnit.SECONDS)
+                        .readTimeout(30, TimeUnit.SECONDS)
+                        .writeTimeout(30, TimeUnit.SECONDS)
+                        .addInterceptor(AuthInterceptor(tm))
+                        .authenticator(TokenAuthenticator(tm, BASE_URL))
+                        .addInterceptor(loggingInterceptor)
+                        .build()
+                } ?: OkHttpClient.Builder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .writeTimeout(30, TimeUnit.SECONDS)
+                    .addInterceptor(loggingInterceptor)
+                    .build()
+            )
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    val authApi: AuthApi by lazy { retrofit.create(AuthApi::class.java) }
+    val postApi: PostApi by lazy { retrofit.create(PostApi::class.java) }
 }

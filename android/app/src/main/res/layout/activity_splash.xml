@@ -18,21 +18,13 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_chainStyle="packed">
 
-        <!-- Nexa Brand Logo Frame -->
-        <FrameLayout
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:background="@color/background_card"
-            android:padding="20dp">
-
-            <ImageView
-                android:id="@+id/imgLogo"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:contentDescription="Nexa Logo"
-                android:src="@android:drawable/ic_dialog_info"
-                app:tint="@color/brand_primary" />
-        </FrameLayout>
+        <!-- Nexa Brand Vector Logo -->
+        <ImageView
+            android:id="@+id/imgLogo"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:contentDescription="Nexa Logo"
+            android:src="@drawable/ic_nexa_splash_logo" />
 
         <TextView
             android:id="@+id/tvAppName"
