@@ -17,6 +17,7 @@ import { CreatorInsightsPage } from '../pages/CreatorInsightsPage.js';
 import { ModerationQueuePage } from '../pages/ModerationQueuePage.js';
 import { ReelsPage } from '../pages/ReelsPage.js';
 import { MessagesPage } from '../pages/MessagesPage.js';
+import { UserManualPage } from '../pages/UserManualPage.js';
 import { LoginPage } from '../pages/LoginPage.js';
 import { RegisterPage } from '../pages/RegisterPage.js';
 import { NotFoundPage } from '../pages/NotFoundPage.js';
@@ -61,6 +62,9 @@ export const App: React.FC = () => {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/reels" element={<ReelsPage />} />
             <Route path="/profile/:username" element={<ProfilePage />} />
+            <Route path="/user-manual" element={<UserManualPage />} />
+            <Route path="/help" element={<UserManualPage />} />
+            <Route path="/tutorial" element={<UserManualPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             

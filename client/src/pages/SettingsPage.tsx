@@ -18,6 +18,7 @@ import {
   User, 
   ShieldCheck, 
   Bell, 
+  HelpCircle,
   Eye, 
   KeyRound, 
   LogOut, 
@@ -213,6 +214,7 @@ export const SettingsPage: React.FC = () => {
     { id: 'security', label: 'Security & Auth', icon: <KeyRound className="w-4 h-4" /> },
     { id: 'notifications', label: 'Notifications', icon: <Bell className="w-4 h-4" /> },
     { id: 'privacy', label: 'Privacy & Preferences', icon: <Sliders className="w-4 h-4" /> },
+    { id: 'help', label: 'User Manual & Viva Guide', icon: <HelpCircle className="w-4 h-4" /> },
     { id: 'data', label: 'Data & Deactivation', icon: <Download className="w-4 h-4" /> }
   ];
 

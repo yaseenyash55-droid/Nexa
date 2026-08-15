@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, Compass, Film, MessageSquare, Bookmark, Bell, User as UserIcon, Settings as SettingsIcon, ShieldCheck, BarChart3, ShieldAlert, LogOut, PlusSquare, Sparkles } from 'lucide-react';
+import { Home, Compass, Film, MessageSquare, Bookmark, Bell, User as UserIcon, Settings as SettingsIcon, BookOpen, ShieldCheck, BarChart3, ShieldAlert, LogOut, PlusSquare, Sparkles } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.js';
 import { Avatar } from '../ui/Avatar.js';
 import { DrDoomOrbLogo } from '../ui/DrDoomOrbLogo.js';
@@ -24,6 +24,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onOpenComp
     { to: '/reels', label: 'Reels', icon: <Film className="w-5 h-5" /> },
     { to: '/messages', label: 'Messages', icon: <MessageSquare className="w-5 h-5" /> },
     { to: '/notifications', label: 'Notifications', icon: <Bell className="w-5 h-5" /> },
+    { to: '/user-manual', label: 'User Manual', icon: <BookOpen className="w-5 h-5" /> },
     { to: user ? `/profile/${user.username}` : '/login', label: 'Profile', icon: <UserIcon className="w-5 h-5" /> },
     { to: '/settings', label: 'Settings', icon: <SettingsIcon className="w-5 h-5" /> }
   ];

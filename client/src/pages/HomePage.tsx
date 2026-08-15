@@ -6,6 +6,7 @@ import { PostComposer } from '../components/feed/PostComposer.js';
 import { PostCard } from '../components/feed/PostCard.js';
 import { PostSkeleton } from '../components/ui/Skeleton.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
+import { OnboardingBanner } from '../components/common/OnboardingBanner.js';
 import { useAuth } from '../contexts/AuthContext.js';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { postsApi } from '../api/posts.api.js';
@@ -39,6 +40,9 @@ export const HomePage: React.FC = () => {
       <FeedTabs activeTab={scope} onChange={setScope} isAuthenticated={!!user} />
 
       <div className="p-4 space-y-4">
+        {/* New User Onboarding Checklist Banner */}
+        <OnboardingBanner />
+
         {user && <PostComposer />}
 
         {isLoading ? (
@@ -60,23 +64,23 @@ export const HomePage: React.FC = () => {
             description={scope === 'following' ? "You aren't following anyone with posts yet." : "Be the first person to share a post on Nexa!"}
           />
         ) : (
-          <div className="divide-y divide-slate-800/80 border border-slate-800/80 rounded-2xl overflow-hidden">
+          <div className="space-y-4">
             {posts.map((post) => (
               <PostCard key={post.postId} post={post} />
             ))}
-          </div>
-        )}
 
-        {hasNextPage && (
-          <div className="pt-4 text-center">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fetchNextPage()}
-              isLoading={isFetchingNextPage}
-            >
-              Load More Posts
-            </Button>
+            {hasNextPage && (
+              <div className="pt-2 text-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                >
+                  {isFetchingNextPage ? 'Loading more...' : 'Load older posts'}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
