@@ -1,5 +1,9 @@
 import axios from 'axios';
 
+export const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:4000/api'
+  : 'https://nexa-backend-in6s.onrender.com/api';
+
 let inMemoryAccessToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('nexa_access_token') : null;
 let inMemoryRefreshToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('nexa_refresh_token') : null;
 
@@ -35,13 +39,8 @@ export function getRefreshToken(): string | null {
   return getAccessToken();
 }
 
-const LIVE_BACKEND_URL = 'https://pick-sims-regions-plaza.trycloudflare.com';
-const API_BASE = window.location.origin.includes('surge.sh') || window.location.origin.includes('github.io') || window.location.origin.includes('vercel.app')
-  ? `${LIVE_BACKEND_URL}/api`
-  : '/api';
-
 export const api = axios.create({
-  baseURL: API_BASE,
+  baseURL: API_BASE_URL,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -92,7 +91,7 @@ api.interceptors.response.use(
         const currentToken = getAccessToken();
         const storedRefreshToken = getRefreshToken() || currentToken;
 
-        const res = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken: storedRefreshToken }, {
+        const res = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken: storedRefreshToken }, {
           withCredentials: true,
           headers: {
             'bypass-tunnel-reminder': 'true',
