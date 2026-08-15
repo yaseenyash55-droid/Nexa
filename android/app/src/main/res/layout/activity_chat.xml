@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0B0F19"
+    android:orientation="vertical">
+
+    <!-- Top Action Bar -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#151E2E"
+        app:navigationIcon="@drawable/ic_close"
+        app:subtitle="🔒 End-to-End Encrypted (AES-256)"
+        app:subtitleTextColor="#10B981"
+        app:title="Chat"
+        app:titleTextColor="#FFFFFF" />
+
+    <!-- Typing Indicator Banner -->
+    <TextView
+        android:id="@+id/tvTypingIndicator"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1F2937"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="4dp"
+        android:text="User is typing..."
+        android:textColor="#818CF8"
+        android:textSize="12sp"
+        android:textStyle="italic"
+        android:visibility="gone" />
+
+    <!-- Message Stream RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvMessages"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:padding="12dp"
+        tools:listitem="@layout/item_message_sent" />
+
+    <!-- Input Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#151E2E"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="8dp">
+
+        <EditText
+            android:id="@+id/etMessage"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_input_field"
+            android:hint="Type a secure message..."
+            android:inputType="textMultiLine"
+            android:maxLines="4"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="10dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#64748B"
+            android:textSize="14sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSend"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="Send"
+            android:textAllCaps="false"
+            app:backgroundTint="#6366F1"
+            app:cornerRadius="12dp" />
+    </LinearLayout>
+</LinearLayout>

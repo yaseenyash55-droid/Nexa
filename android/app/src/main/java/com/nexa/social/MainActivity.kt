@@ -27,6 +27,7 @@ import com.nexa.social.databinding.ActivityMainBinding
 import com.nexa.social.ui.CreatePostActivity
 import com.nexa.social.ui.LoginActivity
 import com.nexa.social.utils.NetworkMonitor
+import com.nexa.social.utils.NexaWebAppInterface
 import com.nexa.social.utils.NotificationHelper
 import com.nexa.social.utils.PreferenceManager
 import com.nexa.social.utils.ThemeManager
@@ -246,6 +247,7 @@ class MainActivity : AppCompatActivity() {
         val targetUrl = when (tabId) {
             R.id.navigation_home -> "https://nexa-social-app.surge.sh/"
             R.id.navigation_explore -> "https://nexa-social-app.surge.sh/explore"
+            R.id.navigation_messages -> "https://nexa-social-app.surge.sh/messages"
             R.id.navigation_reels -> "https://nexa-social-app.surge.sh/reels"
             R.id.navigation_profile -> {
                 val username = prefManager.username
@@ -287,6 +289,9 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.21) {
             settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
         }
+
+        // Add Native Javascript Interface Bridge
+        binding.webView.addJavascriptInterface(NexaWebAppInterface(this), "NexaAndroid")
 
         binding.webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {

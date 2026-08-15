@@ -17,13 +17,13 @@ data class ApiError(
 data class User(
     @SerializedName("userId") val userId: Int,
     @SerializedName("username") val username: String,
-    @SerializedName("email") val email: String,
+    @SerializedName("email") val email: String?,
     @SerializedName("displayName") val displayName: String,
-    @SerializedName("bio") val bio: String?,
-    @SerializedName("profileImageUrl") val profileImageUrl: String?,
-    @SerializedName("coverImageUrl") val coverImageUrl: String?,
-    @SerializedName("location") val location: String?,
-    @SerializedName("websiteUrl") val websiteUrl: String?,
+    @SerializedName("bio") val bio: String? = null,
+    @SerializedName("profileImageUrl") val profileImageUrl: String? = null,
+    @SerializedName("coverImageUrl") val coverImageUrl: String? = null,
+    @SerializedName("location") val location: String? = null,
+    @SerializedName("websiteUrl") val websiteUrl: String? = null,
     @SerializedName("followersCount") val followersCount: Int = 0,
     @SerializedName("followingCount") val followingCount: Int = 0
 )
@@ -49,6 +49,42 @@ data class Post(
     @SerializedName("isLiked") val isLiked: Boolean = false,
     @SerializedName("isBookmarked") val isBookmarked: Boolean = false,
     @SerializedName("author") val author: User,
+    @SerializedName("createdAt") val createdAt: String?
+)
+
+data class Message(
+    @SerializedName("messageId") val messageId: Int,
+    @SerializedName("senderId") val senderId: Int,
+    @SerializedName("receiverId") val receiverId: Int,
+    @SerializedName("content") val content: String,
+    @SerializedName("isRead") val isRead: Boolean = false,
+    @SerializedName("createdAt") val createdAt: String?
+)
+
+data class Group(
+    @SerializedName("groupId") val groupId: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("description") val description: String?,
+    @SerializedName("createdBy") val createdBy: Int,
+    @SerializedName("avatarUrl") val avatarUrl: String?,
+    @SerializedName("createdAt") val createdAt: String?,
+    @SerializedName("membersCount") val membersCount: Int = 1,
+    @SerializedName("lastMessage") val lastMessage: String?
+)
+
+data class GroupSender(
+    @SerializedName("userId") val userId: Int,
+    @SerializedName("username") val username: String,
+    @SerializedName("displayName") val displayName: String,
+    @SerializedName("profileImageUrl") val profileImageUrl: String?
+)
+
+data class GroupMessage(
+    @SerializedName("messageId") val messageId: Int,
+    @SerializedName("groupId") val groupId: Int,
+    @SerializedName("senderId") val senderId: Int,
+    @SerializedName("sender") val sender: GroupSender,
+    @SerializedName("content") val content: String,
     @SerializedName("createdAt") val createdAt: String?
 )
 

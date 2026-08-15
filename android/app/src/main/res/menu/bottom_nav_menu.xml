@@ -11,6 +11,11 @@
         android:title="Explore" />
 
     <item
+        android:id="@+id/navigation_messages"
+        android:icon="@drawable/ic_message"
+        android:title="Messages" />
+
+    <item
         android:id="@+id/navigation_reels"
         android:icon="@drawable/ic_reels"
         android:title="Reels" />

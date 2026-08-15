@@ -69,6 +69,18 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- Native Conversations Screen Activity -->
+        <activity
+            android:name=".ui.ConversationsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Native Chat Screen Activity -->
+        <activity
+            android:name=".ui.ChatActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Firebase Cloud Messaging Service -->
         <service
             android:name=".service.NexaFirebaseMessagingService"

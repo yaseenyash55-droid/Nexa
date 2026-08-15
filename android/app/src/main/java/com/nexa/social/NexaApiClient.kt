@@ -3,6 +3,8 @@ package com.nexa.social
 import android.content.Context
 import com.nexa.social.data.api.AuthApi
 import com.nexa.social.data.api.AuthInterceptor
+import com.nexa.social.data.api.GroupApi
+import com.nexa.social.data.api.MessageApi
 import com.nexa.social.data.api.PostApi
 import com.nexa.social.data.api.TokenAuthenticator
 import com.nexa.social.utils.TokenManager
@@ -19,19 +21,6 @@ object NexaApiClient {
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
-    }
-
-    private fun getOkHttpClient(context: Context): OkHttpClient {
-        val tm = tokenManager ?: TokenManager(context.applicationContext).also { tokenManager = it }
-
-        return OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .addInterceptor(AuthInterceptor(tm))
-            .authenticator(TokenAuthenticator(tm, BASE_URL))
-            .addInterceptor(loggingInterceptor)
-            .build()
     }
 
     fun init(context: Context) {
@@ -64,4 +53,6 @@ object NexaApiClient {
 
     val authApi: AuthApi by lazy { retrofit.create(AuthApi::class.java) }
     val postApi: PostApi by lazy { retrofit.create(PostApi::class.java) }
+    val messageApi: MessageApi by lazy { retrofit.create(MessageApi::class.java) }
+    val groupApi: GroupApi by lazy { retrofit.create(GroupApi::class.java) }
 }
