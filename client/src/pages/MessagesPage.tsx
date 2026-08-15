@@ -4,11 +4,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { socialApi } from '../api/social.api.js';
 import { usersApi } from '../api/users.api.js';
 import { groupsApi, Group, GroupMessage } from '../api/groups.api.js';
+import { broadcastsApi, Broadcast } from '../api/broadcasts.api.js';
 import { Message, User } from '../types/index.js';
 import { Avatar } from '../components/ui/Avatar.js';
-import { Send, MessageSquare, Search, CheckCheck, Check, Phone, Video, Lock, ShieldCheck, Users, Plus } from 'lucide-react';
+import { Send, MessageSquare, Search, CheckCheck, Check, Phone, Video, Lock, ShieldCheck, Users, Plus, Radio } from 'lucide-react';
 import { CallModal } from '../components/chat/CallModal.js';
 import { CreateGroupModal } from '../components/chat/CreateGroupModal.js';
+import { CreateBroadcastModal } from '../components/chat/CreateBroadcastModal.js';
 import { useAuth } from '../contexts/AuthContext.js';
 import { formatDistanceToNow } from 'date-fns';
 import { io, Socket } from 'socket.io-client';
@@ -22,10 +24,13 @@ export const MessagesPage: React.FC = () => {
   const { currentChatTheme } = useTheme();
 
   // Tab & Selection State
-  const [chatType, setChatType] = useState<'direct' | 'groups'>('direct');
+  const [chatType, setChatType] = useState<'direct' | 'groups' | 'broadcasts'>('direct');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [selectedBroadcast, setSelectedBroadcast] = useState<Broadcast | null>(null);
+
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isCreateBroadcastOpen, setIsCreateBroadcastOpen] = useState(false);
 
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,6 +60,12 @@ export const MessagesPage: React.FC = () => {
   const { data: groups = [] } = useQuery({
     queryKey: ['user-groups'],
     queryFn: () => groupsApi.getUserGroups()
+  });
+
+  // Fetch user broadcasts (Broadcast History)
+  const { data: broadcasts = [] } = useQuery({
+    queryKey: ['user-broadcasts'],
+    queryFn: () => broadcastsApi.getUserBroadcasts()
   });
 
   // Fetch active DM messages
@@ -271,7 +282,12 @@ export const MessagesPage: React.FC = () => {
     g.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const isSelectionActive = chatType === 'direct' ? !!selectedUser : !!selectedGroup;
+  const filteredBroadcasts = broadcasts.filter(b =>
+    (b.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    b.content.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const isSelectionActive = chatType === 'direct' ? !!selectedUser : chatType === 'groups' ? !!selectedGroup : !!selectedBroadcast;
 
   return (
     <AppShell>
@@ -280,50 +296,75 @@ export const MessagesPage: React.FC = () => {
         <div className={`w-full md:w-80 border-r border-slate-800/80 flex flex-col bg-background-card/20 ${
           isSelectionActive ? 'hidden md:flex' : 'flex'
         }`}>
-          {/* Header & Tabs */}
+          {/* Header & Action Buttons */}
           <div className="p-4 border-b border-slate-800/80 space-y-3">
             <div className="flex items-center justify-between">
               <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-brand-400" /> Messages
               </h1>
-              {chatType === 'groups' && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setIsCreateBroadcastOpen(true)}
+                  title="New Broadcast List"
+                  className="p-1.5 bg-cyan-600/20 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                >
+                  <Radio className="w-3.5 h-3.5" /> Broadcast
+                </button>
                 <button
                   onClick={() => setIsCreateGroupOpen(true)}
-                  className="px-2.5 py-1 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-glow-brand transition-colors"
+                  title="New Group Chat"
+                  className="p-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-glow-brand"
                 >
-                  <Plus className="w-3.5 h-3.5" /> New Group
+                  <Plus className="w-3.5 h-3.5" /> Group
                 </button>
-              )}
+              </div>
             </div>
 
-            {/* Direct vs Groups Toggle Buttons */}
-            <div className="grid grid-cols-2 p-1 bg-slate-900 border border-slate-800 rounded-xl">
+            {/* Direct vs Groups vs Broadcasts Toggle Buttons */}
+            <div className="grid grid-cols-3 p-1 bg-slate-900 border border-slate-800 rounded-xl">
               <button
                 onClick={() => {
                   setChatType('direct');
                   setSelectedGroup(null);
+                  setSelectedBroadcast(null);
                 }}
-                className={`py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
+                className={`py-1.5 text-[11px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1 ${
                   chatType === 'direct'
                     ? 'bg-brand-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <MessageSquare className="w-3.5 h-3.5" /> Direct
+                <MessageSquare className="w-3 h-3" /> Direct
               </button>
 
               <button
                 onClick={() => {
                   setChatType('groups');
                   setSelectedUser(null);
+                  setSelectedBroadcast(null);
                 }}
-                className={`py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
+                className={`py-1.5 text-[11px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1 ${
                   chatType === 'groups'
                     ? 'bg-brand-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <Users className="w-3.5 h-3.5" /> Groups ({groups.length})
+                <Users className="w-3 h-3" /> Groups ({groups.length})
+              </button>
+
+              <button
+                onClick={() => {
+                  setChatType('broadcasts');
+                  setSelectedUser(null);
+                  setSelectedGroup(null);
+                }}
+                className={`py-1.5 text-[11px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1 ${
+                  chatType === 'broadcasts'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Radio className="w-3 h-3" /> Broadcasts
               </button>
             </div>
             
@@ -333,7 +374,13 @@ export const MessagesPage: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={chatType === 'direct' ? "Search contacts..." : "Search groups..."}
+                placeholder={
+                  chatType === 'direct'
+                    ? "Search contacts..."
+                    : chatType === 'groups'
+                    ? "Search groups..."
+                    : "Search broadcasts..."
+                }
                 className="w-full bg-slate-900 border border-slate-800 focus:border-brand-500 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none"
               />
             </div>
@@ -371,7 +418,7 @@ export const MessagesPage: React.FC = () => {
                   );
                 })
               )
-            ) : (
+            ) : chatType === 'groups' ? (
               filteredGroups.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-400 space-y-2">
                   <p>No group chats yet</p>
@@ -407,6 +454,42 @@ export const MessagesPage: React.FC = () => {
                   );
                 })
               )
+            ) : (
+              filteredBroadcasts.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400 space-y-2">
+                  <p>No broadcast history</p>
+                  <button
+                    onClick={() => setIsCreateBroadcastOpen(true)}
+                    className="px-3 py-1.5 bg-cyan-600 text-white text-xs font-bold rounded-xl"
+                  >
+                    Send Broadcast
+                  </button>
+                </div>
+              ) : (
+                filteredBroadcasts.map((b) => {
+                  const isSelected = selectedBroadcast?.broadcastId === b.broadcastId;
+                  return (
+                    <div
+                      key={b.broadcastId}
+                      onClick={() => setSelectedBroadcast(b)}
+                      className={`p-3.5 flex items-center gap-3 cursor-pointer transition-colors ${
+                        isSelected ? 'bg-cyan-600/15 border-l-4 border-cyan-500' : 'hover:bg-slate-800/40'
+                      }`}
+                    >
+                      <div className="w-10 h-10 rounded-full bg-cyan-600/30 border border-cyan-500/30 flex items-center justify-center text-cyan-300 font-bold">
+                        <Radio className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 truncate">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-white truncate">{b.title || 'Broadcast List'}</p>
+                          <span className="text-[10px] text-cyan-400">{b.recipientsCount} recipients</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate">{b.content}</p>
+                      </div>
+                    </div>
+                  );
+                })
+              )
             )}
           </div>
         </div>
@@ -418,15 +501,27 @@ export const MessagesPage: React.FC = () => {
           {!isSelectionActive ? (
             <div className="text-center space-y-3 p-6 max-w-sm">
               <div className="p-4 bg-slate-800/40 rounded-full w-16 h-16 mx-auto flex items-center justify-center text-brand-400">
-                {chatType === 'direct' ? <ShieldCheck className="w-8 h-8 text-emerald-400" /> : <Users className="w-8 h-8 text-brand-400" />}
+                {chatType === 'direct' ? (
+                  <ShieldCheck className="w-8 h-8 text-emerald-400" />
+                ) : chatType === 'groups' ? (
+                  <Users className="w-8 h-8 text-brand-400" />
+                ) : (
+                  <Radio className="w-8 h-8 text-cyan-400" />
+                )}
               </div>
               <h2 className="text-lg font-bold text-white">
-                {chatType === 'direct' ? 'End-to-End Encrypted Messages' : 'Group Conversations'}
+                {chatType === 'direct'
+                  ? 'End-to-End Encrypted Messages'
+                  : chatType === 'groups'
+                  ? 'Group Conversations'
+                  : 'Message Broadcasts'}
               </h2>
               <p className="text-xs text-slate-400">
                 {chatType === 'direct'
                   ? 'Select a contact from the left panel to start a secure 256-bit AES-GCM conversation.'
-                  : 'Select a group from the left panel or click "New Group" to chat with your team.'}
+                  : chatType === 'groups'
+                  ? 'Select a group from the left panel or click "New Group" to chat with your team.'
+                  : 'Send a message to multiple contacts at once. Each recipient gets a private direct message.'}
               </p>
             </div>
           ) : chatType === 'direct' && selectedUser ? (
@@ -663,6 +758,37 @@ export const MessagesPage: React.FC = () => {
                 </button>
               </form>
             </>
+          ) : chatType === 'broadcasts' && selectedBroadcast ? (
+            <div className="flex-1 flex flex-col bg-background-card/20 p-6 space-y-4">
+              <div className="border-b border-slate-800 pb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-cyan-600/30 border border-cyan-500/30 flex items-center justify-center text-cyan-300 font-bold">
+                    <Radio className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">{selectedBroadcast.title || 'Broadcast List'}</h3>
+                    <p className="text-xs text-cyan-400 font-medium">Dispatched to {selectedBroadcast.recipientsCount} recipients</p>
+                  </div>
+                </div>
+                <span className="text-xs text-slate-500">
+                  {formatDistanceToNow(new Date(selectedBroadcast.createdAt), { addSuffix: true })}
+                </span>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
+                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 font-bold px-2 py-0.5 rounded-full border border-cyan-500/30">
+                  Dispatched Broadcast Content
+                </span>
+                <p className="text-sm text-white leading-relaxed whitespace-pre-line pt-2">
+                  {selectedBroadcast.content}
+                </p>
+              </div>
+
+              <div className="p-4 bg-slate-900/60 border border-slate-800/80 rounded-2xl text-xs text-slate-400 space-y-1">
+                <p className="font-semibold text-slate-300">💡 Broadcast Information:</p>
+                <p>This message was delivered as individual 1-on-1 direct messages to each recipient. Replies from recipients will appear in your direct chat window.</p>
+              </div>
+            </div>
           ) : null}
         </div>
       </div>
@@ -676,6 +802,18 @@ export const MessagesPage: React.FC = () => {
           queryClient.invalidateQueries({ queryKey: ['user-groups'] });
           setChatType('groups');
           setSelectedGroup(newGroup);
+        }}
+      />
+
+      {/* Broadcast Creation Modal */}
+      <CreateBroadcastModal
+        isOpen={isCreateBroadcastOpen}
+        onClose={() => setIsCreateBroadcastOpen(false)}
+        contacts={suggestions}
+        onBroadcastSent={() => {
+          queryClient.invalidateQueries({ queryKey: ['user-broadcasts'] });
+          queryClient.invalidateQueries({ queryKey: ['messages'] });
+          setChatType('broadcasts');
         }}
       />
 

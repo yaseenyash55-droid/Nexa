@@ -163,6 +163,16 @@ export interface CreateGroupParams {
   memberIds?: number[];
 }
 
+export interface Broadcast {
+  broadcastId: number;
+  senderId: number;
+  title?: string | null;
+  content: string;
+  recipientsCount: number;
+  recipientIds: number[];
+  createdAt: string;
+}
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;

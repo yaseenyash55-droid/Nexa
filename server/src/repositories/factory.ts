@@ -11,10 +11,14 @@ import {
   ISecurityRepository 
 } from './types.js';
 import { GroupRepository, MockGroupRepository, OracleGroupRepository } from './group.repository.js';
+import { BroadcastRepository, MockBroadcastRepository, OracleBroadcastRepository } from './broadcast.repository.js';
 import { env } from '../config/env.js';
 
 const mockGroupRepo = new MockGroupRepository();
 const oracleGroupRepo = new OracleGroupRepository();
+
+const mockBroadcastRepo = new MockBroadcastRepository();
+const oracleBroadcastRepo = new OracleBroadcastRepository();
 
 export function getUserRepository(): IUserRepository {
   return getRepositoryManager().userRepo;
@@ -54,4 +58,8 @@ export function getSecurityRepository(): ISecurityRepository {
 
 export function getGroupRepository(): GroupRepository {
   return env.DATA_SOURCE === 'oracle' ? oracleGroupRepo : mockGroupRepo;
+}
+
+export function getBroadcastRepository(): BroadcastRepository {
+  return env.DATA_SOURCE === 'oracle' ? oracleBroadcastRepo : mockBroadcastRepo;
 }
