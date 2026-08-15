@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: nexa-backend
+    env: node
+    plan: free
+    region: singapore
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATA_SOURCE
+        value: mock
+      - key: CORS_ORIGIN
+        value: https://nexa-social-app.surge.sh
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
