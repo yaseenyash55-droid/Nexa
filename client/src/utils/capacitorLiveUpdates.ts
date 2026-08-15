@@ -10,7 +10,10 @@ export async function initializeLiveUpdates() {
 
     // Register event to fire each time user resumes the app  
     App.addListener('resume', async () => {
-      if (localStorage.getItem('shouldReloadApp') === 'true') {
+      if (
+        localStorage.getItem('shouldReloadApp') === 'true' &&
+        localStorage.getItem('shouldBlockReload') !== 'true'
+      ) {
         await LiveUpdates.reload();
       } else {
         const result = await LiveUpdates.sync();
@@ -19,8 +22,15 @@ export async function initializeLiveUpdates() {
     });
 
     // First sync on app load
-    const result = await LiveUpdates.sync();
-    localStorage.setItem('shouldReloadApp', String(result.activeApplicationPathChanged));
+    if (
+      localStorage.getItem('shouldReloadApp') === 'true' &&
+      localStorage.getItem('shouldBlockReload') !== 'true'
+    ) {
+      await LiveUpdates.reload();
+    } else {
+      const result = await LiveUpdates.sync();
+      localStorage.setItem('shouldReloadApp', String(result.activeApplicationPathChanged));
+    }
   } catch (err) {
     console.warn('Capacitor LiveUpdates sync skipped or not installed in current environment:', err);
   }

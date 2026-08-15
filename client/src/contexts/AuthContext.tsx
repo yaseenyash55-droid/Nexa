@@ -82,13 +82,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (credentials: any) => {
-    const res = await authApi.login(credentials);
-    setUser(res.user);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('shouldBlockReload', 'true');
+    }
+    try {
+      const res = await authApi.login(credentials);
+      setUser(res.user);
+    } finally {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('shouldBlockReload', 'false');
+      }
+    }
   };
 
   const register = async (data: any) => {
-    const res = await authApi.register(data);
-    setUser(res.user);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('shouldBlockReload', 'true');
+    }
+    try {
+      const res = await authApi.register(data);
+      setUser(res.user);
+    } finally {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('shouldBlockReload', 'false');
+      }
+    }
   };
 
   const logout = async () => {
@@ -126,4 +144,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
