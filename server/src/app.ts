@@ -1,75 +1,65 @@
 import express from 'express';
-import path from 'path';
-import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import { env } from './config/env.js';
-import { errorHandler } from './middleware/error.middleware.js';
-
-import authRoutes from './routes/auth.routes.js';
-import userRoutes from './routes/user.routes.js';
-import postRoutes from './routes/post.routes.js';
-import notificationRoutes from './routes/notification.routes.js';
-import healthRoutes from './routes/health.routes.js';
+import path from 'path';
+import fs from 'fs';
+import authRouter from './routes/auth.routes.js';
+import userRouter from './routes/user.routes.js';
+import postRouter from './routes/post.routes.js';
+import notificationRouter from './routes/notification.routes.js';
+import healthRouter from './routes/health.routes.js';
 import { socialRouter } from './routes/social.routes.js';
-import { securityRouter } from './routes/security.routes.js';
+import { musicRouter } from './routes/music.routes.js';
 import { privacyRouter } from './routes/privacy.routes.js';
+import { securityRouter } from './routes/security.routes.js';
 import { mediaRouter } from './routes/media.routes.js';
+import { errorHandler } from './middleware/error.middleware.js';
 
 export const app = express();
 
-// Trust single reverse proxy (Nginx) for secure cookies and X-Forwarded-For IP resolution
-app.set('trust proxy', 1);
-
-// Middleware setup
-app.use(helmet({
-  crossOriginResourcePolicy: false
-}));
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin or any web origin in live staging mode
-    callback(null, true);
-  },
+  origin: true,
   credentials: true
 }));
-app.use(cookieParser());
 app.use(express.json({ limit: '500mb' }));
-app.use(express.urlencoded({ extended: true, limit: '500mb', parameterLimit: 500000 }));
+app.use(express.urlencoded({ extended: true, limit: '500mb' }));
+app.use(cookieParser());
 
-import { musicRouter } from './routes/music.routes.js';
+// Static uploads folder
+const uploadsPath = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsPath));
 
-// Route registrations
+// API Routes
+app.use('/api/health', healthRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/users', userRouter);
+app.use('/api/posts', postRouter);
+app.use('/api/notifications', notificationRouter);
+app.use('/api/security', securityRouter);
+app.use('/api/privacy', privacyRouter);
+app.use('/api/music', musicRouter);
+app.use('/api/media', mediaRouter);
+app.use('/api', socialRouter);
+
+// Root API Welcome Endpoint
 app.get('/', (req, res) => {
   res.json({
     status: 'online',
-    app: 'Nexa Social API',
+    app: 'Nexa Social API 24/7',
+    version: '1.0.0',
     health: '/api/health',
     client: 'https://nexa-social-app.surge.sh'
   });
 });
 
-app.use('/api/health', healthRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/posts', postRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/security', securityRouter);
-app.use('/api/privacy', privacyRouter);
-app.use('/api/music', musicRouter);
-app.use('/api/media', mediaRouter);
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-app.use('/api', socialRouter);
-
-// Serve Frontend Static Assets (Unified Same-Origin Production Engine)
-const clientDistPath = path.join(process.cwd(), '../client/dist');
-app.use(express.static(clientDistPath));
-
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
-    return next();
-  }
-  res.sendFile(path.join(clientDistPath, 'index.html'));
+// 404 Route Handler for undefined endpoints
+app.use((req, res) => {
+  res.status(404).json({ error: { code: 'NOT_FOUND', message: `Route ${req.method} ${req.url} not found` } });
 });
 
-// Error Handling Middleware
 app.use(errorHandler);
+
+export default app;
