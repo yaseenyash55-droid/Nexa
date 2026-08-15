@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '../contexts/AuthContext.js';
@@ -21,6 +21,7 @@ import { UserManualPage } from '../pages/UserManualPage.js';
 import { LoginPage } from '../pages/LoginPage.js';
 import { RegisterPage } from '../pages/RegisterPage.js';
 import { NotFoundPage } from '../pages/NotFoundPage.js';
+import { initializeLiveUpdates } from '../utils/capacitorLiveUpdates.js';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,36 +52,40 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 export const App: React.FC = () => {
+  useEffect(() => {
+    initializeLiveUpdates();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
           <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/explore" element={<ExplorePage />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/reels" element={<ReelsPage />} />
-            <Route path="/profile/:username" element={<ProfilePage />} />
-            <Route path="/user-manual" element={<UserManualPage />} />
-            <Route path="/help" element={<UserManualPage />} />
-            <Route path="/tutorial" element={<UserManualPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            
-            <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
-            <Route path="/bookmarks" element={<ProtectedRoute><Navigate to="/settings?tab=bookmarks" replace /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-            <Route path="/settings/appearance" element={<ProtectedRoute><Navigate to="/settings?tab=appearance" replace /></ProtectedRoute>} />
-            <Route path="/settings/protection" element={<ProtectedRoute><Navigate to="/settings?tab=protection" replace /></ProtectedRoute>} />
-            <Route path="/settings/protection/*" element={<ProtectedRoute><Navigate to="/settings?tab=protection" replace /></ProtectedRoute>} />
-            <Route path="/protection" element={<ProtectedRoute><Navigate to="/settings?tab=protection" replace /></ProtectedRoute>} />
-            <Route path="/insights" element={<ProtectedRoute><Navigate to="/settings?tab=insights" replace /></ProtectedRoute>} />
-            <Route path="/moderation" element={<ProtectedRoute><Navigate to="/settings?tab=moderation" replace /></ProtectedRoute>} />
-            <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
-            
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/explore" element={<ExplorePage />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/reels" element={<ReelsPage />} />
+              <Route path="/profile/:username" element={<ProfilePage />} />
+              <Route path="/user-manual" element={<UserManualPage />} />
+              <Route path="/help" element={<UserManualPage />} />
+              <Route path="/tutorial" element={<UserManualPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+
+              <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+              <Route path="/bookmarks" element={<ProtectedRoute><Navigate to="/settings?tab=bookmarks" replace /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+              <Route path="/settings/appearance" element={<ProtectedRoute><Navigate to="/settings?tab=appearance" replace /></ProtectedRoute>} />
+              <Route path="/settings/protection" element={<ProtectedRoute><Navigate to="/settings?tab=protection" replace /></ProtectedRoute>} />
+              <Route path="/settings/protection/*" element={<ProtectedRoute><Navigate to="/settings?tab=protection" replace /></ProtectedRoute>} />
+              <Route path="/protection" element={<ProtectedRoute><Navigate to="/settings?tab=protection" replace /></ProtectedRoute>} />
+              <Route path="/insights" element={<ProtectedRoute><Navigate to="/settings?tab=insights" replace /></ProtectedRoute>} />
+              <Route path="/moderation" element={<ProtectedRoute><Navigate to="/settings?tab=moderation" replace /></ProtectedRoute>} />
+              <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
+
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
           </BrowserRouter>
         </AuthProvider>
       </ThemeProvider>
