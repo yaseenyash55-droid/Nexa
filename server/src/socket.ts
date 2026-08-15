@@ -60,6 +60,25 @@ export class NexaRealtimeServer {
     }
   }
 
+  public handleTypingStart(senderId: number, username: string, receiverId: number) {
+    if (receiverId) {
+      this.emitToUser(receiverId, 'typing:start', {
+        userId: senderId,
+        username,
+        receiverId
+      });
+    }
+  }
+
+  public handleTypingStop(senderId: number, receiverId: number) {
+    if (receiverId) {
+      this.emitToUser(receiverId, 'typing:stop', {
+        userId: senderId,
+        receiverId
+      });
+    }
+  }
+
   public async handleSendMessage(senderId: number, receiverId: number, content: string) {
     if (!content || !content.trim()) {
       throw new Error('Message content cannot be empty');

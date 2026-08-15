@@ -10,6 +10,11 @@ import {
   IAuthRepository,
   ISecurityRepository 
 } from './types.js';
+import { GroupRepository, MockGroupRepository, OracleGroupRepository } from './group.repository.js';
+import { env } from '../config/env.js';
+
+const mockGroupRepo = new MockGroupRepository();
+const oracleGroupRepo = new OracleGroupRepository();
 
 export function getUserRepository(): IUserRepository {
   return getRepositoryManager().userRepo;
@@ -45,4 +50,8 @@ export function getAuthRepository(): IAuthRepository {
 
 export function getSecurityRepository(): ISecurityRepository {
   return getRepositoryManager().securityRepo;
+}
+
+export function getGroupRepository(): GroupRepository {
+  return env.DATA_SOURCE === 'oracle' ? oracleGroupRepo : mockGroupRepo;
 }

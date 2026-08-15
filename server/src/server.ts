@@ -40,6 +40,18 @@ async function startServer() {
       socket.join(`user:${user.userId}`);
       realtimeServer.registerUserSocket(user.userId, socket.id);
 
+      socket.on('typing:start', (data: { receiverId: number }) => {
+        if (data?.receiverId) {
+          realtimeServer.handleTypingStart(user.userId, user.username, data.receiverId);
+        }
+      });
+
+      socket.on('typing:stop', (data: { receiverId: number }) => {
+        if (data?.receiverId) {
+          realtimeServer.handleTypingStop(user.userId, data.receiverId);
+        }
+      });
+
       socket.on('disconnect', () => {
         realtimeServer.removeUserSocket(user.userId, socket.id);
       });

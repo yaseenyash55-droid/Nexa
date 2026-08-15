@@ -117,6 +117,52 @@ export interface Message {
   createdAt: string;
 }
 
+export interface Group {
+  groupId: number;
+  name: string;
+  description?: string | null;
+  createdBy: number;
+  avatarUrl?: string | null;
+  createdAt: string;
+  membersCount?: number;
+  lastMessage?: string | null;
+}
+
+export interface GroupMember {
+  groupId: number;
+  userId: number;
+  role: 'ADMIN' | 'MEMBER';
+  joinedAt: string;
+  user?: {
+    userId: number;
+    username: string;
+    displayName: string;
+    profileImageUrl?: string | null;
+  };
+}
+
+export interface GroupMessage {
+  messageId: number;
+  groupId: number;
+  senderId: number;
+  sender: {
+    userId: number;
+    username: string;
+    displayName: string;
+    profileImageUrl?: string | null;
+  };
+  content: string;
+  createdAt: string;
+}
+
+export interface CreateGroupParams {
+  name: string;
+  description?: string;
+  avatarUrl?: string;
+  createdBy: number;
+  memberIds?: number[];
+}
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;

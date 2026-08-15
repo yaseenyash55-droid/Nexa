@@ -14,6 +14,7 @@ import { musicRouter } from './routes/music.routes.js';
 import { privacyRouter } from './routes/privacy.routes.js';
 import { securityRouter } from './routes/security.routes.js';
 import { mediaRouter } from './routes/media.routes.js';
+import { groupRouter } from './routes/group.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 
 export const app = express();
@@ -50,6 +51,7 @@ app.use('/api/security', securityRouter);
 app.use('/api/privacy', privacyRouter);
 app.use('/api/music', musicRouter);
 app.use('/api/media', mediaRouter);
+app.use('/api/groups', groupRouter);
 app.use('/api', socialRouter);
 
 // Root API Welcome Endpoint
