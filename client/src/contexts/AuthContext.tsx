@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types/index.js';
 import { authApi } from '../api/auth.api.js';
 import { setAccessToken, getAccessToken } from '../api/client.js';
+import { syncUserLiveUpdates } from '../utils/capacitorLiveUpdates.js';
 
 interface AuthContextType {
   user: User | null;
@@ -88,6 +89,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const res = await authApi.login(credentials);
       setUser(res.user);
+      
+      // Perform user-specific Live Updates sync based on logged in user details
+      await syncUserLiveUpdates(res.user);
     } finally {
       if (typeof window !== 'undefined') {
         localStorage.setItem('shouldBlockReload', 'false');
@@ -102,6 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const res = await authApi.register(data);
       setUser(res.user);
+      await syncUserLiveUpdates(res.user);
     } finally {
       if (typeof window !== 'undefined') {
         localStorage.setItem('shouldBlockReload', 'false');

@@ -10,6 +10,9 @@ const config: CapacitorConfig = {
       channel: 'Production',
       autoUpdateMethod: 'background',
       maxVersions: 2
+    },
+    SplashScreen: {
+      launchAutoHide: false
     }
   }
 };
