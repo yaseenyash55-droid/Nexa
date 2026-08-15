@@ -39,6 +39,15 @@ app.use(express.urlencoded({ extended: true, limit: '500mb', parameterLimit: 500
 import { musicRouter } from './routes/music.routes.js';
 
 // Route registrations
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    app: 'Nexa Social API',
+    health: '/api/health',
+    client: 'https://nexa-social-app.surge.sh'
+  });
+});
+
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
