@@ -12,11 +12,17 @@ services:
         value: production
       - key: PORT
         value: 10000
-      - key: DATA_SOURCE
-        value: mock
-      - key: CORS_ORIGIN
+      - key: CLIENT_ORIGIN
         value: https://nexa-social-app.surge.sh
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_CONNECT_STRING
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      - key: COOKIE_SECURE
+        value: true

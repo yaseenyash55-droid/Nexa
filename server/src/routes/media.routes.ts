@@ -3,7 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import { Router } from 'express';
 import multer from 'multer';
-import { env } from '../config/env.js';
 import { executeSql } from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { AuthenticatedRequest } from '../types/index.js';
@@ -86,36 +85,40 @@ mediaRouter.post('/upload', requireAuth, aiAndMediaRateLimiter, upload.single('f
     await fs.promises.rename(uploaded.path, finalPath);
 
     const authReq = req as AuthenticatedRequest;
-    if (env.DATA_SOURCE === 'oracle') {
-      try {
-        await executeSql(
-          `INSERT INTO MEDIA_ASSETS
-             (ASSET_ID, USER_ID, STORAGE_KEY, ORIGINAL_NAME, MIME_TYPE, SIZE_BYTES, MEDIA_KIND)
-           VALUES
-             (:assetId, :userId, :storageKey, :originalName, :mimeType, :sizeBytes, :mediaKind)`,
-          {
-            assetId,
-            userId: authReq.user!.userId,
-            storageKey,
-            originalName: path.basename(uploaded.originalname).slice(0, 255),
-            mimeType: uploaded.mimetype,
-            sizeBytes: uploaded.size,
-            mediaKind: kind.toUpperCase()
-          }
-        );
-      } catch (error) {
-        await removeIfPresent(finalPath);
-        throw error;
-      }
+    try {
+      await executeSql(
+        `INSERT INTO MEDIA_ASSETS
+           (ASSET_ID, USER_ID, STORAGE_KEY, ORIGINAL_NAME, MIME_TYPE, SIZE_BYTES, MEDIA_KIND)
+         VALUES
+           (:assetId, :userId, :storageKey, :originalName, :mimeType, :sizeBytes, :mediaKind)`,
+        {
+          assetId,
+          userId: authReq.user!.userId,
+          storageKey,
+          originalName: path.basename(uploaded.originalname).slice(0, 255),
+          mimeType: uploaded.mimetype,
+          sizeBytes: uploaded.size,
+          mediaKind: kind.toUpperCase()
+        }
+      );
+    } catch (error) {
+      await removeIfPresent(finalPath);
+      throw error;
     }
 
-    return sendSuccess(res, {
-      assetId,
-      mediaKind: kind,
-      mimeType: uploaded.mimetype,
-      sizeBytes: uploaded.size,
-      publicUrl: `/uploads/${storageKey}`
-    }, 'Media uploaded', undefined, 201);
+    return sendSuccess(
+      res,
+      {
+        assetId,
+        mediaKind: kind,
+        mimeType: uploaded.mimetype,
+        sizeBytes: uploaded.size,
+        publicUrl: `/uploads/${storageKey}`
+      },
+      'Media uploaded',
+      undefined,
+      201
+    );
   } catch (error) {
     await removeIfPresent(uploaded?.path);
     next(error);

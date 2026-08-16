@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OracleUserRepository } from '../src/repositories/oracle/user.oracle.repo.js';
 import { OraclePostRepository } from '../src/repositories/oracle/post.oracle.repo.js';
 import { checkOracleHealth, initializeOraclePool, closeOraclePool } from '../src/db/pool.js';
@@ -10,17 +10,19 @@ describe('Oracle Repository Integration Suite', () => {
   let postRepo: OraclePostRepository;
 
   beforeAll(async () => {
-    if (env.DATA_SOURCE === 'oracle') {
-      try {
-        await initializeOraclePool();
-        const health = await checkOracleHealth();
-        isOracleLive = health.reachable;
-      } catch {
-        isOracleLive = false;
-      }
+    try {
+      await initializeOraclePool();
+      const health = await checkOracleHealth();
+      isOracleLive = health.reachable;
+    } catch {
+      isOracleLive = false;
     }
     userRepo = new OracleUserRepository();
     postRepo = new OraclePostRepository();
+  });
+
+  afterAll(async () => {
+    await closeOraclePool();
   });
 
   it('should report database reachability status without throwing secrets', async () => {

@@ -1,23 +1,10 @@
 import { getRepositoryManager } from './index.js';
-import { 
-  IUserRepository, 
-  IPostRepository, 
-  ICommentRepository, 
-  INotificationRepository, 
-  IStoryRepository,
-  IReelRepository,
-  IMessageRepository,
-  IAuthRepository,
-  ISecurityRepository 
-} from './types.js';
-import { GroupRepository, MockGroupRepository, OracleGroupRepository } from './group.repository.js';
-import { BroadcastRepository, MockBroadcastRepository, OracleBroadcastRepository } from './broadcast.repository.js';
-import { env } from '../config/env.js';
+import { IUserRepository, IPostRepository, ICommentRepository, INotificationRepository, IStoryRepository, IReelRepository, IMessageRepository, IAuthRepository, ISecurityRepository } from './types.js';
+import { GroupRepository, OracleGroupRepository } from './group.repository.js';
+import { BroadcastRepository, OracleBroadcastRepository } from './broadcast.repository.js';
 
-const mockGroupRepo = new MockGroupRepository();
 const oracleGroupRepo = new OracleGroupRepository();
 
-const mockBroadcastRepo = new MockBroadcastRepository();
 const oracleBroadcastRepo = new OracleBroadcastRepository();
 
 export function getUserRepository(): IUserRepository {
@@ -57,9 +44,9 @@ export function getSecurityRepository(): ISecurityRepository {
 }
 
 export function getGroupRepository(): GroupRepository {
-  return env.DATA_SOURCE === 'oracle' ? oracleGroupRepo : mockGroupRepo;
+  return oracleGroupRepo;
 }
 
 export function getBroadcastRepository(): BroadcastRepository {
-  return env.DATA_SOURCE === 'oracle' ? oracleBroadcastRepo : mockBroadcastRepo;
+  return oracleBroadcastRepo;
 }

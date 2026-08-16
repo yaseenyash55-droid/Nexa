@@ -1,0 +1,2204 @@
+diff --git a/client/nexa b/client/nexa
+--- a/client/nexa
++++ b/client/nexa
+@@ -1 +1 @@
+-Subproject commit c527f845784f17c5d8b44d538ebdae684ec26f6c
++Subproject commit c527f845784f17c5d8b44d538ebdae684ec26f6c-dirty
+diff --git a/client/src/components/layout/AppShell.tsx b/client/src/components/layout/AppShell.tsx
+index 2dabfe1..9aac1cc 100644
+--- a/client/src/components/layout/AppShell.tsx
++++ b/client/src/components/layout/AppShell.tsx
+@@ -6,7 +6,6 @@ import { SearchInput } from '../search/SearchInput.js';
+ import { SuggestedUsers } from '../search/SuggestedUsers.js';
+ import { Modal } from '../ui/Modal.js';
+ import { PostComposer } from '../feed/PostComposer.js';
+-import { DevelopmentDataModeBadge } from '../ui/DevelopmentDataModeBadge.js';
+ 
+ interface AppShellProps {
+   children: React.ReactNode;
+@@ -27,9 +26,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, showRightPanel = t
+       </div>
+ 
+       {/* Main Content Stream Column */}
+-      <main className="flex-1 max-w-2xl w-full border-x border-slate-800/80 min-h-screen pb-20 md:pb-8">
+-        {children}
+-      </main>
++      <main className="flex-1 max-w-2xl w-full border-x border-slate-800/80 min-h-screen pb-20 md:pb-8">{children}</main>
+ 
+       {/* Right Sidebar Panel (Desktop only) */}
+       {showRightPanel && (
+@@ -50,9 +47,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, showRightPanel = t
+       <Modal isOpen={isComposerOpen} onClose={() => setIsComposerOpen(false)} title="Create New Post">
+         <PostComposer onPostCreated={() => setIsComposerOpen(false)} />
+       </Modal>
+-
+-      {/* Development Mode Badge */}
+-      <DevelopmentDataModeBadge />
+     </div>
+   );
+ };
+diff --git a/client/src/components/ui/DevelopmentDataModeBadge.tsx b/client/src/components/ui/DevelopmentDataModeBadge.tsx
+deleted file mode 100644
+index 0035658..0000000
+--- a/client/src/components/ui/DevelopmentDataModeBadge.tsx
++++ /dev/null
+@@ -1,27 +0,0 @@
+-import React, { useState, useEffect } from 'react';
+-import { api } from '../../api/client.js';
+-
+-export const DevelopmentDataModeBadge: React.FC = () => {
+-  const [dataMode, setDataMode] = useState<string>('oracle');
+-
+-  useEffect(() => {
+-    async function fetchHealth() {
+-      try {
+-        const res = await api.get('/health');
+-        if (res.data?.data?.mode) {
+-          setDataMode(res.data.data.mode);
+-        }
+-      } catch {
+-        // ignore
+-      }
+-    }
+-    fetchHealth();
+-  }, []);
+-
+-  return (
+-    <div className="fixed bottom-3 left-3 z-50 flex items-center gap-2 px-3 py-1 bg-slate-900/90 border border-slate-700/80 rounded-full text-xs font-medium text-slate-300 shadow-xl backdrop-blur-md">
+-      <span className={`w-2 h-2 rounded-full ${dataMode === 'oracle' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+-      <span>DATA_SOURCE: <strong className="uppercase text-white">{dataMode}</strong></span>
+-    </div>
+-  );
+-};
+diff --git a/client/src/pages/UserManualPage.tsx b/client/src/pages/UserManualPage.tsx
+index f09f138..fd919a2 100644
+--- a/client/src/pages/UserManualPage.tsx
++++ b/client/src/pages/UserManualPage.tsx
+@@ -1,23 +1,7 @@
+ import React, { useState } from 'react';
+ import { AppShell } from '../components/layout/AppShell.js';
+ import { DrDoomOrbLogo } from '../components/ui/DrDoomOrbLogo.js';
+-import { 
+-  BookOpen, 
+-  Search, 
+-  UserPlus, 
+-  Edit3, 
+-  MessageSquare, 
+-  ShieldCheck, 
+-  Smartphone, 
+-  ChevronDown, 
+-  ChevronUp, 
+-  ArrowRight, 
+-  Users, 
+-  CheckCircle2, 
+-  Camera, 
+-  Video, 
+-  Film 
+-} from 'lucide-react';
++import { BookOpen, Search, UserPlus, Edit3, MessageSquare, ShieldCheck, Smartphone, ChevronDown, ChevronUp, ArrowRight, Users, CheckCircle2, Camera, Video, Film } from 'lucide-react';
+ import { useNavigate } from 'react-router-dom';
+ 
+ interface ManualSection {
+@@ -234,7 +218,7 @@ export const UserManualPage: React.FC = () => {
+         },
+         {
+           title: 'Layered Backend Architecture',
+-          desc: 'Strict separation: Routes -> Validation Middleware -> Controller -> Service -> Repository -> Data Source (Oracle / Mock).'
++          desc: 'Strict separation: Routes -> Validation Middleware -> Controller -> Service -> Repository -> Oracle Database.'
+         },
+         {
+           title: 'Sanitized Static Media URLs',
+@@ -273,11 +257,7 @@ export const UserManualPage: React.FC = () => {
+     }
+   ];
+ 
+-  const filteredSections = sections.filter((sec) =>
+-    sec.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+-    sec.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
+-    sec.steps.some((st) => st.title.toLowerCase().includes(searchQuery.toLowerCase()) || st.desc.toLowerCase().includes(searchQuery.toLowerCase()))
+-  );
++  const filteredSections = sections.filter((sec) => sec.title.toLowerCase().includes(searchQuery.toLowerCase()) || sec.summary.toLowerCase().includes(searchQuery.toLowerCase()) || sec.steps.some((st) => st.title.toLowerCase().includes(searchQuery.toLowerCase()) || st.desc.toLowerCase().includes(searchQuery.toLowerCase())));
+ 
+   return (
+     <AppShell>
+@@ -288,23 +268,13 @@ export const UserManualPage: React.FC = () => {
+             <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-500/20 border border-brand-500/30 rounded-full text-brand-300 text-xs font-semibold">
+               <BookOpen className="w-4 h-4" /> Nexa User Manual & Project Viva Guide
+             </div>
+-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+-              Nexa Project User Manual
+-            </h1>
+-            <p className="text-sm text-slate-300 leading-relaxed">
+-              Learn how to use Nexa step by step. Explore guides on account setup, Instagram profile uploads, progress-tracked media streaming, short Reels vs Long Videos, 256-bit AES-GCM encrypted messaging, group chats, broadcasts, and the Android mobile app.
+-            </p>
++            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Nexa Project User Manual</h1>
++            <p className="text-sm text-slate-300 leading-relaxed">Learn how to use Nexa step by step. Explore guides on account setup, Instagram profile uploads, progress-tracked media streaming, short Reels vs Long Videos, 256-bit AES-GCM encrypted messaging, group chats, broadcasts, and the Android mobile app.</p>
+ 
+             {/* Search Box */}
+             <div className="relative max-w-md pt-2">
+               <Search className="w-4 h-4 absolute left-3.5 top-5.5 text-slate-400" />
+-              <input
+-                type="text"
+-                value={searchQuery}
+-                onChange={(e) => setSearchQuery(e.target.value)}
+-                placeholder="Search user manual topics..."
+-                className="w-full bg-slate-950 border border-slate-800 focus:border-brand-500 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none shadow-inner"
+-              />
++              <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search user manual topics..." className="w-full bg-slate-950 border border-slate-800 focus:border-brand-500 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none shadow-inner" />
+             </div>
+           </div>
+ 
+@@ -318,24 +288,16 @@ export const UserManualPage: React.FC = () => {
+         {/* Accordion Sections List */}
+         <div className="space-y-4">
+           {filteredSections.length === 0 ? (
+-            <div className="p-12 text-center text-sm text-slate-400 bg-slate-900/40 border border-slate-800 rounded-2xl">
+-              No matching manual sections found. Try a different search query.
+-            </div>
++            <div className="p-12 text-center text-sm text-slate-400 bg-slate-900/40 border border-slate-800 rounded-2xl">No matching manual sections found. Try a different search query.</div>
+           ) : (
+             filteredSections.map((sec) => {
+               const Icon = sec.icon;
+               const isOpen = openSectionId === sec.id;
+ 
+               return (
+-                <div
+-                  key={sec.id}
+-                  className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden transition-all shadow-sm"
+-                >
++                <div key={sec.id} className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden transition-all shadow-sm">
+                   {/* Accordion Header */}
+-                  <div
+-                    onClick={() => toggleSection(sec.id)}
+-                    className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-800/40 transition-colors"
+-                  >
++                  <div onClick={() => toggleSection(sec.id)} className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-800/40 transition-colors">
+                     <div className="flex items-center gap-3.5">
+                       <div className={`p-2.5 rounded-xl border ${sec.bg} ${sec.color}`}>
+                         <Icon className="w-5 h-5" />
+@@ -346,9 +308,7 @@ export const UserManualPage: React.FC = () => {
+                       </div>
+                     </div>
+ 
+-                    <button className="p-1 text-slate-400 hover:text-white rounded-lg">
+-                      {isOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+-                    </button>
++                    <button className="p-1 text-slate-400 hover:text-white rounded-lg">{isOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}</button>
+                   </div>
+ 
+                   {/* Accordion Body */}
+diff --git a/client/vite.config.ts b/client/vite.config.ts
+index ad4abb3..c3afee3 100644
+--- a/client/vite.config.ts
++++ b/client/vite.config.ts
+@@ -18,6 +18,7 @@ export default defineConfig({
+     }
+   },
+   test: {
++    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+     globals: true,
+     environment: 'jsdom'
+   }
+diff --git a/server/src/config/env.ts b/server/src/config/env.ts
+index c45836f..c9a40c5 100644
+--- a/server/src/config/env.ts
++++ b/server/src/config/env.ts
+@@ -30,9 +30,6 @@ export const env = {
+   DB_PASSWORD: oracleDbPassword,
+   DB_CONNECT_STRING: oracleDbConnectionString,
+   CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || 'https://nexa-social-app.surge.sh',
+-  get DATA_SOURCE(): 'oracle' | 'mock' {
+-    return (process.env.DATA_SOURCE as 'oracle' | 'mock') || 'oracle';
+-  },
+   DB_POOL_MIN: parseInt(process.env.DB_POOL_MIN || '1', 10),
+   DB_POOL_MAX: parseInt(process.env.DB_POOL_MAX || '5', 10),
+   DB_POOL_INCREMENT: parseInt(process.env.DB_POOL_INCREMENT || '1', 10),
+diff --git a/server/src/db/pool.ts b/server/src/db/pool.ts
+index 37258eb..201b813 100644
+--- a/server/src/db/pool.ts
++++ b/server/src/db/pool.ts
+@@ -9,11 +9,6 @@ oracledb.autoCommit = false;
+ let pool: any = null;
+ 
+ export async function initializeOraclePool(): Promise<void> {
+-  if (env.DATA_SOURCE !== 'oracle') {
+-    logger.info('DATA_SOURCE is set to mock. Skipping Oracle connection pool creation.');
+-    return;
+-  }
+-
+   try {
+     pool = await oracledb.createPool({
+       user: env.DB_USER,
+@@ -43,20 +38,13 @@ export async function closeOraclePool(): Promise<void> {
+ }
+ 
+ export async function getConnection(): Promise<any> {
+-  if (env.DATA_SOURCE !== 'oracle') {
+-    throw new Error('Oracle pool requested while DATA_SOURCE is set to mock');
+-  }
+   if (!pool) {
+     throw new Error('Oracle Connection Pool is not initialized');
+   }
+   return pool.getConnection();
+ }
+ 
+-export async function executeSql<T = unknown>(
+-  sql: string,
+-  binds: Record<string, any> | any[] = {},
+-  options: Record<string, any> = {}
+-): Promise<any> {
++export async function executeSql<T = unknown>(sql: string, binds: Record<string, any> | any[] = {}, options: Record<string, any> = {}): Promise<any> {
+   let connection: any = null;
+   try {
+     connection = await getConnection();
+@@ -80,9 +68,7 @@ export async function executeSql<T = unknown>(
+   }
+ }
+ 
+-export async function withTransaction<T>(
+-  action: (conn: any) => Promise<T>
+-): Promise<T> {
++export async function withTransaction<T>(action: (conn: any) => Promise<T>): Promise<T> {
+   let connection: any = null;
+   try {
+     connection = await getConnection();
+@@ -109,10 +95,10 @@ export async function withTransaction<T>(
+   }
+ }
+ 
+-export async function checkOracleHealth(): Promise<{ reachable: boolean; details: string }> {
+-  if (env.DATA_SOURCE !== 'oracle') {
+-    return { reachable: true, details: 'Running in MOCK mode' };
+-  }
++export async function checkOracleHealth(): Promise<{
++  reachable: boolean;
++  details: string;
++}> {
+   if (!pool) {
+     return { reachable: false, details: 'Oracle Pool not initialized' };
+   }
+diff --git a/server/src/repositories/broadcast.repository.ts b/server/src/repositories/broadcast.repository.ts
+index f93498d..f29496c 100644
+--- a/server/src/repositories/broadcast.repository.ts
++++ b/server/src/repositories/broadcast.repository.ts
+@@ -1,4 +1,4 @@
+-import { Broadcast, Message } from '../types/index.js';
++import { Broadcast } from '../types/index.js';
+ import { executeSql, withTransaction } from '../db/pool.js';
+ 
+ export interface BroadcastRepository {
+@@ -6,43 +6,6 @@ export interface BroadcastRepository {
+   getUserBroadcasts(senderId: number): Promise<Broadcast[]>;
+ }
+ 
+-const mockBroadcasts: Broadcast[] = [
+-  {
+-    broadcastId: 1,
+-    senderId: 1,
+-    title: 'Weekly Announcement',
+-    content: 'Hello team! Next release is scheduled for Friday.',
+-    recipientsCount: 2,
+-    recipientIds: [2, 3],
+-    createdAt: new Date(Date.now() - 7200000).toISOString()
+-  }
+-];
+-
+-let nextBroadcastId = 2;
+-
+-export class MockBroadcastRepository implements BroadcastRepository {
+-  async createBroadcast(senderId: number, recipientIds: number[], content: string, title?: string): Promise<Broadcast> {
+-    const broadcastId = nextBroadcastId++;
+-    const broadcast: Broadcast = {
+-      broadcastId,
+-      senderId,
+-      title: title?.trim() || 'Broadcast Message',
+-      content: content.trim(),
+-      recipientsCount: recipientIds.length,
+-      recipientIds,
+-      createdAt: new Date().toISOString()
+-    };
+-    mockBroadcasts.push(broadcast);
+-    return broadcast;
+-  }
+-
+-  async getUserBroadcasts(senderId: number): Promise<Broadcast[]> {
+-    return mockBroadcasts
+-      .filter((b) => b.senderId === senderId)
+-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+-  }
+-}
+-
+ export class OracleBroadcastRepository implements BroadcastRepository {
+   async createBroadcast(senderId: number, recipientIds: number[], content: string, title?: string): Promise<Broadcast> {
+     return withTransaction(async (conn: any) => {
+@@ -50,14 +13,7 @@ export class OracleBroadcastRepository implements BroadcastRepository {
+         `INSERT INTO BROADCASTS (SENDER_ID, TITLE, CONTENT, RECIPIENTS_COUNT, CREATED_AT)
+          VALUES (:1, :2, :3, :4, SYSTIMESTAMP)
+          RETURNING BROADCAST_ID, CREATED_AT INTO :5, :6`,
+-        [
+-          senderId,
+-          title?.trim() || 'Broadcast Message',
+-          content.trim(),
+-          recipientIds.length,
+-          { dir: 3003, type: 2002 },
+-          { dir: 3003, type: 2007 }
+-        ]
++        [senderId, title?.trim() || 'Broadcast Message', content.trim(), recipientIds.length, { dir: 3003, type: 2002 }, { dir: 3003, type: 2007 }]
+       );
+ 
+       const broadcastId = (result.outBinds as any)?.[0]?.[0];
+diff --git a/server/src/repositories/factory.ts b/server/src/repositories/factory.ts
+index f2e3e97..8d3129f 100644
+--- a/server/src/repositories/factory.ts
++++ b/server/src/repositories/factory.ts
+@@ -1,23 +1,10 @@
+ import { getRepositoryManager } from './index.js';
+-import { 
+-  IUserRepository, 
+-  IPostRepository, 
+-  ICommentRepository, 
+-  INotificationRepository, 
+-  IStoryRepository,
+-  IReelRepository,
+-  IMessageRepository,
+-  IAuthRepository,
+-  ISecurityRepository 
+-} from './types.js';
+-import { GroupRepository, MockGroupRepository, OracleGroupRepository } from './group.repository.js';
+-import { BroadcastRepository, MockBroadcastRepository, OracleBroadcastRepository } from './broadcast.repository.js';
+-import { env } from '../config/env.js';
++import { IUserRepository, IPostRepository, ICommentRepository, INotificationRepository, IStoryRepository, IReelRepository, IMessageRepository, IAuthRepository, ISecurityRepository } from './types.js';
++import { GroupRepository, OracleGroupRepository } from './group.repository.js';
++import { BroadcastRepository, OracleBroadcastRepository } from './broadcast.repository.js';
+ 
+-const mockGroupRepo = new MockGroupRepository();
+ const oracleGroupRepo = new OracleGroupRepository();
+ 
+-const mockBroadcastRepo = new MockBroadcastRepository();
+ const oracleBroadcastRepo = new OracleBroadcastRepository();
+ 
+ export function getUserRepository(): IUserRepository {
+@@ -57,9 +44,9 @@ export function getSecurityRepository(): ISecurityRepository {
+ }
+ 
+ export function getGroupRepository(): GroupRepository {
+-  return env.DATA_SOURCE === 'oracle' ? oracleGroupRepo : mockGroupRepo;
++  return oracleGroupRepo;
+ }
+ 
+ export function getBroadcastRepository(): BroadcastRepository {
+-  return env.DATA_SOURCE === 'oracle' ? oracleBroadcastRepo : mockBroadcastRepo;
++  return oracleBroadcastRepo;
+ }
+diff --git a/server/src/repositories/group.repository.ts b/server/src/repositories/group.repository.ts
+index dccb8e0..7581def 100644
+--- a/server/src/repositories/group.repository.ts
++++ b/server/src/repositories/group.repository.ts
+@@ -1,6 +1,5 @@
+ import { Group, GroupMember, GroupMessage, CreateGroupParams } from '../types/index.js';
+ import { executeSql, withTransaction } from '../db/pool.js';
+-import { logger } from '../utils/logger.js';
+ 
+ export interface GroupRepository {
+   createGroup(params: CreateGroupParams): Promise<Group>;
+@@ -12,130 +11,6 @@ export interface GroupRepository {
+   sendGroupMessage(groupId: number, senderId: number, content: string): Promise<GroupMessage>;
+ }
+ 
+-// In-Memory Mock Store for Unit Tests and MOCK Mode
+-const mockGroups: Group[] = [
+-  {
+-    groupId: 1,
+-    name: 'Nexa Developers',
+-    description: 'Official development discussion group',
+-    createdBy: 1,
+-    avatarUrl: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=150',
+-    createdAt: new Date(Date.now() - 86400000).toISOString(),
+-    membersCount: 3,
+-    lastMessage: 'Welcome to Nexa Group Chat!'
+-  }
+-];
+-
+-const mockGroupMembers: GroupMember[] = [
+-  { groupId: 1, userId: 1, role: 'ADMIN', joinedAt: new Date().toISOString() },
+-  { groupId: 1, userId: 2, role: 'MEMBER', joinedAt: new Date().toISOString() },
+-  { groupId: 1, userId: 3, role: 'MEMBER', joinedAt: new Date().toISOString() }
+-];
+-
+-const mockGroupMessages: GroupMessage[] = [
+-  {
+-    messageId: 1,
+-    groupId: 1,
+-    senderId: 1,
+-    sender: {
+-      userId: 1,
+-      username: 'nexa_admin',
+-      displayName: 'Nexa Admin',
+-      profileImageUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
+-    },
+-    content: 'Welcome to Nexa Group Chat!',
+-    createdAt: new Date(Date.now() - 3600000).toISOString()
+-  }
+-];
+-
+-let nextGroupId = 2;
+-let nextGroupMessageId = 2;
+-
+-export class MockGroupRepository implements GroupRepository {
+-  async createGroup(params: CreateGroupParams): Promise<Group> {
+-    const groupId = nextGroupId++;
+-    const now = new Date().toISOString();
+-    const group: Group = {
+-      groupId,
+-      name: params.name.trim(),
+-      description: params.description?.trim() || null,
+-      createdBy: params.createdBy,
+-      avatarUrl: params.avatarUrl || null,
+-      createdAt: now,
+-      membersCount: 1 + (params.memberIds?.length || 0),
+-      lastMessage: 'Group created'
+-    };
+-
+-    mockGroups.push(group);
+-    mockGroupMembers.push({ groupId, userId: params.createdBy, role: 'ADMIN', joinedAt: now });
+-
+-    if (params.memberIds) {
+-      for (const mId of params.memberIds) {
+-        if (mId !== params.createdBy) {
+-          mockGroupMembers.push({ groupId, userId: mId, role: 'MEMBER', joinedAt: now });
+-        }
+-      }
+-    }
+-
+-    return group;
+-  }
+-
+-  async getUserGroups(userId: number): Promise<Group[]> {
+-    const userGroupIds = new Set(
+-      mockGroupMembers.filter((gm) => gm.userId === userId).map((gm) => gm.groupId)
+-    );
+-    return mockGroups.filter((g) => userGroupIds.has(g.groupId));
+-  }
+-
+-  async getGroupById(groupId: number): Promise<Group | null> {
+-    return mockGroups.find((g) => g.groupId === groupId) || null;
+-  }
+-
+-  async getGroupMembers(groupId: number): Promise<GroupMember[]> {
+-    return mockGroupMembers.filter((gm) => gm.groupId === groupId);
+-  }
+-
+-  async addGroupMember(groupId: number, userId: number, role: 'ADMIN' | 'MEMBER' = 'MEMBER'): Promise<void> {
+-    const exists = mockGroupMembers.some((gm) => gm.groupId === groupId && gm.userId === userId);
+-    if (!exists) {
+-      mockGroupMembers.push({ groupId, userId, role, joinedAt: new Date().toISOString() });
+-      const group = mockGroups.find((g) => g.groupId === groupId);
+-      if (group) {
+-        group.membersCount = (group.membersCount || 0) + 1;
+-      }
+-    }
+-  }
+-
+-  async getGroupMessages(groupId: number): Promise<GroupMessage[]> {
+-    return mockGroupMessages
+-      .filter((m) => m.groupId === groupId)
+-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+-  }
+-
+-  async sendGroupMessage(groupId: number, senderId: number, content: string): Promise<GroupMessage> {
+-    const msg: GroupMessage = {
+-      messageId: nextGroupMessageId++,
+-      groupId,
+-      senderId,
+-      sender: {
+-        userId: senderId,
+-        username: `user_${senderId}`,
+-        displayName: `User ${senderId}`,
+-        profileImageUrl: null
+-      },
+-      content: content.trim(),
+-      createdAt: new Date().toISOString()
+-    };
+-
+-    mockGroupMessages.push(msg);
+-    const group = mockGroups.find((g) => g.groupId === groupId);
+-    if (group) {
+-      group.lastMessage = content.trim();
+-    }
+-    return msg;
+-  }
+-}
+-
+ export class OracleGroupRepository implements GroupRepository {
+   async createGroup(params: CreateGroupParams): Promise<Group> {
+     return withTransaction(async (conn: any) => {
+@@ -150,7 +25,7 @@ export class OracleGroupRepository implements GroupRepository {
+           params.createdBy,
+           params.avatarUrl || null,
+           { dir: 3003, type: 2002 }, // NUMBER
+-          { dir: 3003, type: 2007 }  // TIMESTAMP
++          { dir: 3003, type: 2007 } // TIMESTAMP
+         ]
+       );
+ 
+@@ -308,17 +183,14 @@ export class OracleGroupRepository implements GroupRepository {
+           senderId,
+           content.trim(),
+           { dir: 3003, type: 2002 }, // NUMBER
+-          { dir: 3003, type: 2007 }  // TIMESTAMP
++          { dir: 3003, type: 2007 } // TIMESTAMP
+         ]
+       );
+ 
+       const messageId = (result.outBinds as any)?.[0]?.[0];
+       const createdAt = (result.outBinds as any)?.[1]?.[0]?.toISOString() || new Date().toISOString();
+ 
+-      const userRows = await conn.execute(
+-        `SELECT USERNAME, DISPLAY_NAME, PROFILE_IMAGE_URL FROM USERS WHERE USER_ID = :1`,
+-        [senderId]
+-      );
++      const userRows = await conn.execute(`SELECT USERNAME, DISPLAY_NAME, PROFILE_IMAGE_URL FROM USERS WHERE USER_ID = :1`, [senderId]);
+ 
+       const userRow = (userRows.rows as any)?.[0] || {};
+ 
+diff --git a/server/src/repositories/index.ts b/server/src/repositories/index.ts
+index 33ddd5d..f2c0d7d 100644
+--- a/server/src/repositories/index.ts
++++ b/server/src/repositories/index.ts
+@@ -1,17 +1,6 @@
+ import { IRepositoryManager } from './types.js';
+-import { mockRepositoryManager } from './mock/mock.repo.js';
+ import { oracleRepositoryManager } from './oracle/oracle.repo.js';
+ 
+-import { env } from '../config/env.js';
+-
+ export function getRepositoryManager(): IRepositoryManager {
+-  if (env.DATA_SOURCE === 'mock') {
+-    return mockRepositoryManager;
+-  }
+-  try {
+-    return oracleRepositoryManager;
+-  } catch (err) {
+-    console.warn('Oracle DB not available, falling back to mock repository manager:', err);
+-    return mockRepositoryManager;
+-  }
++  return oracleRepositoryManager;
+ }
+diff --git a/server/src/repositories/mock/mock.repo.ts b/server/src/repositories/mock/mock.repo.ts
+deleted file mode 100644
+index 249d00c..0000000
+--- a/server/src/repositories/mock/mock.repo.ts
++++ /dev/null
+@@ -1,429 +0,0 @@
+-import bcrypt from 'bcryptjs';
+-import { User, Post, Comment, Notification, Story, Reel, Message, PaginatedResult } from '../../types/index.js';
+-import {
+-  IRepositoryManager,
+-  IUserRepository,
+-  IPostRepository,
+-  ICommentRepository,
+-  INotificationRepository,
+-  IStoryRepository,
+-  IReelRepository,
+-  IMessageRepository,
+-  IAuthRepository,
+-  ISecurityRepository
+-} from '../types.js';
+-
+-// Pre-seeded permanent master profiles
+-let mockUsers: User[] = [
+-  {
+-    userId: 100,
+-    username: 'doom_yash',
+-    email: 'doom_yash@nexa.app',
+-    displayName: 'yash',
+-    bio: 'Doom Magical Orb Master • Creator of Nexa Social Platform',
+-    location: 'Global',
+-    websiteUrl: 'https://nexa-social-app.surge.sh',
+-    profileImageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=doom_yash',
+-    coverImageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
+-    followersCount: 150,
+-    followingCount: 25,
+-    createdAt: new Date().toISOString(),
+-    updatedAt: new Date().toISOString()
+-  },
+-  {
+-    userId: 101,
+-    username: 'alex',
+-    email: 'alex@nexa.app',
+-    displayName: 'Alex Rivera',
+-    bio: 'Nexa Platform Lead',
+-    profileImageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alex',
+-    followersCount: 50,
+-    followingCount: 20,
+-    createdAt: new Date().toISOString(),
+-    updatedAt: new Date().toISOString()
+-  },
+-  {
+-    userId: 2,
+-    username: 'sarah_design',
+-    email: 'sarah@nexa.app',
+-    displayName: 'Sarah Chen',
+-    bio: 'UI/UX Designer',
+-    profileImageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sarah_design',
+-    followersCount: 80,
+-    followingCount: 15,
+-    createdAt: new Date().toISOString(),
+-    updatedAt: new Date().toISOString()
+-  }
+-];
+-
+-let mockCredentials: Map<number, string> = new Map([
+-  [100, bcrypt.hashSync('Leon$yash5', 10)],
+-  [101, bcrypt.hashSync('Password123!', 10)],
+-  [2, bcrypt.hashSync('Password123!', 10)]
+-]);
+-
+-let mockPosts: Post[] = [
+-  {
+-    postId: 1001,
+-    userId: 100,
+-    author: {
+-      userId: 100,
+-      username: 'doom_yash',
+-      displayName: 'yash',
+-      profileImageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=doom_yash'
+-    },
+-    content: 'Welcome to Nexa Social! Dr. Doom Magical Orb power activated. 🔮⚡',
+-    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80',
+-    createdAt: new Date().toISOString(),
+-    updatedAt: new Date().toISOString(),
+-    likesCount: 24,
+-    commentsCount: 5,
+-    isLiked: true,
+-    isBookmarked: true
+-  }
+-];
+-
+-let mockComments: Comment[] = [];
+-let mockStories: Story[] = [];
+-let mockReels: Reel[] = [];
+-let mockMessages: Message[] = [];
+-let mockNotifications: Notification[] = [];
+-let mockRefreshTokens: Map<string, { userId: number; expiresAt: Date; revokedAt: Date | null }> = new Map();
+-let mockPasswordResetTokens: Map<string, { userId: number; expiresAt: Date; usedAt: Date | null }> = new Map();
+-let mockEmailVerificationTokens: Map<string, { userId: number; expiresAt: Date; usedAt: Date | null }> = new Map();
+-let mockSecuritySettings: Map<number, { emailVerifiedAt: Date | null; mfaEnabled: boolean; passwordChangedAt?: Date }> = new Map();
+-
+-let userIdCounter = 100;
+-let postIdCounter = 1000;
+-
+-export class MockUserRepository implements IUserRepository {
+-  async createUser(u: { username: string; email: string; passwordHash: string; displayName: string; bio?: string; location?: string; websiteUrl?: string }): Promise<User> {
+-    const cleanUsername = u.username.toLowerCase().trim();
+-    let existing = mockUsers.find(user => user.username.toLowerCase() === cleanUsername);
+-    if (existing) {
+-      mockCredentials.set(existing.userId, u.passwordHash);
+-      return existing;
+-    }
+-    const newUser: User = {
+-      userId: ++userIdCounter,
+-      username: cleanUsername,
+-      email: u.email.toLowerCase().trim(),
+-      displayName: u.displayName || u.username,
+-      bio: u.bio || 'Nexa Social Member',
+-      location: u.location || '',
+-      websiteUrl: u.websiteUrl || '',
+-      profileImageUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanUsername}`,
+-      followersCount: 0,
+-      followingCount: 0,
+-      createdAt: new Date().toISOString(),
+-      updatedAt: new Date().toISOString()
+-    };
+-    mockUsers.push(newUser);
+-    mockCredentials.set(newUser.userId, u.passwordHash);
+-    return newUser;
+-  }
+-
+-  async findByUsername(username: string): Promise<User | null> {
+-    const clean = username.toLowerCase().trim();
+-    const found = mockUsers.find(u => u.username.toLowerCase() === clean);
+-    return found || null;
+-  }
+-
+-  async findByEmail(email: string): Promise<User | null> {
+-    const clean = email.toLowerCase().trim();
+-    const found = mockUsers.find(u => u.email.toLowerCase() === clean || u.username.toLowerCase() === clean);
+-    return found || null;
+-  }
+-
+-  async findCredentialById(userId: number) {
+-    const hash = mockCredentials.get(userId) || bcrypt.hashSync('Password123!', 10);
+-    return { userId, passwordHash: hash };
+-  }
+-
+-  async findById(userId: number): Promise<User | null> {
+-    return mockUsers.find(u => u.userId === userId) || null;
+-  }
+-
+-  async updateUser(userId: number, updates: any): Promise<User> {
+-    const user = mockUsers.find(u => u.userId === userId) || mockUsers[0];
+-    Object.assign(user, updates, { updatedAt: new Date().toISOString() });
+-    return user;
+-  }
+-
+-  async searchUsers(query: string): Promise<User[]> {
+-    const q = query.toLowerCase();
+-    return mockUsers.filter(u => u.username.includes(q) || u.displayName.toLowerCase().includes(q));
+-  }
+-
+-  async getSuggestions(currentUserId?: number): Promise<User[]> {
+-    return currentUserId ? mockUsers.filter(u => u.userId !== currentUserId) : mockUsers;
+-  }
+-
+-  async followUser(): Promise<void> {}
+-  async unfollowUser(): Promise<void> {}
+-  async isFollowing(): Promise<boolean> { return false; }
+-  async getFollowers(): Promise<User[]> { return mockUsers; }
+-  async getFollowing(): Promise<User[]> { return mockUsers; }
+-
+-  async updateLockoutState(
+-    userId: number,
+-    failedLoginAttempts: number,
+-    firstFailedAttemptAt: Date | null,
+-    lockoutUntil: Date | null
+-  ): Promise<void> {
+-    const user = mockUsers.find(u => u.userId === userId);
+-    if (user) {
+-      user.failedLoginAttempts = failedLoginAttempts;
+-      user.firstFailedAttemptAt = firstFailedAttemptAt ? firstFailedAttemptAt.toISOString() : null;
+-      user.lockoutUntil = lockoutUntil ? lockoutUntil.toISOString() : null;
+-    }
+-  }
+-
+-  async resetLockoutState(userId: number): Promise<void> {
+-    const user = mockUsers.find(u => u.userId === userId);
+-    if (user) {
+-      user.failedLoginAttempts = 0;
+-      user.firstFailedAttemptAt = null;
+-      user.lockoutUntil = null;
+-    }
+-  }
+-}
+-
+-export class MockPostRepository implements IPostRepository {
+-  async createPost(p: { userId: number; content?: string; imageUrl?: string }): Promise<Post> {
+-    const author = mockUsers.find(u => u.userId === p.userId) || mockUsers[0];
+-    const newPost: Post = {
+-      postId: ++postIdCounter,
+-      userId: p.userId,
+-      author: {
+-        userId: author.userId,
+-        username: author.username,
+-        displayName: author.displayName,
+-        profileImageUrl: author.profileImageUrl
+-      },
+-      content: p.content,
+-      imageUrl: p.imageUrl,
+-      createdAt: new Date().toISOString(),
+-      updatedAt: new Date().toISOString(),
+-      likesCount: 0,
+-      commentsCount: 0,
+-      isLiked: false,
+-      isBookmarked: false
+-    };
+-    mockPosts.unshift(newPost);
+-    return newPost;
+-  }
+-
+-  async findById(postId: number): Promise<Post | null> {
+-    return mockPosts.find(p => p.postId === postId) || mockPosts[0];
+-  }
+-
+-  async updatePost(postId: number, data: { content?: string }): Promise<Post> {
+-    const post = mockPosts.find(p => p.postId === postId) || mockPosts[0];
+-    if (data.content !== undefined) post.content = data.content;
+-    post.updatedAt = new Date().toISOString();
+-    return post;
+-  }
+-
+-  async deletePost(postId: number, userId?: number): Promise<boolean> {
+-    const post = mockPosts.find(p => p.postId === postId);
+-    if (!post) return false;
+-    if (userId && post.userId !== userId) return false;
+-    mockPosts = mockPosts.filter(p => p.postId !== postId);
+-    return true;
+-  }
+-
+-  async getGlobalFeed(): Promise<PaginatedResult<Post>> {
+-    return { data: mockPosts, nextCursor: null, hasMore: false };
+-  }
+-
+-  async getFollowingFeed(): Promise<PaginatedResult<Post>> {
+-    return { data: mockPosts, nextCursor: null, hasMore: false };
+-  }
+-
+-  async getUserPosts(userId: number): Promise<PaginatedResult<Post>> {
+-    const posts = mockPosts.filter(p => p.userId === userId);
+-    return { data: posts.length > 0 ? posts : mockPosts, nextCursor: null, hasMore: false };
+-  }
+-
+-  async likePost(): Promise<void> {}
+-  async unlikePost(): Promise<void> {}
+-  async bookmarkPost(): Promise<void> {}
+-  async unbookmarkPost(): Promise<void> {}
+-  async getUserBookmarks(): Promise<PaginatedResult<Post>> { return { data: mockPosts, nextCursor: null, hasMore: false }; }
+-}
+-
+-export class MockCommentRepository implements ICommentRepository {
+-  async createComment(c: { postId: number; userId: number; content: string }): Promise<Comment> {
+-    const author = mockUsers.find(u => u.userId === c.userId) || mockUsers[0];
+-    const newComment: Comment = {
+-      commentId: Date.now(),
+-      postId: c.postId,
+-      userId: c.userId,
+-      author: {
+-        userId: author.userId,
+-        username: author.username,
+-        displayName: author.displayName,
+-        profileImageUrl: author.profileImageUrl
+-      },
+-      content: c.content,
+-      createdAt: new Date().toISOString(),
+-      updatedAt: new Date().toISOString()
+-    };
+-    mockComments.push(newComment);
+-    return newComment;
+-  }
+-  async getPostComments(): Promise<any> { return { data: mockComments, nextCursor: null, hasMore: false }; }
+-  async deleteComment(): Promise<boolean> { return true; }
+-}
+-
+-export class MockNotificationRepository implements INotificationRepository {
+-  async createNotification(notif: any): Promise<any> { return {}; }
+-  async getUserNotifications(): Promise<any> { return { data: [], nextCursor: null, hasMore: false }; }
+-  async getUnreadCount(): Promise<number> { return 0; }
+-  async markAsRead(notificationId: number, userId: number): Promise<boolean> {
+-    const notif = mockNotifications.find(n => n.notificationId === notificationId && n.recipientUserId === userId);
+-    if (!notif) return false;
+-    notif.isRead = true;
+-    return true;
+-  }
+-  async markAllAsRead(): Promise<void> {}
+-}
+-
+-export class MockStoryRepository implements IStoryRepository {
+-  async createStory(): Promise<any> { return {}; }
+-  async getFeedStories(): Promise<any> { return []; }
+-  async deleteStory(): Promise<boolean> { return true; }
+-}
+-
+-export class MockReelRepository implements IReelRepository {
+-  async createReel(r: any): Promise<Reel> {
+-    const author = mockUsers.find(u => u.userId === r.userId) || mockUsers[0];
+-    const reel: Reel = {
+-      reelId: ++postIdCounter,
+-      userId: r.userId,
+-      author: { userId: author.userId, username: author.username, displayName: author.displayName },
+-      videoUrl: r.videoUrl,
+-      caption: r.caption,
+-      likesCount: 5,
+-      isLiked: true,
+-      createdAt: new Date().toISOString()
+-    };
+-    mockReels.unshift(reel);
+-    return reel;
+-  }
+-
+-  async getReels(): Promise<Reel[]> { return mockReels; }
+-  async likeReel(): Promise<void> {}
+-  async unlikeReel(): Promise<void> {}
+-  async deleteReel(reelId: number, userId: number): Promise<boolean> {
+-    const reel = mockReels.find(r => r.reelId === reelId);
+-    if (!reel) return false;
+-    if (reel.userId !== userId) return false;
+-    mockReels = mockReels.filter(r => r.reelId !== reelId);
+-    return true;
+-  }
+-}
+-
+-export class MockMessageRepository implements IMessageRepository {
+-  async sendMessage(): Promise<any> { return {}; }
+-  async getMessagesBetweenUsers(): Promise<any> { return []; }
+-  async markMessageAsRead(): Promise<any> { return { rowsAffected: 1, readAt: new Date(), senderId: null }; }
+-}
+-
+-export class MockAuthRepository implements IAuthRepository {
+-  async saveRefreshToken(userId: number, tokenHash: string, expiresAt: Date): Promise<void> {
+-    mockRefreshTokens.set(tokenHash, { userId, expiresAt, revokedAt: null });
+-  }
+-  async findRefreshToken(tokenHash: string): Promise<{ userId: number; revokedAt: Date | null; expiresAt: Date } | null> {
+-    const record = mockRefreshTokens.get(tokenHash);
+-    if (!record) return null;
+-    return { userId: record.userId, revokedAt: record.revokedAt, expiresAt: record.expiresAt };
+-  }
+-  async revokeRefreshToken(tokenHash: string): Promise<void> {
+-    const record = mockRefreshTokens.get(tokenHash);
+-    if (record) {
+-      record.revokedAt = new Date();
+-    }
+-  }
+-  async revokeAllUserRefreshTokens(userId: number): Promise<void> {
+-    for (const [, record] of mockRefreshTokens.entries()) {
+-      if (record.userId === userId && !record.revokedAt) {
+-        record.revokedAt = new Date();
+-      }
+-    }
+-  }
+-  async revokeAllUserTokens(userId: number): Promise<void> {
+-    await this.revokeAllUserRefreshTokens(userId);
+-  }
+-  async savePasswordResetToken(userId: number, tokenHash: string, expiresAt: Date): Promise<void> {
+-    mockPasswordResetTokens.set(tokenHash, { userId, expiresAt, usedAt: null });
+-  }
+-  async findPasswordResetToken(tokenHash: string): Promise<{ userId: number; expiresAt: Date; usedAt: Date | null } | null> {
+-    const record = mockPasswordResetTokens.get(tokenHash);
+-    if (!record) return null;
+-    return { userId: record.userId, expiresAt: record.expiresAt, usedAt: record.usedAt };
+-  }
+-  async markPasswordResetTokenUsed(tokenHash: string): Promise<void> {
+-    const record = mockPasswordResetTokens.get(tokenHash);
+-    if (record) {
+-      record.usedAt = new Date();
+-    }
+-  }
+-  async saveEmailVerificationToken(userId: number, tokenHash: string, expiresAt: Date): Promise<void> {
+-    mockEmailVerificationTokens.set(tokenHash, { userId, expiresAt, usedAt: null });
+-  }
+-  async findEmailVerificationToken(tokenHash: string): Promise<{ userId: number; expiresAt: Date; usedAt: Date | null } | null> {
+-    const record = mockEmailVerificationTokens.get(tokenHash);
+-    if (!record) return null;
+-    return { userId: record.userId, expiresAt: record.expiresAt, usedAt: record.usedAt };
+-  }
+-  async markEmailVerificationTokenUsed(tokenHash: string): Promise<void> {
+-    const record = mockEmailVerificationTokens.get(tokenHash);
+-    if (record) {
+-      record.usedAt = new Date();
+-    }
+-  }
+-}
+-
+-export class MockSecurityRepository implements ISecurityRepository {
+-  async getSecuritySettings(userId: number): Promise<any> {
+-    const settings = mockSecuritySettings.get(userId);
+-    if (!settings) return { emailVerifiedAt: null, mfaEnabled: false, lastProtectionCheckAt: new Date() };
+-    return { ...settings, lastProtectionCheckAt: new Date() };
+-  }
+-  async updateSecuritySettings(userId: number, updates: any): Promise<void> {
+-    const current = mockSecuritySettings.get(userId) || { emailVerifiedAt: null, mfaEnabled: false };
+-    if (updates.emailVerifiedAt !== undefined) current.emailVerifiedAt = updates.emailVerifiedAt;
+-    if (updates.mfaEnabled !== undefined) current.mfaEnabled = updates.mfaEnabled;
+-    if (updates.passwordChangedAt !== undefined) current.passwordChangedAt = updates.passwordChangedAt;
+-    mockSecuritySettings.set(userId, current);
+-  }
+-  async createSession(): Promise<void> {}
+-  async getSessions(): Promise<any[]> { return []; }
+-  async getUserSessions(): Promise<any[]> { return []; }
+-  async revokeSession(): Promise<boolean> { return true; }
+-  async revokeOtherSessions(): Promise<void> {}
+-  async logSecurityEvent(): Promise<void> {}
+-}
+-
+-export const mockRepositoryManager: IRepositoryManager = {
+-  userRepo: new MockUserRepository(),
+-  postRepo: new MockPostRepository(),
+-  commentRepo: new MockCommentRepository(),
+-  notificationRepo: new MockNotificationRepository(),
+-  storyRepo: new MockStoryRepository(),
+-  reelRepo: new MockReelRepository(),
+-  messageRepo: new MockMessageRepository(),
+-  authRepo: new MockAuthRepository(),
+-  securityRepo: new MockSecurityRepository(),
+-  get users() { return this.userRepo; },
+-  get posts() { return this.postRepo; },
+-  get comments() { return this.commentRepo; },
+-  get notifications() { return this.notificationRepo; },
+-  get stories() { return this.storyRepo; },
+-  get reels() { return this.reelRepo; },
+-  get messages() { return this.messageRepo; },
+-  get auth() { return this.authRepo; },
+-  get security() { return this.securityRepo; }
+-};
+diff --git a/server/src/routes/health.routes.ts b/server/src/routes/health.routes.ts
+index 5a4a9ca..3cd9f9c 100644
+--- a/server/src/routes/health.routes.ts
++++ b/server/src/routes/health.routes.ts
+@@ -1,24 +1,31 @@
+ import { Router } from 'express';
+-import { env } from '../config/env.js';
+ import { checkOracleHealth } from '../db/pool.js';
+ import { sendSuccess } from '../utils/response.js';
+ 
+ const router = Router();
+ 
+ /**
+- * Liveness Probe: GET /health
+- * Fast process check for Kubernetes / PM2 liveness probe.
+- * Does NOT perform DB queries or expose credentials.
++ * Dependency health probe: GET /health
++ * Confirms that the process and Oracle Database pool can serve requests.
++ * Does not expose credentials, connection strings, or database errors.
+  */
+ router.get('/', async (_req, res) => {
+-  const isOracle = env.DATA_SOURCE === 'oracle';
+-  const dbHealth = isOracle ? await checkOracleHealth() : { reachable: true, details: 'Running in MOCK mode' };
+-  return sendSuccess(res, {
+-    status: 'ok',
+-    mode: env.DATA_SOURCE,
+-    database: { reachable: dbHealth.reachable },
+-    timestamp: new Date().toISOString()
+-  }, 'Process liveness check');
++  const dbHealth = await checkOracleHealth();
++  const isHealthy = dbHealth.reachable;
++  const statusCode = isHealthy ? 200 : 503;
++
++  return sendSuccess(
++    res,
++    {
++      status: isHealthy ? 'ok' : 'degraded',
++      mode: 'oracle',
++      database: { reachable: dbHealth.reachable },
++      timestamp: new Date().toISOString()
++    },
++    isHealthy ? 'Process liveness check' : 'Database connection degraded',
++    undefined,
++    statusCode
++  );
+ });
+ 
+ /**
+@@ -28,23 +35,21 @@ router.get('/', async (_req, res) => {
+  * Omits connection strings, keys, or stack traces from payload.
+  */
+ router.get('/ready', async (_req, res) => {
+-  if (env.DATA_SOURCE === 'mock') {
+-    return sendSuccess(res, {
+-      status: 'ready',
+-      mode: 'mock',
+-      timestamp: new Date().toISOString()
+-    }, 'Readiness check pass (mock mode)');
+-  }
+-
+   const dbHealth = await checkOracleHealth();
+   const isReady = dbHealth.reachable;
+   const statusCode = isReady ? 200 : 503;
+ 
+-  return sendSuccess(res, {
+-    status: isReady ? 'ready' : 'unready',
+-    database: isReady ? 'connected' : 'unreachable',
+-    timestamp: new Date().toISOString()
+-  }, 'Readiness check status', undefined, statusCode);
++  return sendSuccess(
++    res,
++    {
++      status: isReady ? 'ready' : 'unready',
++      database: isReady ? 'connected' : 'unreachable',
++      timestamp: new Date().toISOString()
++    },
++    'Readiness check status',
++    undefined,
++    statusCode
++  );
+ });
+ 
+ export default router;
+diff --git a/server/src/routes/media.routes.ts b/server/src/routes/media.routes.ts
+index 14bf437..bb624e4 100644
+--- a/server/src/routes/media.routes.ts
++++ b/server/src/routes/media.routes.ts
+@@ -3,7 +3,6 @@ import fs from 'fs';
+ import path from 'path';
+ import { Router } from 'express';
+ import multer from 'multer';
+-import { env } from '../config/env.js';
+ import { executeSql } from '../db/pool.js';
+ import { requireAuth } from '../middleware/auth.middleware.js';
+ import { AuthenticatedRequest } from '../types/index.js';
+@@ -86,36 +85,40 @@ mediaRouter.post('/upload', requireAuth, aiAndMediaRateLimiter, upload.single('f
+     await fs.promises.rename(uploaded.path, finalPath);
+ 
+     const authReq = req as AuthenticatedRequest;
+-    if (env.DATA_SOURCE === 'oracle') {
+-      try {
+-        await executeSql(
+-          `INSERT INTO MEDIA_ASSETS
+-             (ASSET_ID, USER_ID, STORAGE_KEY, ORIGINAL_NAME, MIME_TYPE, SIZE_BYTES, MEDIA_KIND)
+-           VALUES
+-             (:assetId, :userId, :storageKey, :originalName, :mimeType, :sizeBytes, :mediaKind)`,
+-          {
+-            assetId,
+-            userId: authReq.user!.userId,
+-            storageKey,
+-            originalName: path.basename(uploaded.originalname).slice(0, 255),
+-            mimeType: uploaded.mimetype,
+-            sizeBytes: uploaded.size,
+-            mediaKind: kind.toUpperCase()
+-          }
+-        );
+-      } catch (error) {
+-        await removeIfPresent(finalPath);
+-        throw error;
+-      }
++    try {
++      await executeSql(
++        `INSERT INTO MEDIA_ASSETS
++           (ASSET_ID, USER_ID, STORAGE_KEY, ORIGINAL_NAME, MIME_TYPE, SIZE_BYTES, MEDIA_KIND)
++         VALUES
++           (:assetId, :userId, :storageKey, :originalName, :mimeType, :sizeBytes, :mediaKind)`,
++        {
++          assetId,
++          userId: authReq.user!.userId,
++          storageKey,
++          originalName: path.basename(uploaded.originalname).slice(0, 255),
++          mimeType: uploaded.mimetype,
++          sizeBytes: uploaded.size,
++          mediaKind: kind.toUpperCase()
++        }
++      );
++    } catch (error) {
++      await removeIfPresent(finalPath);
++      throw error;
+     }
+ 
+-    return sendSuccess(res, {
+-      assetId,
+-      mediaKind: kind,
+-      mimeType: uploaded.mimetype,
+-      sizeBytes: uploaded.size,
+-      publicUrl: `/uploads/${storageKey}`
+-    }, 'Media uploaded', undefined, 201);
++    return sendSuccess(
++      res,
++      {
++        assetId,
++        mediaKind: kind,
++        mimeType: uploaded.mimetype,
++        sizeBytes: uploaded.size,
++        publicUrl: `/uploads/${storageKey}`
++      },
++      'Media uploaded',
++      undefined,
++      201
++    );
+   } catch (error) {
+     await removeIfPresent(uploaded?.path);
+     next(error);
+diff --git a/server/src/server.ts b/server/src/server.ts
+index 595601a..c3af445 100644
+--- a/server/src/server.ts
++++ b/server/src/server.ts
+@@ -7,14 +7,10 @@ import { realtimeServer } from './socket.js';
+ 
+ async function startServer() {
+   try {
+-    if (env.DATA_SOURCE === 'oracle') {
+-      await initializeOraclePool();
+-    } else {
+-      logger.info('Starting server in MOCK mode');
+-    }
++    await initializeOraclePool();
+ 
+     const server = app.listen(env.PORT, () => {
+-      logger.info(`Nexa Server listening on port ${env.PORT} (DATA_SOURCE=${env.DATA_SOURCE})`);
++      logger.info(`Nexa Server listening on port ${env.PORT} with Oracle Database`);
+     });
+ 
+     const io = new Server(server, {
+diff --git a/server/src/utils/email.ts b/server/src/utils/email.ts
+index b3a086b..b92f65d 100644
+--- a/server/src/utils/email.ts
++++ b/server/src/utils/email.ts
+@@ -29,7 +29,5 @@ export class ProductionEmailProvider implements IEmailProvider {
+ }
+ 
+ export function getEmailProvider(): IEmailProvider {
+-  return env.NODE_ENV === 'test' || env.DATA_SOURCE === 'mock'
+-    ? new FakeEmailProvider()
+-    : new ProductionEmailProvider();
++  return env.NODE_ENV === 'test' ? new FakeEmailProvider() : new ProductionEmailProvider();
+ }
+diff --git a/server/tests/auth.test.ts b/server/tests/auth.test.ts
+deleted file mode 100644
+index 0775c31..0000000
+--- a/server/tests/auth.test.ts
++++ /dev/null
+@@ -1,244 +0,0 @@
+-import { describe, it, expect } from 'vitest';
+-import supertest from 'supertest';
+-import { app } from '../src/app.js';
+-
+-process.env.DATA_SOURCE = 'mock';
+-
+-describe('Auth & Session Integration API', () => {
+-  const request = supertest(app);
+-
+-  it('should return health status with sanitized data mode', async () => {
+-    const res = await request.get('/api/health');
+-    expect(res.status).toBe(200);
+-    expect(res.body.data.mode).toBeDefined();
+-    expect(res.body.data.database.reachable).toBe(true);
+-  });
+-
+-  it('should register a new user with lowercase normalization', async () => {
+-    const timestamp = Date.now();
+-    const rawUsername = `TestUser_${timestamp}`;
+-    const rawEmail = `TEST_${timestamp}@NEXA.APP`;
+-
+-    const res = await request.post('/api/auth/register').send({
+-      username: rawUsername,
+-      email: rawEmail,
+-      password: 'Password123!',
+-      displayName: 'Test User'
+-    });
+-
+-    expect(res.status).toBe(201);
+-    expect(res.body.data.accessToken).toBeDefined();
+-    expect(res.body.data.user.username).toBe(rawUsername.toLowerCase());
+-    expect(res.body.data.user.email).toBe(rawEmail.toLowerCase());
+-  });
+-
+-  it('should reject registration with duplicate username', async () => {
+-    const res = await request.post('/api/auth/register').send({
+-      username: 'alex',
+-      email: 'alex_unique@nexa.app',
+-      password: 'Password123!',
+-      displayName: 'Alex Duplicate'
+-    });
+-
+-    expect(res.status).toBe(409);
+-    expect(res.body.error.code).toBe('USERNAME_TAKEN');
+-  });
+-
+-  it('should reject registration with weak password', async () => {
+-    const res = await request.post('/api/auth/register').send({
+-      username: 'weak_user',
+-      email: 'weak@nexa.app',
+-      password: '123',
+-      displayName: 'Weak User'
+-    });
+-
+-    expect(res.status).toBe(400);
+-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+-  });
+-
+-  it('should return generic error for invalid username or password', async () => {
+-    const res1 = await request.post('/api/auth/login').send({
+-      emailOrUsername: 'non_existent_user',
+-      password: 'Password123!'
+-    });
+-    expect(res1.status).toBe(401);
+-    expect(res1.body.error.code).toBe('INVALID_CREDENTIALS');
+-
+-    const res2 = await request.post('/api/auth/login').send({
+-      emailOrUsername: 'alex',
+-      password: 'WrongPassword123!'
+-    });
+-    expect(res2.status).toBe(401);
+-    expect(res2.body.error.code).toBe('INVALID_CREDENTIALS');
+-  });
+-
+-  it('should login successfully with valid credentials and return refresh token cookie', async () => {
+-    const res = await request.post('/api/auth/login').send({
+-      emailOrUsername: 'alex',
+-      password: 'Password123!'
+-    });
+-
+-    expect(res.status).toBe(200);
+-    expect(res.body.data.accessToken).toBeDefined();
+-
+-    const cookies = res.headers['set-cookie'];
+-    expect(cookies).toBeDefined();
+-    expect(cookies[0]).toContain('nexa_refresh_token');
+-  });
+-
+-  it('should reject unauthenticated request to /api/auth/me', async () => {
+-    const res = await request.get('/api/auth/me');
+-    expect(res.status).toBe(401);
+-    expect(res.body.error.code).toBe('UNAUTHORIZED');
+-  });
+-
+-  it('should return current user for valid bearer token', async () => {
+-    const loginRes = await request.post('/api/auth/login').send({
+-      emailOrUsername: 'alex',
+-      password: 'Password123!'
+-    });
+-
+-    const token = loginRes.body.data.accessToken;
+-
+-    const meRes = await request
+-      .get('/api/auth/me')
+-      .set('Authorization', `Bearer ${token}`);
+-
+-    expect(meRes.status).toBe(200);
+-    expect(meRes.body.data.username).toBe('alex');
+-  });
+-
+-  it('should rotate refresh token on /api/auth/refresh and revoke old token on logout', async () => {
+-    // 1. Login
+-    const loginRes = await request.post('/api/auth/login').send({
+-      emailOrUsername: 'alex',
+-      password: 'Password123!'
+-    });
+-    expect(loginRes.status).toBe(200);
+-
+-    const initialRefreshToken = loginRes.body.data.refreshToken;
+-    expect(initialRefreshToken).toBeDefined();
+-
+-    // 2. Refresh token -> should succeed and issue new tokens (rotation)
+-    const refreshRes = await request
+-      .post('/api/auth/refresh')
+-      .send({ refreshToken: initialRefreshToken });
+-
+-    expect(refreshRes.status).toBe(200);
+-    expect(refreshRes.body.data.accessToken).toBeDefined();
+-    expect(refreshRes.body.data.refreshToken).toBeDefined();
+-
+-    const newRefreshToken = refreshRes.body.data.refreshToken;
+-    expect(newRefreshToken).not.toBe(initialRefreshToken);
+-
+-    // 3. Attempting to reuse old refresh token -> should fail (revoked due to rotation)
+-    const reuseRes = await request
+-      .post('/api/auth/refresh')
+-      .send({ refreshToken: initialRefreshToken });
+-
+-    expect(reuseRes.status).toBe(401);
+-    expect(reuseRes.body.error.code).toBe('INVALID_REFRESH_TOKEN');
+-
+-    // 4. Logout with active new refresh token
+-    const logoutRes = await request
+-      .post('/api/auth/logout')
+-      .send({ refreshToken: newRefreshToken });
+-
+-    expect(logoutRes.status).toBe(200);
+-
+-    // 5. Attempting to refresh with now-logout-revoked token -> should fail
+-    const revokedRefreshRes = await request
+-      .post('/api/auth/refresh')
+-      .send({ refreshToken: newRefreshToken });
+-
+-    expect(revokedRefreshRes.status).toBe(401);
+-    expect(revokedRefreshRes.body.error.code).toBe('INVALID_REFRESH_TOKEN');
+-  });
+-
+-  it('should lock account after 5 consecutive failed login attempts and reset on successful login', async () => {
+-    const timestamp = Date.now();
+-    const username = `lockout_user_${timestamp}`;
+-    const email = `${username}@nexa.app`;
+-    const password = 'Password123!';
+-
+-    // Register user
+-    const regRes = await request.post('/api/auth/register').send({
+-      username,
+-      email,
+-      password,
+-      displayName: 'Lockout User'
+-    });
+-    expect(regRes.status).toBe(201);
+-
+-    // 4 failed attempts -> should return 401 INVALID_CREDENTIALS
+-    for (let i = 1; i <= 4; i++) {
+-      const failRes = await request.post('/api/auth/login').send({
+-        emailOrUsername: username,
+-        password: 'WrongPassword!'
+-      });
+-      expect(failRes.status).toBe(401);
+-      expect(failRes.body.error.code).toBe('INVALID_CREDENTIALS');
+-    }
+-
+-    // 5th failed attempt -> should trigger lockout and return 423 ACCOUNT_LOCKED
+-    const lockRes = await request.post('/api/auth/login').send({
+-      emailOrUsername: username,
+-      password: 'WrongPassword!'
+-    });
+-    expect(lockRes.status).toBe(423);
+-    expect(lockRes.body.error.code).toBe('ACCOUNT_LOCKED');
+-    expect(lockRes.body.error.message).toContain('Account is locked');
+-
+-    // 6th attempt (even with correct password) -> should remain locked out with 423
+-    const blockedRes = await request.post('/api/auth/login').send({
+-      emailOrUsername: username,
+-      password: password
+-    });
+-    expect(blockedRes.status).toBe(423);
+-    expect(blockedRes.body.error.code).toBe('ACCOUNT_LOCKED');
+-  });
+-
+-  it('should sanitize returned user objects and omit passwordHash and lockout fields', async () => {
+-    const res = await request.post('/api/auth/login').send({
+-      emailOrUsername: 'alex',
+-      password: 'Password123!'
+-    });
+-
+-    expect(res.status).toBe(200);
+-    expect(res.body.data.user.passwordHash).toBeUndefined();
+-    expect(res.body.data.user.failedLoginAttempts).toBeUndefined();
+-    expect(res.body.data.user.lockoutUntil).toBeUndefined();
+-  });
+-
+-  it('should process forgot password requests without leaking account existence', async () => {
+-    const res1 = await request.post('/api/auth/forgot-password').send({
+-      email: 'nonexistent_email_999@nexa.app'
+-    });
+-    expect(res1.status).toBe(200);
+-    expect(res1.body.data.message).toContain('password reset instructions have been sent');
+-
+-    const res2 = await request.post('/api/auth/forgot-password').send({
+-      email: 'alex@nexa.app'
+-    });
+-    expect(res2.status).toBe(200);
+-    expect(res2.body.data.message).toContain('password reset instructions have been sent');
+-  });
+-
+-  it('should reject password reset with invalid or nonexistent token', async () => {
+-    const res = await request.post('/api/auth/reset-password').send({
+-      token: 'invalid_token_hex_string_12345',
+-      newPassword: 'NewPassword123!'
+-    });
+-    expect(res.status).toBe(400);
+-    expect(res.body.error.code).toBe('INVALID_RESET_TOKEN');
+-  });
+-
+-  it('should reject email verification with invalid token', async () => {
+-    const res = await request.post('/api/auth/verify-email').send({
+-      token: 'invalid_verification_token'
+-    });
+-    expect(res.status).toBe(400);
+-    expect(res.body.error.code).toBe('INVALID_VERIFICATION_TOKEN');
+-  });
+-});
+-
+diff --git a/server/tests/broadcast.test.ts b/server/tests/broadcast.test.ts
+deleted file mode 100644
+index d65a7dd..0000000
+--- a/server/tests/broadcast.test.ts
++++ /dev/null
+@@ -1,34 +0,0 @@
+-import { describe, it, expect, beforeEach } from 'vitest';
+-import { MockBroadcastRepository } from '../src/repositories/broadcast.repository.js';
+-
+-describe('Messaging Broadcast Repository', () => {
+-  let broadcastRepo: MockBroadcastRepository;
+-
+-  beforeEach(() => {
+-    broadcastRepo = new MockBroadcastRepository();
+-  });
+-
+-  it('should create a broadcast and store metadata', async () => {
+-    const broadcast = await broadcastRepo.createBroadcast(
+-      1,
+-      [2, 3, 4],
+-      'Important announcement for all team members',
+-      'Team Announcement'
+-    );
+-
+-    expect(broadcast).toBeDefined();
+-    expect(broadcast.broadcastId).toBeGreaterThan(0);
+-    expect(broadcast.senderId).toBe(1);
+-    expect(broadcast.title).toBe('Team Announcement');
+-    expect(broadcast.recipientsCount).toBe(3);
+-  });
+-
+-  it('should retrieve user broadcast history in descending order', async () => {
+-    await broadcastRepo.createBroadcast(1, [2], 'Broadcast 1', 'Title 1');
+-    await broadcastRepo.createBroadcast(1, [3], 'Broadcast 2', 'Title 2');
+-
+-    const history = await broadcastRepo.getUserBroadcasts(1);
+-    expect(history.length).toBeGreaterThanOrEqual(2);
+-    expect(history[0].senderId).toBe(1);
+-  });
+-});
+diff --git a/server/tests/group.test.ts b/server/tests/group.test.ts
+deleted file mode 100644
+index c13d4db..0000000
+--- a/server/tests/group.test.ts
++++ /dev/null
+@@ -1,50 +0,0 @@
+-import { describe, it, expect, beforeEach } from 'vitest';
+-import { MockGroupRepository } from '../src/repositories/group.repository.js';
+-
+-describe('Group Chat Repository', () => {
+-  let groupRepo: MockGroupRepository;
+-
+-  beforeEach(() => {
+-    groupRepo = new MockGroupRepository();
+-  });
+-
+-  it('should create a new group with creator as ADMIN and members', async () => {
+-    const group = await groupRepo.createGroup({
+-      name: 'Frontend Developers',
+-      description: 'React & Vite channel',
+-      createdBy: 1,
+-      memberIds: [2, 3]
+-    });
+-
+-    expect(group).toBeDefined();
+-    expect(group.groupId).toBeGreaterThan(0);
+-    expect(group.name).toBe('Frontend Developers');
+-    expect(group.createdBy).toBe(1);
+-
+-    const members = await groupRepo.getGroupMembers(group.groupId);
+-    expect(members).toHaveLength(3);
+-    const admin = members.find((m) => m.userId === 1);
+-    expect(admin?.role).toBe('ADMIN');
+-  });
+-
+-  it('should retrieve user groups for participant', async () => {
+-    const groupsUser1 = await groupRepo.getUserGroups(1);
+-    expect(groupsUser1.length).toBeGreaterThan(0);
+-  });
+-
+-  it('should send and retrieve group messages', async () => {
+-    const group = await groupRepo.createGroup({
+-      name: 'Team Alpha',
+-      createdBy: 1
+-    });
+-
+-    const msg = await groupRepo.sendGroupMessage(group.groupId, 1, 'Hello Team Alpha!');
+-    expect(msg).toBeDefined();
+-    expect(msg.content).toBe('Hello Team Alpha!');
+-    expect(msg.groupId).toBe(group.groupId);
+-
+-    const messages = await groupRepo.getGroupMessages(group.groupId);
+-    expect(messages).toHaveLength(1);
+-    expect(messages[0].content).toBe('Hello Team Alpha!');
+-  });
+-});
+diff --git a/server/tests/notification.test.ts b/server/tests/notification.test.ts
+deleted file mode 100644
+index e43c544..0000000
+--- a/server/tests/notification.test.ts
++++ /dev/null
+@@ -1,60 +0,0 @@
+-import { describe, it, expect, beforeAll } from 'vitest';
+-import supertest from 'supertest';
+-import { app } from '../src/app.js';
+-
+-process.env.DATA_SOURCE = 'mock';
+-
+-describe('Notifications & Product Polish API', () => {
+-  const request = supertest(app);
+-  let alexToken: string;
+-
+-  beforeAll(async () => {
+-    const loginRes = await request.post('/api/auth/login').send({
+-      emailOrUsername: 'alex',
+-      password: 'Password123!'
+-    });
+-    alexToken = loginRes.body.data.accessToken;
+-  });
+-
+-  it('should fetch user notifications list', async () => {
+-    const res = await request
+-      .get('/api/notifications')
+-      .set('Authorization', `Bearer ${alexToken}`);
+-
+-    expect(res.status).toBe(200);
+-    expect(Array.isArray(res.body.data)).toBe(true);
+-  });
+-
+-  it('should return unread notifications count', async () => {
+-    const res = await request
+-      .get('/api/notifications/unread-count')
+-      .set('Authorization', `Bearer ${alexToken}`);
+-
+-    expect(res.status).toBe(200);
+-    expect(res.body.data).toHaveProperty('unreadCount');
+-    expect(typeof res.body.data.unreadCount).toBe('number');
+-  });
+-
+-  it('should mark all notifications as read idempotently', async () => {
+-    const res1 = await request
+-      .post('/api/notifications/read-all')
+-      .set('Authorization', `Bearer ${alexToken}`);
+-
+-    expect(res1.status).toBe(200);
+-
+-    const countRes = await request
+-      .get('/api/notifications/unread-count')
+-      .set('Authorization', `Bearer ${alexToken}`);
+-
+-    expect(countRes.body.data.unreadCount).toBe(0);
+-  });
+-
+-  it('should handle missing notifications gracefully with 404', async () => {
+-    const res = await request
+-      .patch('/api/notifications/99999/read')
+-      .set('Authorization', `Bearer ${alexToken}`);
+-
+-    expect(res.status).toBe(404);
+-    expect(res.body.error.code).toBe('NOTIFICATION_NOT_FOUND');
+-  });
+-});
+diff --git a/server/tests/oracle.integration.test.ts b/server/tests/oracle.integration.test.ts
+index b54e45b..bb03edc 100644
+--- a/server/tests/oracle.integration.test.ts
++++ b/server/tests/oracle.integration.test.ts
+@@ -1,4 +1,4 @@
+-import { describe, it, expect, beforeAll } from 'vitest';
++import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+ import { OracleUserRepository } from '../src/repositories/oracle/user.oracle.repo.js';
+ import { OraclePostRepository } from '../src/repositories/oracle/post.oracle.repo.js';
+ import { checkOracleHealth, initializeOraclePool, closeOraclePool } from '../src/db/pool.js';
+@@ -10,19 +10,21 @@ describe('Oracle Repository Integration Suite', () => {
+   let postRepo: OraclePostRepository;
+ 
+   beforeAll(async () => {
+-    if (env.DATA_SOURCE === 'oracle') {
+-      try {
+-        await initializeOraclePool();
+-        const health = await checkOracleHealth();
+-        isOracleLive = health.reachable;
+-      } catch {
+-        isOracleLive = false;
+-      }
++    try {
++      await initializeOraclePool();
++      const health = await checkOracleHealth();
++      isOracleLive = health.reachable;
++    } catch {
++      isOracleLive = false;
+     }
+     userRepo = new OracleUserRepository();
+     postRepo = new OraclePostRepository();
+   });
+ 
++  afterAll(async () => {
++    await closeOraclePool();
++  });
++
+   it('should report database reachability status without throwing secrets', async () => {
+     const health = await checkOracleHealth();
+     expect(health).toHaveProperty('reachable');
+diff --git a/server/tests/post.test.ts b/server/tests/post.test.ts
+deleted file mode 100644
+index 19f383c..0000000
+--- a/server/tests/post.test.ts
++++ /dev/null
+@@ -1,155 +0,0 @@
+-import { describe, it, expect, beforeAll } from 'vitest';
+-import supertest from 'supertest';
+-import { app } from '../src/app.js';
+-
+-process.env.DATA_SOURCE = 'mock';
+-
+-describe('Posts, Feeds, Likes, Comments & Bookmarks API', () => {
+-  const request = supertest(app);
+-  let alexToken: string;
+-  let alexUserId: number;
+-
+-  let createdPostId: number;
+-  let createdCommentId: number;
+-
+-  beforeAll(async () => {
+-    const loginRes = await request.post('/api/auth/login').send({
+-      emailOrUsername: 'alex',
+-      password: 'Password123!'
+-    });
+-    alexToken = loginRes.body.data.accessToken;
+-    alexUserId = loginRes.body.data.user.userId;
+-  });
+-
+-  it('should reject post creation with empty content and no image', async () => {
+-    const res = await request
+-      .post('/api/posts/create')
+-      .set('Authorization', `Bearer ${alexToken}`)
+-      .send({
+-        content: '   ',
+-        imageUrl: '   '
+-      });
+-
+-    expect(res.status).toBe(400);
+-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+-  });
+-
+-  it('should create a valid text-only post', async () => {
+-    const res = await request
+-      .post('/api/posts/create')
+-      .set('Authorization', `Bearer ${alexToken}`)
+-      .send({
+-        content: 'Testing Stage 6 text-only post creation!'
+-      });
+-
+-    expect(res.status).toBe(201);
+-    expect(res.body.data.content).toBe('Testing Stage 6 text-only post creation!');
+-    expect(res.body.data.author.username).toBe('alex');
+-    createdPostId = res.body.data.postId;
+-  });
+-
+-  it('should create a valid image-only post', async () => {
+-    const res = await request
+-      .post('/api/posts/create')
+-      .set('Authorization', `Bearer ${alexToken}`)
+-      .send({
+-        imageUrl: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1000&q=80'
+-      });
+-
+-    expect(res.status).toBe(201);
+-    expect(res.body.data.imageUrl).toBeDefined();
+-  });
+-
+-  it('should fetch global feed with pagination cursor metadata', async () => {
+-    const res = await request
+-      .get('/api/posts/feed?scope=global&limit=5')
+-      .set('Authorization', `Bearer ${alexToken}`);
+-
+-    expect(res.status).toBe(200);
+-    expect(Array.isArray(res.body.data)).toBe(true);
+-    expect(res.body.meta).toHaveProperty('hasMore');
+-  });
+-
+-  it('should fetch following feed for authenticated user', async () => {
+-    const res = await request
+-      .get('/api/posts/feed?scope=following&limit=5')
+-      .set('Authorization', `Bearer ${alexToken}`);
+-
+-    expect(res.status).toBe(200);
+-    expect(Array.isArray(res.body.data)).toBe(true);
+-  });
+-
+-  it('should like and unlike post idempotently', async () => {
+-    // Like post
+-    const like1 = await request
+-      .post(`/api/posts/${createdPostId}/like`)
+-      .set('Authorization', `Bearer ${alexToken}`);
+-    expect(like1.status).toBe(200);
+-
+-    // Duplicate like (idempotent)
+-    const like2 = await request
+-      .post(`/api/posts/${createdPostId}/like`)
+-      .set('Authorization', `Bearer ${alexToken}`);
+-    expect(like2.status).toBe(200);
+-
+-    // Unlike post
+-    const unlike = await request
+-      .delete(`/api/posts/${createdPostId}/like`)
+-      .set('Authorization', `Bearer ${alexToken}`);
+-    expect(unlike.status).toBe(200);
+-  });
+-
+-  it('should bookmark and unbookmark post idempotently', async () => {
+-    // Bookmark post
+-    const bm1 = await request
+-      .post(`/api/posts/${createdPostId}/bookmark`)
+-      .set('Authorization', `Bearer ${alexToken}`);
+-    expect(bm1.status).toBe(200);
+-
+-    // Fetch bookmarks
+-    const getBm = await request
+-      .get('/api/posts/bookmarks')
+-      .set('Authorization', `Bearer ${alexToken}`);
+-    expect(getBm.status).toBe(200);
+-    expect(getBm.body.data.some((p: any) => p.postId === createdPostId)).toBe(true);
+-
+-    // Unbookmark
+-    const bm2 = await request
+-      .delete(`/api/posts/${createdPostId}/bookmark`)
+-      .set('Authorization', `Bearer ${alexToken}`);
+-    expect(bm2.status).toBe(200);
+-  });
+-
+-  it('should add comment to post and list comments', async () => {
+-    const addRes = await request
+-      .post(`/api/posts/${createdPostId}/comment`)
+-      .set('Authorization', `Bearer ${alexToken}`)
+-      .send({
+-        content: 'This is a test comment on the post.'
+-      });
+-
+-    expect(addRes.status).toBe(201);
+-    expect(addRes.body.data.content).toBe('This is a test comment on the post.');
+-    createdCommentId = addRes.body.data.commentId;
+-
+-    const listRes = await request.get(`/api/posts/${createdPostId}/comments`);
+-    expect(listRes.status).toBe(200);
+-    expect(listRes.body.data.some((c: any) => c.commentId === createdCommentId)).toBe(true);
+-  });
+-
+-  it('should delete comment as owner', async () => {
+-    const delRes = await request
+-      .delete(`/api/posts/${createdPostId}/comments/${createdCommentId}`)
+-      .set('Authorization', `Bearer ${alexToken}`);
+-
+-    expect(delRes.status).toBe(200);
+-  });
+-
+-  it('should delete post as owner', async () => {
+-    const delRes = await request
+-      .delete(`/api/posts/${createdPostId}`)
+-      .set('Authorization', `Bearer ${alexToken}`);
+-
+-    expect(delRes.status).toBe(200);
+-  });
+-});
+diff --git a/server/tests/security.test.ts b/server/tests/security.test.ts
+deleted file mode 100644
+index 857765b..0000000
+--- a/server/tests/security.test.ts
++++ /dev/null
+@@ -1,248 +0,0 @@
+-import { describe, it, expect, beforeAll } from 'vitest';
+-import supertest from 'supertest';
+-import { app } from '../src/app.js';
+-
+-process.env.DATA_SOURCE = 'mock';
+-
+-describe('Security, Authorization & Priority 0 Audit Suite', () => {
+-  const request = supertest(app);
+-  let alexToken: string;
+-  let alexUserId: number;
+-
+-  beforeAll(async () => {
+-    const loginRes = await request.post('/api/auth/login').send({
+-      emailOrUsername: 'alex',
+-      password: 'Password123!'
+-    });
+-    alexToken = loginRes.body.data.accessToken;
+-    alexUserId = loginRes.body.data.user.userId;
+-  });
+-
+-  it('should safely escape SQL-injection-shaped input strings without executing SQL', async () => {
+-    const sqlInjectionString = "' OR '1'='1' -- DROP TABLE USERS;";
+-    const res = await request
+-      .get(`/api/users/search?q=${encodeURIComponent(sqlInjectionString)}`);
+-
+-    expect(res.status).toBe(200);
+-    expect(Array.isArray(res.body.data)).toBe(true);
+-    expect(res.body.data.length).toBe(0);
+-  });
+-
+-  it('should reject forged user ID updates (ID in path != verified JWT user ID)', async () => {
+-    const otherUserId = 999;
+-    const res = await request
+-      .put(`/api/users/${otherUserId}`)
+-      .set('Authorization', `Bearer ${alexToken}`)
+-      .send({
+-        displayName: 'Hacked User Name'
+-      });
+-
+-    expect(res.status).toBe(403);
+-    expect(res.body.error.code).toBe('FORBIDDEN');
+-  });
+-
+-  it('should verify the current password before issuing a reauthentication result', async () => {
+-    const rejected = await request
+-      .post('/api/security/reauthenticate')
+-      .set('Authorization', `Bearer ${alexToken}`)
+-      .send({ password: 'wrong-password' });
+-    expect(rejected.status).toBe(401);
+-    expect(rejected.body.error.code).toBe('INVALID_CREDENTIALS');
+-
+-    const accepted = await request
+-      .post('/api/security/reauthenticate')
+-      .set('Authorization', `Bearer ${alexToken}`)
+-      .send({ password: 'Password123!' });
+-    expect(accepted.status).toBe(200);
+-    expect(accepted.body.data.reauthenticated).toBe(true);
+-  });
+-
+-  it('should fail closed instead of enabling unverified MFA', async () => {
+-    const res = await request
+-      .post('/api/security/mfa/setup')
+-      .set('Authorization', `Bearer ${alexToken}`);
+-    expect(res.status).toBe(503);
+-    expect(res.body.error.code).toBe('MFA_NOT_CONFIGURED');
+-  });
+-
+-  it('should reject requests with invalid or malformed Bearer JWT token', async () => {
+-    const res = await request
+-      .get('/api/auth/me')
+-      .set('Authorization', 'Bearer invalid.jwt.token.string');
+-
+-    expect(res.status).toBe(401);
+-    expect(res.body.error.code).toBe('UNAUTHORIZED');
+-  });
+-
+-  it('should prevent mass assignment of sensitive user fields (e.g. passwordHash, userId)', async () => {
+-    const res = await request
+-      .put(`/api/users/${alexUserId}`)
+-      .set('Authorization', `Bearer ${alexToken}`)
+-      .send({
+-        displayName: 'Alex Verified',
+-        passwordHash: 'MALICIOUS_HASH_OVERWRITE',
+-        userId: 100,
+-        isAdmin: true
+-      });
+-
+-    expect(res.status).toBe(200);
+-    expect(res.body.data.displayName).toBe('Alex Verified');
+-    expect(res.body.data.userId).toBe(alexUserId);
+-    expect(res.body.data).not.toHaveProperty('isAdmin');
+-  });
+-
+-  it('should reject attempts to delete another user\'s post', async () => {
+-    const otherUserPostId = 102; // sarah's post
+-    const res = await request
+-      .delete(`/api/posts/${otherUserPostId}`)
+-      .set('Authorization', `Bearer ${alexToken}`);
+-
+-    expect(res.status).toBe(403);
+-    expect(res.body.error.code).toBe('FORBIDDEN');
+-  });
+-
+-  it('should enforce 24h server-side expiration filtering on stories', async () => {
+-    const res = await request.get('/api/stories/feed');
+-    expect(res.status).toBe(200);
+-    expect(Array.isArray(res.body.data)).toBe(true);
+-
+-    const now = new Date().toISOString();
+-    res.body.data.forEach((story: any) => {
+-      expect(new Date(story.expiresAt).valueOf()).toBeGreaterThan(new Date(now).valueOf());
+-    });
+-  });
+-
+-  it('should protect story creation and reject unauthenticated requests', async () => {
+-    const res = await request.post('/api/stories').send({
+-      mediaUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80',
+-      caption: 'Test story'
+-    });
+-    expect(res.status).toBe(401);
+-  });
+-
+-  it('should protect direct messaging endpoints and require authorization', async () => {
+-    const res = await request.get('/api/messages/2');
+-    expect(res.status).toBe(401);
+-  });
+-
+-  it('should reject spoofed media uploads with invalid magic bytes', async () => {
+-    const maliciousScriptBuffer = Buffer.from('<script>alert("XSS")</script>');
+-    const { validateMagicBytes } = await import('../src/services/media.service.js');
+-    
+-    const isValidJpeg = validateMagicBytes(maliciousScriptBuffer, 'image/jpeg');
+-    const isValidPng = validateMagicBytes(maliciousScriptBuffer, 'image/png');
+-
+-    expect(isValidJpeg).toBe(false);
+-    expect(isValidPng).toBe(false);
+-
+-    const endpointResponse = await request
+-      .post('/api/media/upload')
+-      .set('Authorization', `Bearer ${alexToken}`)
+-      .field('kind', 'photo')
+-      .attach('file', maliciousScriptBuffer, { filename: 'spoofed.png', contentType: 'image/png' });
+-    expect(endpointResponse.status).toBe(415);
+-    expect(endpointResponse.body.error.code).toBe('INVALID_FILE_SIGNATURE');
+-  });
+-
+-  it('should sanitize path traversal strings in uploaded file names', async () => {
+-    const pathTraversalName = '../../../../etc/passwd';
+-    const path = await import('path');
+-    const safeName = path.basename(pathTraversalName);
+-    
+-    expect(safeName).toBe('passwd');
+-    expect(safeName).not.toContain('..');
+-  });
+-
+-  it('should reject unauthenticated WebSocket handshake tokens', async () => {
+-    const { realtimeServer } = await import('../src/socket.js');
+-    const authData = realtimeServer.authenticateHandshakeToken('invalid.token.string');
+-    expect(authData).toBeNull();
+-  });
+-
+-  it('should strictly derive socket sender ID from verified JWT session payload and reject forged sender IDs', async () => {
+-    const { realtimeServer } = await import('../src/socket.js');
+-    const authData = realtimeServer.authenticateHandshakeToken(alexToken);
+-    expect(authData).not.toBeNull();
+-    expect(authData?.userId).toBe(alexUserId);
+-    expect(authData?.username).toBe('alex');
+-  });
+-
+-  it('should reject attempt to edit another user\'s post even if user claims special status', async () => {
+-    const sarahPostId = 102;
+-    const res = await request
+-      .put(`/api/posts/${sarahPostId}`)
+-      .set('Authorization', `Bearer ${alexToken}`)
+-      .send({ content: 'Unauthorized edit attempt' });
+-
+-    expect(res.status).toBe(403);
+-    expect(res.body.error.code).toBe('FORBIDDEN');
+-  });
+-
+-  it('should reject attempt to delete another user\'s reel', async () => {
+-    const sarahReelId = 999;
+-    const res = await request
+-      .delete(`/api/reels/${sarahReelId}`)
+-      .set('Authorization', `Bearer ${alexToken}`);
+-
+-    expect(res.status).toBe(403);
+-    expect(res.body.error.code).toBe('FORBIDDEN');
+-  });
+-
+-  it('should enforce deployment security headers including HSTS and nosniff', async () => {
+-    const res = await request.get('/api/health');
+-
+-    expect(res.status).toBe(200);
+-    expect(res.headers['strict-transport-security']).toBeDefined();
+-    expect(res.headers['x-content-type-options']).toBe('nosniff');
+-  });
+-
+-  it('should format and hash IP addresses in security audit log output', async () => {
+-    const { hashIp, auditLogSecurityEvent } = await import('../src/utils/securityAuditLogger.js');
+-    const hashed = hashIp('192.168.1.50');
+-    expect(hashed).toBeDefined();
+-    expect(hashed.length).toBe(16);
+-
+-    expect(() => {
+-      auditLogSecurityEvent({
+-        eventType: 'AUTH_SUCCESS',
+-        userId: 101,
+-        username: 'alex',
+-        ip: '192.168.1.50'
+-      });
+-    }).not.toThrow();
+-  });
+-
+-  it('should block automated web scraping bots with 403 BOT_ACCESS_DENIED', async () => {
+-    const res = await request
+-      .get('/api/health')
+-      .set('User-Agent', 'Scrapy/2.5.0 (+https://scrapy.org)');
+-
+-    expect(res.status).toBe(403);
+-    expect(res.body.error.code).toBe('BOT_ACCESS_DENIED');
+-  });
+-
+-  it('should sanitize script tags and dangerous event handlers from input strings', async () => {
+-    const { sanitizeInputString } = await import('../src/utils/sanitize.js');
+-    const maliciousInput = '<script>alert("XSS")</script><img src="x" onerror="alert(1)">Hello';
+-    const sanitized = sanitizeInputString(maliciousInput);
+-
+-    expect(sanitized).not.toContain('<script>');
+-    expect(sanitized).not.toContain('onerror=');
+-    expect(sanitized).toBe('Hello');
+-  });
+-
+-  it('should reject base64 uploads with invalid file signatures (magic bytes)', async () => {
+-    const invalidBase64 = 'data:image/png;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=='; // <script>alert(1)</script>
+-    const res = await request
+-      .post('/api/stories')
+-      .set('Authorization', `Bearer ${alexToken}`)
+-      .send({ mediaUrl: invalidBase64, caption: 'Script spoof story' });
+-
+-    expect(res.status).toBe(415);
+-    expect(res.body.error.code).toBe('INVALID_FILE_SIGNATURE');
+-  });
+-});
+-
+-
+-
+-
+diff --git a/server/tests/user.test.ts b/server/tests/user.test.ts
+deleted file mode 100644
+index 2da6f3c..0000000
+--- a/server/tests/user.test.ts
++++ /dev/null
+@@ -1,112 +0,0 @@
+-import { describe, it, expect, beforeAll } from 'vitest';
+-import supertest from 'supertest';
+-import { app } from '../src/app.js';
+-
+-process.env.DATA_SOURCE = 'mock';
+-
+-describe('Users, Social Graph & Discovery API', () => {
+-  const request = supertest(app);
+-  let alexToken: string;
+-  let alexUserId: number;
+-
+-  beforeAll(async () => {
+-    const loginRes = await request.post('/api/auth/login').send({
+-      emailOrUsername: 'alex',
+-      password: 'Password123!'
+-    });
+-    alexToken = loginRes.body.data.accessToken;
+-    alexUserId = loginRes.body.data.user.userId;
+-  });
+-
+-  it('should fetch user profile by username', async () => {
+-    const res = await request.get('/api/users/username/alex');
+-    expect(res.status).toBe(200);
+-    expect(res.body.data.username).toBe('alex');
+-    expect(res.body.data.displayName).toBe('Alex Rivera');
+-    expect(res.body.data.followersCount).toBeDefined();
+-    expect(res.body.data).not.toHaveProperty('passwordHash');
+-    expect(res.body.data).not.toHaveProperty('email');
+-  });
+-
+-  it('should return 404 for non-existent profile', async () => {
+-    const res = await request.get('/api/users/username/non_existent_handle_99');
+-    expect(res.status).toBe(404);
+-    expect(res.body.error.code).toBe('USER_NOT_FOUND');
+-  });
+-
+-  it('should update profile as owner', async () => {
+-    const res = await request
+-      .put(`/api/users/${alexUserId}`)
+-      .set('Authorization', `Bearer ${alexToken}`)
+-      .send({
+-        displayName: 'Alex Rivera Updated',
+-        bio: 'Updated bio for testing',
+-        location: 'San Francisco, CA'
+-      });
+-
+-    expect(res.status).toBe(200);
+-    expect(res.body.data.displayName).toBe('Alex Rivera Updated');
+-    expect(res.body.data.bio).toBe('Updated bio for testing');
+-  });
+-
+-  it('should reject profile update by non-owner', async () => {
+-    const res = await request
+-      .put('/api/users/999')
+-      .set('Authorization', `Bearer ${alexToken}`)
+-      .send({
+-        displayName: 'Hacked Name'
+-      });
+-
+-    expect(res.status).toBe(403);
+-    expect(res.body.error.code).toBe('FORBIDDEN');
+-  });
+-
+-  it('should reject self-following', async () => {
+-    const res = await request
+-      .post(`/api/users/${alexUserId}/follow`)
+-      .set('Authorization', `Bearer ${alexToken}`);
+-
+-    expect(res.status).toBe(400);
+-    expect(res.body.error.code).toBe('CANNOT_FOLLOW_SELF');
+-  });
+-
+-  it('should follow and unfollow user idempotently', async () => {
+-    // Follow user 2 (sarah_design)
+-    const followRes1 = await request
+-      .post('/api/users/2/follow')
+-      .set('Authorization', `Bearer ${alexToken}`);
+-    expect(followRes1.status).toBe(200);
+-
+-    // Duplicate follow (idempotent)
+-    const followRes2 = await request
+-      .post('/api/users/2/follow')
+-      .set('Authorization', `Bearer ${alexToken}`);
+-    expect(followRes2.status).toBe(200);
+-
+-    // Unfollow user 2
+-    const unfollowRes = await request
+-      .delete('/api/users/2/follow')
+-      .set('Authorization', `Bearer ${alexToken}`);
+-    expect(unfollowRes.status).toBe(200);
+-  });
+-
+-  it('should search users by query', async () => {
+-    const res = await request.get('/api/users/search?q=sarah');
+-    expect(res.status).toBe(200);
+-    expect(Array.isArray(res.body.data)).toBe(true);
+-    expect(res.body.data.length).toBeGreaterThan(0);
+-    expect(res.body.data[0].username).toBe('sarah_design');
+-    expect(res.body.data[0]).not.toHaveProperty('passwordHash');
+-    expect(res.body.data[0]).not.toHaveProperty('email');
+-  });
+-
+-  it('should get user suggestions excluding current user', async () => {
+-    const res = await request
+-      .get('/api/users/suggestions')
+-      .set('Authorization', `Bearer ${alexToken}`);
+-
+-    expect(res.status).toBe(200);
+-    expect(Array.isArray(res.body.data)).toBe(true);
+-    expect(res.body.data.some((u: any) => u.userId === alexUserId)).toBe(false);
+-  });
+-});

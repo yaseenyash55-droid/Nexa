@@ -1,23 +1,7 @@
 import React, { useState } from 'react';
 import { AppShell } from '../components/layout/AppShell.js';
 import { DrDoomOrbLogo } from '../components/ui/DrDoomOrbLogo.js';
-import { 
-  BookOpen, 
-  Search, 
-  UserPlus, 
-  Edit3, 
-  MessageSquare, 
-  ShieldCheck, 
-  Smartphone, 
-  ChevronDown, 
-  ChevronUp, 
-  ArrowRight, 
-  Users, 
-  CheckCircle2, 
-  Camera, 
-  Video, 
-  Film 
-} from 'lucide-react';
+import { BookOpen, Search, UserPlus, Edit3, MessageSquare, ShieldCheck, Smartphone, ChevronDown, ChevronUp, ArrowRight, Users, CheckCircle2, Camera, Video, Film } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface ManualSection {
@@ -234,7 +218,7 @@ export const UserManualPage: React.FC = () => {
         },
         {
           title: 'Layered Backend Architecture',
-          desc: 'Strict separation: Routes -> Validation Middleware -> Controller -> Service -> Repository -> Data Source (Oracle / Mock).'
+          desc: 'Strict separation: Routes -> Validation Middleware -> Controller -> Service -> Repository -> Oracle Database.'
         },
         {
           title: 'Sanitized Static Media URLs',
@@ -273,11 +257,7 @@ export const UserManualPage: React.FC = () => {
     }
   ];
 
-  const filteredSections = sections.filter((sec) =>
-    sec.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    sec.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    sec.steps.some((st) => st.title.toLowerCase().includes(searchQuery.toLowerCase()) || st.desc.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredSections = sections.filter((sec) => sec.title.toLowerCase().includes(searchQuery.toLowerCase()) || sec.summary.toLowerCase().includes(searchQuery.toLowerCase()) || sec.steps.some((st) => st.title.toLowerCase().includes(searchQuery.toLowerCase()) || st.desc.toLowerCase().includes(searchQuery.toLowerCase())));
 
   return (
     <AppShell>
@@ -288,23 +268,13 @@ export const UserManualPage: React.FC = () => {
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-500/20 border border-brand-500/30 rounded-full text-brand-300 text-xs font-semibold">
               <BookOpen className="w-4 h-4" /> Nexa User Manual & Project Viva Guide
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Nexa Project User Manual
-            </h1>
-            <p className="text-sm text-slate-300 leading-relaxed">
-              Learn how to use Nexa step by step. Explore guides on account setup, Instagram profile uploads, progress-tracked media streaming, short Reels vs Long Videos, 256-bit AES-GCM encrypted messaging, group chats, broadcasts, and the Android mobile app.
-            </p>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Nexa Project User Manual</h1>
+            <p className="text-sm text-slate-300 leading-relaxed">Learn how to use Nexa step by step. Explore guides on account setup, Instagram profile uploads, progress-tracked media streaming, short Reels vs Long Videos, 256-bit AES-GCM encrypted messaging, group chats, broadcasts, and the Android mobile app.</p>
 
             {/* Search Box */}
             <div className="relative max-w-md pt-2">
               <Search className="w-4 h-4 absolute left-3.5 top-5.5 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search user manual topics..."
-                className="w-full bg-slate-950 border border-slate-800 focus:border-brand-500 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none shadow-inner"
-              />
+              <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search user manual topics..." className="w-full bg-slate-950 border border-slate-800 focus:border-brand-500 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none shadow-inner" />
             </div>
           </div>
 
@@ -318,24 +288,16 @@ export const UserManualPage: React.FC = () => {
         {/* Accordion Sections List */}
         <div className="space-y-4">
           {filteredSections.length === 0 ? (
-            <div className="p-12 text-center text-sm text-slate-400 bg-slate-900/40 border border-slate-800 rounded-2xl">
-              No matching manual sections found. Try a different search query.
-            </div>
+            <div className="p-12 text-center text-sm text-slate-400 bg-slate-900/40 border border-slate-800 rounded-2xl">No matching manual sections found. Try a different search query.</div>
           ) : (
             filteredSections.map((sec) => {
               const Icon = sec.icon;
               const isOpen = openSectionId === sec.id;
 
               return (
-                <div
-                  key={sec.id}
-                  className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden transition-all shadow-sm"
-                >
+                <div key={sec.id} className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden transition-all shadow-sm">
                   {/* Accordion Header */}
-                  <div
-                    onClick={() => toggleSection(sec.id)}
-                    className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-800/40 transition-colors"
-                  >
+                  <div onClick={() => toggleSection(sec.id)} className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-800/40 transition-colors">
                     <div className="flex items-center gap-3.5">
                       <div className={`p-2.5 rounded-xl border ${sec.bg} ${sec.color}`}>
                         <Icon className="w-5 h-5" />
@@ -346,9 +308,7 @@ export const UserManualPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <button className="p-1 text-slate-400 hover:text-white rounded-lg">
-                      {isOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                    </button>
+                    <button className="p-1 text-slate-400 hover:text-white rounded-lg">{isOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}</button>
                   </div>
 
                   {/* Accordion Body */}

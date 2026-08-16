@@ -126,8 +126,8 @@ VALUES (
 
 INSERT INTO POSTS (USER_ID, CONTENT, IMAGE_URL, CREATED_AT)
 VALUES (
-  (SELECT USER_ID FROM USERS WHERE USERNAME = 'alex'), 
-  'Refactoring backend services to use clean repository interfaces. Oracle and Mock mode both pass test suites seamlessly.', 
+  (SELECT USER_ID FROM USERS WHERE USERNAME = 'alex'),
+  'Refactoring backend services to use clean repository interfaces with strict Oracle Database persistence.',
   'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1000&q=80', 
   SYSTIMESTAMP - INTERVAL '4' HOUR
 );

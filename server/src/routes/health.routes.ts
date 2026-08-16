@@ -1,24 +1,31 @@
 import { Router } from 'express';
-import { env } from '../config/env.js';
 import { checkOracleHealth } from '../db/pool.js';
 import { sendSuccess } from '../utils/response.js';
 
 const router = Router();
 
 /**
- * Liveness Probe: GET /health
- * Fast process check for Kubernetes / PM2 liveness probe.
- * Does NOT perform DB queries or expose credentials.
+ * Dependency health probe: GET /health
+ * Confirms that the process and Oracle Database pool can serve requests.
+ * Does not expose credentials, connection strings, or database errors.
  */
 router.get('/', async (_req, res) => {
-  const isOracle = env.DATA_SOURCE === 'oracle';
-  const dbHealth = isOracle ? await checkOracleHealth() : { reachable: true, details: 'Running in MOCK mode' };
-  return sendSuccess(res, {
-    status: 'ok',
-    mode: env.DATA_SOURCE,
-    database: { reachable: dbHealth.reachable },
-    timestamp: new Date().toISOString()
-  }, 'Process liveness check');
+  const dbHealth = await checkOracleHealth();
+  const isHealthy = dbHealth.reachable;
+  const statusCode = isHealthy ? 200 : 503;
+
+  return sendSuccess(
+    res,
+    {
+      status: isHealthy ? 'ok' : 'degraded',
+      mode: 'oracle',
+      database: { reachable: dbHealth.reachable },
+      timestamp: new Date().toISOString()
+    },
+    isHealthy ? 'Process liveness check' : 'Database connection degraded',
+    undefined,
+    statusCode
+  );
 });
 
 /**
@@ -28,23 +35,21 @@ router.get('/', async (_req, res) => {
  * Omits connection strings, keys, or stack traces from payload.
  */
 router.get('/ready', async (_req, res) => {
-  if (env.DATA_SOURCE === 'mock') {
-    return sendSuccess(res, {
-      status: 'ready',
-      mode: 'mock',
-      timestamp: new Date().toISOString()
-    }, 'Readiness check pass (mock mode)');
-  }
-
   const dbHealth = await checkOracleHealth();
   const isReady = dbHealth.reachable;
   const statusCode = isReady ? 200 : 503;
 
-  return sendSuccess(res, {
-    status: isReady ? 'ready' : 'unready',
-    database: isReady ? 'connected' : 'unreachable',
-    timestamp: new Date().toISOString()
-  }, 'Readiness check status', undefined, statusCode);
+  return sendSuccess(
+    res,
+    {
+      status: isReady ? 'ready' : 'unready',
+      database: isReady ? 'connected' : 'unreachable',
+      timestamp: new Date().toISOString()
+    },
+    'Readiness check status',
+    undefined,
+    statusCode
+  );
 });
 
 export default router;

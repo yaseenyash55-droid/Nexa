@@ -29,7 +29,5 @@ export class ProductionEmailProvider implements IEmailProvider {
 }
 
 export function getEmailProvider(): IEmailProvider {
-  return env.NODE_ENV === 'test' || env.DATA_SOURCE === 'mock'
-    ? new FakeEmailProvider()
-    : new ProductionEmailProvider();
+  return env.NODE_ENV === 'test' ? new FakeEmailProvider() : new ProductionEmailProvider();
 }

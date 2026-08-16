@@ -1,6 +1,5 @@
 import { Group, GroupMember, GroupMessage, CreateGroupParams } from '../types/index.js';
 import { executeSql, withTransaction } from '../db/pool.js';
-import { logger } from '../utils/logger.js';
 
 export interface GroupRepository {
   createGroup(params: CreateGroupParams): Promise<Group>;
@@ -10,130 +9,6 @@ export interface GroupRepository {
   addGroupMember(groupId: number, userId: number, role?: 'ADMIN' | 'MEMBER'): Promise<void>;
   getGroupMessages(groupId: number): Promise<GroupMessage[]>;
   sendGroupMessage(groupId: number, senderId: number, content: string): Promise<GroupMessage>;
-}
-
-// In-Memory Mock Store for Unit Tests and MOCK Mode
-const mockGroups: Group[] = [
-  {
-    groupId: 1,
-    name: 'Nexa Developers',
-    description: 'Official development discussion group',
-    createdBy: 1,
-    avatarUrl: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=150',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    membersCount: 3,
-    lastMessage: 'Welcome to Nexa Group Chat!'
-  }
-];
-
-const mockGroupMembers: GroupMember[] = [
-  { groupId: 1, userId: 1, role: 'ADMIN', joinedAt: new Date().toISOString() },
-  { groupId: 1, userId: 2, role: 'MEMBER', joinedAt: new Date().toISOString() },
-  { groupId: 1, userId: 3, role: 'MEMBER', joinedAt: new Date().toISOString() }
-];
-
-const mockGroupMessages: GroupMessage[] = [
-  {
-    messageId: 1,
-    groupId: 1,
-    senderId: 1,
-    sender: {
-      userId: 1,
-      username: 'nexa_admin',
-      displayName: 'Nexa Admin',
-      profileImageUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
-    },
-    content: 'Welcome to Nexa Group Chat!',
-    createdAt: new Date(Date.now() - 3600000).toISOString()
-  }
-];
-
-let nextGroupId = 2;
-let nextGroupMessageId = 2;
-
-export class MockGroupRepository implements GroupRepository {
-  async createGroup(params: CreateGroupParams): Promise<Group> {
-    const groupId = nextGroupId++;
-    const now = new Date().toISOString();
-    const group: Group = {
-      groupId,
-      name: params.name.trim(),
-      description: params.description?.trim() || null,
-      createdBy: params.createdBy,
-      avatarUrl: params.avatarUrl || null,
-      createdAt: now,
-      membersCount: 1 + (params.memberIds?.length || 0),
-      lastMessage: 'Group created'
-    };
-
-    mockGroups.push(group);
-    mockGroupMembers.push({ groupId, userId: params.createdBy, role: 'ADMIN', joinedAt: now });
-
-    if (params.memberIds) {
-      for (const mId of params.memberIds) {
-        if (mId !== params.createdBy) {
-          mockGroupMembers.push({ groupId, userId: mId, role: 'MEMBER', joinedAt: now });
-        }
-      }
-    }
-
-    return group;
-  }
-
-  async getUserGroups(userId: number): Promise<Group[]> {
-    const userGroupIds = new Set(
-      mockGroupMembers.filter((gm) => gm.userId === userId).map((gm) => gm.groupId)
-    );
-    return mockGroups.filter((g) => userGroupIds.has(g.groupId));
-  }
-
-  async getGroupById(groupId: number): Promise<Group | null> {
-    return mockGroups.find((g) => g.groupId === groupId) || null;
-  }
-
-  async getGroupMembers(groupId: number): Promise<GroupMember[]> {
-    return mockGroupMembers.filter((gm) => gm.groupId === groupId);
-  }
-
-  async addGroupMember(groupId: number, userId: number, role: 'ADMIN' | 'MEMBER' = 'MEMBER'): Promise<void> {
-    const exists = mockGroupMembers.some((gm) => gm.groupId === groupId && gm.userId === userId);
-    if (!exists) {
-      mockGroupMembers.push({ groupId, userId, role, joinedAt: new Date().toISOString() });
-      const group = mockGroups.find((g) => g.groupId === groupId);
-      if (group) {
-        group.membersCount = (group.membersCount || 0) + 1;
-      }
-    }
-  }
-
-  async getGroupMessages(groupId: number): Promise<GroupMessage[]> {
-    return mockGroupMessages
-      .filter((m) => m.groupId === groupId)
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }
-
-  async sendGroupMessage(groupId: number, senderId: number, content: string): Promise<GroupMessage> {
-    const msg: GroupMessage = {
-      messageId: nextGroupMessageId++,
-      groupId,
-      senderId,
-      sender: {
-        userId: senderId,
-        username: `user_${senderId}`,
-        displayName: `User ${senderId}`,
-        profileImageUrl: null
-      },
-      content: content.trim(),
-      createdAt: new Date().toISOString()
-    };
-
-    mockGroupMessages.push(msg);
-    const group = mockGroups.find((g) => g.groupId === groupId);
-    if (group) {
-      group.lastMessage = content.trim();
-    }
-    return msg;
-  }
 }
 
 export class OracleGroupRepository implements GroupRepository {
@@ -150,7 +25,7 @@ export class OracleGroupRepository implements GroupRepository {
           params.createdBy,
           params.avatarUrl || null,
           { dir: 3003, type: 2002 }, // NUMBER
-          { dir: 3003, type: 2007 }  // TIMESTAMP
+          { dir: 3003, type: 2007 } // TIMESTAMP
         ]
       );
 
@@ -308,17 +183,14 @@ export class OracleGroupRepository implements GroupRepository {
           senderId,
           content.trim(),
           { dir: 3003, type: 2002 }, // NUMBER
-          { dir: 3003, type: 2007 }  // TIMESTAMP
+          { dir: 3003, type: 2007 } // TIMESTAMP
         ]
       );
 
       const messageId = (result.outBinds as any)?.[0]?.[0];
       const createdAt = (result.outBinds as any)?.[1]?.[0]?.toISOString() || new Date().toISOString();
 
-      const userRows = await conn.execute(
-        `SELECT USERNAME, DISPLAY_NAME, PROFILE_IMAGE_URL FROM USERS WHERE USER_ID = :1`,
-        [senderId]
-      );
+      const userRows = await conn.execute(`SELECT USERNAME, DISPLAY_NAME, PROFILE_IMAGE_URL FROM USERS WHERE USER_ID = :1`, [senderId]);
 
       const userRow = (userRows.rows as any)?.[0] || {};
 

@@ -9,11 +9,6 @@ oracledb.autoCommit = false;
 let pool: any = null;
 
 export async function initializeOraclePool(): Promise<void> {
-  if (env.DATA_SOURCE !== 'oracle') {
-    logger.info('DATA_SOURCE is set to mock. Skipping Oracle connection pool creation.');
-    return;
-  }
-
   try {
     pool = await oracledb.createPool({
       user: env.DB_USER,
@@ -43,20 +38,13 @@ export async function closeOraclePool(): Promise<void> {
 }
 
 export async function getConnection(): Promise<any> {
-  if (env.DATA_SOURCE !== 'oracle') {
-    throw new Error('Oracle pool requested while DATA_SOURCE is set to mock');
-  }
   if (!pool) {
     throw new Error('Oracle Connection Pool is not initialized');
   }
   return pool.getConnection();
 }
 
-export async function executeSql<T = unknown>(
-  sql: string,
-  binds: Record<string, any> | any[] = {},
-  options: Record<string, any> = {}
-): Promise<any> {
+export async function executeSql<T = unknown>(sql: string, binds: Record<string, any> | any[] = {}, options: Record<string, any> = {}): Promise<any> {
   let connection: any = null;
   try {
     connection = await getConnection();
@@ -80,9 +68,7 @@ export async function executeSql<T = unknown>(
   }
 }
 
-export async function withTransaction<T>(
-  action: (conn: any) => Promise<T>
-): Promise<T> {
+export async function withTransaction<T>(action: (conn: any) => Promise<T>): Promise<T> {
   let connection: any = null;
   try {
     connection = await getConnection();
@@ -109,10 +95,10 @@ export async function withTransaction<T>(
   }
 }
 
-export async function checkOracleHealth(): Promise<{ reachable: boolean; details: string }> {
-  if (env.DATA_SOURCE !== 'oracle') {
-    return { reachable: true, details: 'Running in MOCK mode' };
-  }
+export async function checkOracleHealth(): Promise<{
+  reachable: boolean;
+  details: string;
+}> {
   if (!pool) {
     return { reachable: false, details: 'Oracle Pool not initialized' };
   }

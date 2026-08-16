@@ -2,9 +2,9 @@
 
 ## Architecture & Code Boundaries
 - **Monorepo Structure**: Root npm workspace with `client/` (React + Vite + TypeScript + Tailwind) and `server/` (Node.js + Express + TypeScript + `oracledb`).
-- **Layered Architecture**: Route -> Validation Middleware -> Controller -> Service -> Repository -> Data Source (Oracle or Mock).
-- **Data Source Modes**: `DATA_SOURCE=oracle` (primary local target) and `DATA_SOURCE=mock` (deterministic unit testing).
-- **No Silent Fallbacks**: In Oracle mode, database errors MUST return sanitized 500 / health degraded responses without falling back to mock mode.
+- **Layered Architecture**: Route -> Validation Middleware -> Controller -> Service -> Repository -> Oracle Database.
+- **Oracle-Only Operation**: All runtime data access uses Oracle Database repositories.
+- **No Silent Fallbacks**: Database errors MUST return sanitized 500 responses and degraded health status.
 
 ## Oracle Database Conventions & Rules
 - **Identifiers**: Unquoted uppercase (`USERS`, `POSTS`, `COMMENTS`, `LIKES`, `FOLLOWERS`, `REFRESH_TOKENS`, `BOOKMARKS`, `NOTIFICATIONS`).

@@ -66,7 +66,10 @@ sqlplus NEXA_USER@localhost:1521/FREEPDB1 @database/03_seed.sql
 # 5. Apply security and privacy tables
 sqlplus NEXA_USER@localhost:1521/FREEPDB1 @database/05_security_privacy_migrations.sql
 
-# 6. Run verification suite
+# 6. Add group chat and broadcast persistence
+sqlplus NEXA_USER@localhost:1521/FREEPDB1 @database/06_groups_broadcasts_migration.sql
+
+# 7. Run verification suite
 sqlplus NEXA_USER@localhost:1521/FREEPDB1 @database/04_verification.sql
 ```
 
@@ -82,7 +85,6 @@ Copy `.env.example` to `.env` in the project root and update credentials for you
 
 ```bash
 # Oracle 23c / 26ai Free (default)
-DATA_SOURCE=oracle
 DB_USER=NEXA_USER
 DB_PASSWORD=your_unique_local_oracle_password
 DB_CONNECT_STRING=localhost:1521/FREEPDB1

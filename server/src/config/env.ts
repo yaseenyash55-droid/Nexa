@@ -30,9 +30,6 @@ export const env = {
   DB_PASSWORD: oracleDbPassword,
   DB_CONNECT_STRING: oracleDbConnectionString,
   CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || 'https://nexa-social-app.surge.sh',
-  get DATA_SOURCE(): 'oracle' | 'mock' {
-    return (process.env.DATA_SOURCE as 'oracle' | 'mock') || 'oracle';
-  },
   DB_POOL_MIN: parseInt(process.env.DB_POOL_MIN || '1', 10),
   DB_POOL_MAX: parseInt(process.env.DB_POOL_MAX || '5', 10),
   DB_POOL_INCREMENT: parseInt(process.env.DB_POOL_INCREMENT || '1', 10),

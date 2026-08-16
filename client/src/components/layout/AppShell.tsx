@@ -6,7 +6,6 @@ import { SearchInput } from '../search/SearchInput.js';
 import { SuggestedUsers } from '../search/SuggestedUsers.js';
 import { Modal } from '../ui/Modal.js';
 import { PostComposer } from '../feed/PostComposer.js';
-import { DevelopmentDataModeBadge } from '../ui/DevelopmentDataModeBadge.js';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -27,9 +26,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, showRightPanel = t
       </div>
 
       {/* Main Content Stream Column */}
-      <main className="flex-1 max-w-2xl w-full border-x border-slate-800/80 min-h-screen pb-20 md:pb-8">
-        {children}
-      </main>
+      <main className="flex-1 max-w-2xl w-full border-x border-slate-800/80 min-h-screen pb-20 md:pb-8">{children}</main>
 
       {/* Right Sidebar Panel (Desktop only) */}
       {showRightPanel && (
@@ -50,9 +47,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, showRightPanel = t
       <Modal isOpen={isComposerOpen} onClose={() => setIsComposerOpen(false)} title="Create New Post">
         <PostComposer onPostCreated={() => setIsComposerOpen(false)} />
       </Modal>
-
-      {/* Development Mode Badge */}
-      <DevelopmentDataModeBadge />
     </div>
   );
 };

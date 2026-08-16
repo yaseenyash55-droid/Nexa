@@ -7,14 +7,10 @@ import { realtimeServer } from './socket.js';
 
 async function startServer() {
   try {
-    if (env.DATA_SOURCE === 'oracle') {
-      await initializeOraclePool();
-    } else {
-      logger.info('Starting server in MOCK mode');
-    }
+    await initializeOraclePool();
 
     const server = app.listen(env.PORT, () => {
-      logger.info(`Nexa Server listening on port ${env.PORT} (DATA_SOURCE=${env.DATA_SOURCE})`);
+      logger.info(`Nexa Server listening on port ${env.PORT} with Oracle Database`);
     });
 
     const io = new Server(server, {
