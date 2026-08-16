@@ -149,6 +149,13 @@ export interface ISecurityRepository {
   }): Promise<void>;
 }
 
+export interface IFcmTokenRepository {
+  upsertToken(userId: number, token: string, platform?: string, deviceId?: string): Promise<void>;
+  revokeToken(token: string, userId?: number): Promise<boolean>;
+  revokeUserTokens(userId: number): Promise<number>;
+  getUserTokens(userId: number): Promise<string[]>;
+}
+
 export interface IRepositoryManager {
   userRepo: IUserRepository;
   postRepo: IPostRepository;
@@ -159,6 +166,7 @@ export interface IRepositoryManager {
   messageRepo: IMessageRepository;
   authRepo: IAuthRepository;
   securityRepo: ISecurityRepository;
+  fcmTokenRepo: IFcmTokenRepository;
   users: IUserRepository;
   posts: IPostRepository;
   comments: ICommentRepository;
@@ -168,5 +176,6 @@ export interface IRepositoryManager {
   messages: IMessageRepository;
   auth: IAuthRepository;
   security: ISecurityRepository;
+  fcmTokens: IFcmTokenRepository;
 }
 

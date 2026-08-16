@@ -15,7 +15,7 @@ interface GroupApi {
 
     @POST("groups")
     suspend fun createGroup(
-        @Body body: Map<String, Any>
+        @Body body: Map<String, @JvmSuppressWildcards Any>
     ): Response<ApiResponse<Group>>
 
     @GET("groups/{id}/messages")

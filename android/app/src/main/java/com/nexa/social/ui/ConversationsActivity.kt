@@ -118,7 +118,7 @@ class ConversationsActivity : AppCompatActivity() {
             try {
                 when (activeTab) {
                     0 -> {
-                        val res = NexaApiClient.authApi.getSuggestions()
+                        val res = NexaApiClient.userApi.getSuggestions()
                         val users = res.body()?.data ?: emptyList()
                         val items = users.map { ConversationItem.Direct(it) }
                         withContext(Dispatchers.Main) {

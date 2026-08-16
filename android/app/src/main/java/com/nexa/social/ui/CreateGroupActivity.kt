@@ -41,7 +41,7 @@ class CreateGroupActivity : AppCompatActivity() {
     private fun loadContacts() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val res = NexaApiClient.authApi.getSuggestions()
+                val res = NexaApiClient.userApi.getSuggestions()
                 val users = res.body()?.data ?: emptyList()
                 withContext(Dispatchers.Main) {
                     adapter.submitList(users)

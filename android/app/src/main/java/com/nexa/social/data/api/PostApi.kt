@@ -9,7 +9,6 @@ import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
-import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
@@ -25,14 +24,12 @@ interface PostApi {
     @Multipart
     @POST("media/upload")
     suspend fun uploadMedia(
-        @Header("Authorization") token: String,
         @Part file: MultipartBody.Part,
         @Part("kind") kind: RequestBody
     ): Response<ApiResponse<MediaUploadResponse>>
 
     @POST("posts/create")
     suspend fun createPost(
-        @Header("Authorization") token: String,
         @Body request: CreatePostRequest
     ): Response<ApiResponse<Post>>
 }

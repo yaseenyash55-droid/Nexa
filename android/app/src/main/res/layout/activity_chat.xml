@@ -14,8 +14,8 @@
         android:layout_height="?attr/actionBarSize"
         android:background="#151E2E"
         app:navigationIcon="@drawable/ic_close"
-        app:subtitle="🔒 End-to-End Encrypted (AES-256)"
-        app:subtitleTextColor="#10B981"
+        app:subtitle="Direct Conversation"
+        app:subtitleTextColor="#94A3B8"
         app:title="Chat"
         app:titleTextColor="#FFFFFF" />
 

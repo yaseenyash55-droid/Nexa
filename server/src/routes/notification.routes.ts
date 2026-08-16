@@ -11,4 +11,9 @@ router.post('/read-all', requireAuth, (req, res, next) => controller.markAllAsRe
 router.patch('/read-all', requireAuth, (req, res, next) => controller.markAllAsRead(req, res, next));
 router.patch('/:id/read', requireAuth, (req, res, next) => controller.markAsRead(req, res, next));
 
+// FCM Token Registration & Revocation
+router.post('/register', requireAuth, (req, res, next) => controller.registerFcmToken(req, res, next));
+router.post('/fcm-token', requireAuth, (req, res, next) => controller.registerFcmToken(req, res, next));
+router.delete('/fcm-token', requireAuth, (req, res, next) => controller.revokeFcmToken(req, res, next));
+
 export default router;

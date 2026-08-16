@@ -6,26 +6,11 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.nexa.social.R
-import com.nexa.social.utils.AndroidE2EE
-
-data class DisplayMessage(
-    val id: Int,
-    val senderId: Int,
-    val senderName: String?,
-    val rawContent: String,
-    val isSelf: Boolean,
-    val timestamp: String?
-)
+import com.nexa.social.data.models.DisplayMessage
 
 class MessagesAdapter(
-    private val currentUserId: Int,
-    private val otherUserId: Int?
+    private val currentUserId: Int
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-
-    companion object {
-        private const val TYPE_SENT = 1
-        private const val TYPE_RECEIVED = 2
-    }
 
     private val messages = mutableListOf<DisplayMessage>()
 
@@ -56,16 +41,10 @@ class MessagesAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val msg = messages[position]
-        val (decryptedText, isEncrypted) = if (otherUserId != null) {
-            AndroidE2EE.decryptMessage(currentUserId, otherUserId, msg.rawContent)
-        } else {
-            Pair(msg.rawContent, false)
-        }
-
         if (holder is SentViewHolder) {
-            holder.bind(msg, decryptedText, isEncrypted)
+            holder.bind(msg)
         } else if (holder is ReceivedViewHolder) {
-            holder.bind(msg, decryptedText, isEncrypted)
+            holder.bind(msg)
         }
     }
 
@@ -75,9 +54,9 @@ class MessagesAdapter(
         private val tvContent: TextView = itemView.findViewById(R.id.tvContent)
         private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
 
-        fun bind(msg: DisplayMessage, decryptedText: String, isEncrypted: Boolean) {
-            tvContent.text = decryptedText
-            tvTime.text = if (isEncrypted) "🔒 E2EE" else "Sent"
+        fun bind(msg: DisplayMessage) {
+            tvContent.text = msg.content
+            tvTime.text = formatTimestamp(msg.timestamp) ?: "Sent"
         }
     }
 
@@ -86,7 +65,7 @@ class MessagesAdapter(
         private val tvContent: TextView = itemView.findViewById(R.id.tvContent)
         private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
 
-        fun bind(msg: DisplayMessage, decryptedText: String, isEncrypted: Boolean) {
+        fun bind(msg: DisplayMessage) {
             if (!msg.senderName.isNullOrEmpty()) {
                 tvSenderName.text = msg.senderName
                 tvSenderName.visibility = View.VISIBLE
@@ -94,8 +73,26 @@ class MessagesAdapter(
                 tvSenderName.visibility = View.GONE
             }
 
-            tvContent.text = decryptedText
-            tvTime.text = if (isEncrypted) "🔒 E2EE" else "Received"
+            tvContent.text = msg.content
+            tvTime.text = formatTimestamp(msg.timestamp) ?: "Received"
+        }
+    }
+
+    companion object {
+        private const val TYPE_SENT = 1
+        private const val TYPE_RECEIVED = 2
+
+        fun formatTimestamp(timestamp: String?): String? {
+            if (timestamp.isNullOrEmpty()) return null
+            return try {
+                if (timestamp.length >= 16 && timestamp.contains("T")) {
+                    timestamp.substring(11, 16)
+                } else {
+                    timestamp
+                }
+            } catch (_: Exception) {
+                timestamp
+            }
         }
     }
 }

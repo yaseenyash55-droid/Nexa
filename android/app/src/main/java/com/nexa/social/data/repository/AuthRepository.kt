@@ -3,6 +3,7 @@ package com.nexa.social.data.repository
 import com.nexa.social.NexaApiClient
 import com.nexa.social.data.models.LoginRequest
 import com.nexa.social.data.models.User
+import com.nexa.social.utils.SocketManager
 import com.nexa.social.utils.TokenManager
 
 class AuthRepository(private val tokenManager: TokenManager) {
@@ -11,7 +12,7 @@ class AuthRepository(private val tokenManager: TokenManager) {
         return try {
             val response = NexaApiClient.authApi.login(LoginRequest(username, password))
             if (response.isSuccessful && response.body()?.data != null) {
-                val data = response.body()!!.data!
+                val data = response.body()!!.data!!
                 tokenManager.saveTokens(
                     accessToken = data.accessToken,
                     refreshToken = data.refreshToken,
@@ -32,14 +33,18 @@ class AuthRepository(private val tokenManager: TokenManager) {
     }
 
     suspend fun logout(): Result<Unit> {
-        val token = tokenManager.accessToken
         return try {
+            val token = tokenManager.accessToken
             if (!token.isNullOrEmpty()) {
-                NexaApiClient.authApi.logout("Bearer $token")
+                try {
+                    NexaApiClient.authApi.logout()
+                } catch (_: Exception) {}
             }
+            SocketManager.disconnect()
             tokenManager.clear()
             Result.success(Unit)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
+            SocketManager.disconnect()
             tokenManager.clear()
             Result.success(Unit)
         }

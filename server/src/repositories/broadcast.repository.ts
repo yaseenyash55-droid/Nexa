@@ -1,3 +1,4 @@
+import oracledb from 'oracledb';
 import { Broadcast } from '../types/index.js';
 import { executeSql, withTransaction } from '../db/pool.js';
 
@@ -13,7 +14,14 @@ export class OracleBroadcastRepository implements BroadcastRepository {
         `INSERT INTO BROADCASTS (SENDER_ID, TITLE, CONTENT, RECIPIENTS_COUNT, CREATED_AT)
          VALUES (:1, :2, :3, :4, SYSTIMESTAMP)
          RETURNING BROADCAST_ID, CREATED_AT INTO :5, :6`,
-        [senderId, title?.trim() || 'Broadcast Message', content.trim(), recipientIds.length, { dir: 3003, type: 2002 }, { dir: 3003, type: 2007 }]
+        [
+          senderId,
+          title?.trim() || 'Broadcast Message',
+          content.trim(),
+          recipientIds.length,
+          { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
+          { dir: oracledb.BIND_OUT, type: oracledb.DATE }
+        ]
       );
 
       const broadcastId = (result.outBinds as any)?.[0]?.[0];

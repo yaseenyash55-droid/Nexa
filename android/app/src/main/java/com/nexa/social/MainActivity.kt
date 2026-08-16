@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.webkit.CookieManager
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -30,7 +31,10 @@ import com.nexa.social.utils.NetworkMonitor
 import com.nexa.social.utils.NexaWebAppInterface
 import com.nexa.social.utils.NotificationHelper
 import com.nexa.social.utils.PreferenceManager
+import com.nexa.social.utils.SocketManager
 import com.nexa.social.utils.ThemeManager
+import com.nexa.social.utils.TokenManager
+import com.nexa.social.utils.UrlValidator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -79,12 +83,28 @@ class MainActivity : AppCompatActivity() {
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val allGranted = permissions.values.all { it }
-        if (allGranted && pendingPermissionRequest != null) {
-            pendingPermissionRequest?.grant(pendingPermissionRequest?.resources)
-        } else {
-            pendingPermissionRequest?.deny()
-            Toast.makeText(this, "Camera & Audio permissions are required for calling features", Toast.LENGTH_SHORT).show()
+        val req = pendingPermissionRequest
+        if (req != null) {
+            val granted = mutableListOf<String>()
+            val resources = req.resources ?: emptyArray()
+
+            if (resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE) &&
+                permissions[Manifest.permission.CAMERA] == true
+            ) {
+                granted.add(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
+            }
+            if (resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE) &&
+                permissions[Manifest.permission.RECORD_AUDIO] == true
+            ) {
+                granted.add(PermissionRequest.RESOURCE_AUDIO_CAPTURE)
+            }
+
+            if (granted.isNotEmpty()) {
+                req.grant(granted.toTypedArray())
+            } else {
+                req.deny()
+                Toast.makeText(this, "Camera & Audio permissions are required for calling features", Toast.LENGTH_SHORT).show()
+            }
         }
         pendingPermissionRequest = null
     }
@@ -108,10 +128,12 @@ class MainActivity : AppCompatActivity() {
         setupRetryButton()
         setupNetworkMonitoring()
 
-        val tokenManager = TokenManager(this)
-        tokenManager.accessToken?.let { token ->
-            SocketManager.connect(token)
-        }
+        try {
+            val tokenManager = TokenManager(this)
+            tokenManager.accessToken?.let { token ->
+                SocketManager.connect(token)
+            }
+        } catch (_: Exception) {}
 
         handleNotificationIntent(intent)
     }
@@ -124,9 +146,22 @@ class MainActivity : AppCompatActivity() {
     override fun onStop() {
         super.onStop()
         networkMonitor.stopMonitoring()
+        clearPendingPermissionRequest()
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onDestroy() {
+        super.onDestroy()
+        clearPendingPermissionRequest()
+        binding.webView.removeJavascriptInterface("NexaAndroid")
+        binding.webView.destroy()
+    }
+
+    private fun clearPendingPermissionRequest() {
+        pendingPermissionRequest?.deny()
+        pendingPermissionRequest = null
+    }
+
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handleNotificationIntent(intent)
@@ -155,7 +190,8 @@ class MainActivity : AppCompatActivity() {
     private fun handleNotificationIntent(intent: Intent?) {
         val targetUrl = intent?.getStringExtra(NotificationHelper.EXTRA_TARGET_URL)
         if (!targetUrl.isNullOrEmpty()) {
-            loadUrl(targetUrl)
+            val sanitized = UrlValidator.sanitizeTargetUrl(targetUrl)
+            loadUrl(sanitized)
         } else {
             loadTab(R.id.navigation_home)
         }
@@ -181,9 +217,11 @@ class MainActivity : AppCompatActivity() {
                 val fcmToken = task.result
                 lifecycleScope.launch(Dispatchers.IO) {
                     try {
-                        NexaApiClient.authApi.registerFcmToken(FcmTokenRequest(fcmToken))
-                    } catch (e: Exception) {
-                        // Ignore background notification sync errors
+                        NexaApiClient.authApi.registerFcmToken(
+                            FcmTokenRequest(fcmToken = fcmToken, platform = "android")
+                        )
+                    } catch (_: Exception) {
+                        // Background notification sync retry handled by WorkManager
                     }
                 }
             }
@@ -249,33 +287,35 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadTab(tabId: Int) {
         currentTabId = tabId
+        val baseUrl = UrlValidator.APPROVED_ORIGIN.trimEnd('/')
         val targetUrl = when (tabId) {
-            R.id.navigation_home -> "https://nexa-social-app.surge.sh/"
-            R.id.navigation_explore -> "https://nexa-social-app.surge.sh/explore"
-            R.id.navigation_messages -> "https://nexa-social-app.surge.sh/messages"
-            R.id.navigation_reels -> "https://nexa-social-app.surge.sh/reels"
+            R.id.navigation_home -> "$baseUrl/"
+            R.id.navigation_explore -> "$baseUrl/explore"
+            R.id.navigation_messages -> "$baseUrl/messages"
+            R.id.navigation_reels -> "$baseUrl/reels"
             R.id.navigation_profile -> {
                 val username = prefManager.username
                 if (!username.isNullOrEmpty()) {
-                    "https://nexa-social-app.surge.sh/profile/$username"
+                    "$baseUrl/profile/$username"
                 } else {
-                    "https://nexa-social-app.surge.sh/login"
+                    "$baseUrl/login"
                 }
             }
-            else -> "https://nexa-social-app.surge.sh/"
+            else -> "$baseUrl/"
         }
 
         loadUrl(targetUrl)
     }
 
     private fun loadUrl(url: String) {
+        val validatedUrl = UrlValidator.sanitizeTargetUrl(url)
         val isConnected = networkMonitor.isOnline.value ?: false
         if (!isConnected) {
             showOfflineError()
         } else {
             showWebViewContent()
             binding.progressBarHorizontal.visibility = View.VISIBLE
-            binding.webView.loadUrl(url)
+            binding.webView.loadUrl(validatedUrl)
         }
     }
 
@@ -283,19 +323,26 @@ class MainActivity : AppCompatActivity() {
         val settings: WebSettings = binding.webView.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
-        settings.databaseEnabled = true
-        settings.allowFileAccess = true
-        settings.allowContentAccess = true
+        settings.databaseEnabled = false
+        settings.allowFileAccess = false
+        settings.allowContentAccess = false
+        settings.allowFileAccessFromFileURLs = false
+        settings.allowUniversalAccessFromFileURLs = false
         settings.mediaPlaybackRequiresUserGesture = false
         settings.setSupportZoom(false)
         settings.useWideViewPort = true
         settings.loadWithOverviewMode = true
+        settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.21) {
-            settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            settings.safeBrowsingEnabled = true
         }
 
-        // Add Native Javascript Interface Bridge
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+
+        CookieManager.getInstance().setAcceptThirdPartyCookies(binding.webView, false)
+
+        // Native Javascript Interface Bridge
         binding.webView.addJavascriptInterface(NexaWebAppInterface(this), "NexaAndroid")
 
         binding.webView.webChromeClient = object : WebChromeClient() {
@@ -311,7 +358,15 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPermissionRequest(request: PermissionRequest?) {
                 if (request == null) return
-                val requestedResources = request.resources
+
+                // Origin verification
+                val origin = request.origin?.toString()
+                if (!UrlValidator.isApprovedOrigin(origin)) {
+                    request.deny()
+                    return
+                }
+
+                val requestedResources = request.resources ?: emptyArray()
                 val neededPermissions = mutableListOf<String>()
 
                 for (res in requestedResources) {
@@ -327,7 +382,10 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (ungranted.isEmpty()) {
-                    request.grant(requestedResources)
+                    val recognized = requestedResources.filter {
+                        it == PermissionRequest.RESOURCE_VIDEO_CAPTURE || it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                    }.toTypedArray()
+                    request.grant(recognized)
                 } else {
                     pendingPermissionRequest = request
                     permissionLauncher.launch(ungranted.toTypedArray())
@@ -342,12 +400,12 @@ class MainActivity : AppCompatActivity() {
                 this@MainActivity.filePathCallback?.onReceiveValue(null)
                 this@MainActivity.filePathCallback = filePathCallback
 
-                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
                     type = "*/*"
                     putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
                 }
-                fileChooserLauncher.launch(Intent.createChooser(intent, "Select Media Post File"))
+                fileChooserLauncher.launch(Intent.createChooser(intent, "Select Media"))
                 return true
             }
         }
@@ -355,13 +413,27 @@ class MainActivity : AppCompatActivity() {
         binding.webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url?.toString() ?: return false
-                if (url.startsWith("http://") || url.startsWith("https://")) return false
-                try {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                    return true
-                } catch (e: Exception) {
+                val uri = request.url
+
+                // Check if target is canonical approved HTTPS origin
+                if (UrlValidator.isApprovedOrigin(url)) {
                     return false
                 }
+
+                // If external web link, launch in external browser
+                val scheme = uri.scheme
+                if (scheme.equals("http", ignoreCase = true) || scheme.equals("https", ignoreCase = true)) {
+                    try {
+                        val browserIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                            addCategory(Intent.CATEGORY_BROWSABLE)
+                        }
+                        startActivity(browserIntent)
+                    } catch (_: Exception) {}
+                    return true
+                }
+
+                // Block any other custom/dangerous schemes (javascript:, file:, content:, data:, intent:)
+                return true
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {

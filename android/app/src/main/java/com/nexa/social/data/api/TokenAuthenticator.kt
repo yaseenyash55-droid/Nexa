@@ -3,6 +3,7 @@ package com.nexa.social.data.api
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.nexa.social.data.models.ApiResponse
+import com.nexa.social.data.models.RefreshTokenResponse
 import com.nexa.social.utils.TokenManager
 import okhttp3.Authenticator
 import okhttp3.MediaType.Companion.toMediaTypeOrNull

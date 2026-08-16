@@ -7,6 +7,7 @@ import com.nexa.social.data.api.GroupApi
 import com.nexa.social.data.api.MessageApi
 import com.nexa.social.data.api.PostApi
 import com.nexa.social.data.api.TokenAuthenticator
+import com.nexa.social.data.api.UserApi
 import com.nexa.social.utils.TokenManager
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -15,38 +16,65 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object NexaApiClient {
-    const val BASE_URL = "https://nexa-backend-in6s.onrender.com/api/"
+    val BASE_URL: String = BuildConfig.API_BASE_URL
 
+    @Volatile
     private var tokenManager: TokenManager? = null
 
-    private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
-    }
+    @Volatile
+    private var isInitialized = false
 
     fun init(context: Context) {
-        tokenManager = TokenManager(context.applicationContext)
+        if (!isInitialized) {
+            synchronized(this) {
+                if (!isInitialized) {
+                    try {
+                        tokenManager = TokenManager(context.applicationContext)
+                    } catch (_: Exception) {
+                        // Fail closed: tokenManager remains null
+                    }
+                    isInitialized = true
+                }
+            }
+        }
+    }
+
+    private fun createLoggingInterceptor(): HttpLoggingInterceptor {
+        val logging = HttpLoggingInterceptor { message ->
+            // Redact tokens, passwords, and sensitive headers in logcat
+            val sanitized = message
+                .replace(Regex("(?i)(authorization:\\s*bearer\\s+)[a-zA-Z0-9_.-]+"), "$1[REDACTED]")
+                .replace(Regex("(?i)(token\"?\\s*:\\s*\"?)[^\",\\s]+"), "$1[REDACTED]")
+                .replace(Regex("(?i)(password\"?\\s*:\\s*\"?)[^\",\\s]+"), "$1[REDACTED]")
+                .replace(Regex("(?i)(set-cookie:\\s*)[^\r\n]+"), "$1[REDACTED]")
+            android.util.Log.d("NexaHttp", sanitized)
+        }
+
+        logging.level = if (BuildConfig.DEBUG) {
+            HttpLoggingInterceptor.Level.BASIC
+        } else {
+            HttpLoggingInterceptor.Level.NONE
+        }
+
+        return logging
     }
 
     val retrofit: Retrofit by lazy {
+        val okHttpClientBuilder = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor(createLoggingInterceptor())
+
+        tokenManager?.let { tm ->
+            okHttpClientBuilder
+                .addInterceptor(AuthInterceptor(tm))
+                .authenticator(TokenAuthenticator(tm, BASE_URL))
+        }
+
         Retrofit.Builder()
             .baseUrl(BASE_URL)
-            .client(
-                tokenManager?.let { tm ->
-                    OkHttpClient.Builder()
-                        .connectTimeout(30, TimeUnit.SECONDS)
-                        .readTimeout(30, TimeUnit.SECONDS)
-                        .writeTimeout(30, TimeUnit.SECONDS)
-                        .addInterceptor(AuthInterceptor(tm))
-                        .authenticator(TokenAuthenticator(tm, BASE_URL))
-                        .addInterceptor(loggingInterceptor)
-                        .build()
-                } ?: OkHttpClient.Builder()
-                    .connectTimeout(30, TimeUnit.SECONDS)
-                    .readTimeout(30, TimeUnit.SECONDS)
-                    .writeTimeout(30, TimeUnit.SECONDS)
-                    .addInterceptor(loggingInterceptor)
-                    .build()
-            )
+            .client(okHttpClientBuilder.build())
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
@@ -55,4 +83,5 @@ object NexaApiClient {
     val postApi: PostApi by lazy { retrofit.create(PostApi::class.java) }
     val messageApi: MessageApi by lazy { retrofit.create(MessageApi::class.java) }
     val groupApi: GroupApi by lazy { retrofit.create(GroupApi::class.java) }
+    val userApi: UserApi by lazy { retrofit.create(UserApi::class.java) }
 }

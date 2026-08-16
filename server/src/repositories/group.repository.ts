@@ -1,3 +1,4 @@
+import oracledb from 'oracledb';
 import { Group, GroupMember, GroupMessage, CreateGroupParams } from '../types/index.js';
 import { executeSql, withTransaction } from '../db/pool.js';
 
@@ -24,8 +25,8 @@ export class OracleGroupRepository implements GroupRepository {
           params.description?.trim() || null,
           params.createdBy,
           params.avatarUrl || null,
-          { dir: 3003, type: 2002 }, // NUMBER
-          { dir: 3003, type: 2007 } // TIMESTAMP
+          { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
+          { dir: oracledb.BIND_OUT, type: oracledb.DATE }
         ]
       );
 
@@ -182,8 +183,8 @@ export class OracleGroupRepository implements GroupRepository {
           groupId,
           senderId,
           content.trim(),
-          { dir: 3003, type: 2002 }, // NUMBER
-          { dir: 3003, type: 2007 } // TIMESTAMP
+          { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
+          { dir: oracledb.BIND_OUT, type: oracledb.DATE }
         ]
       );
 

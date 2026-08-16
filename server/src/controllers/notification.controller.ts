@@ -1,11 +1,15 @@
 import { Response, NextFunction } from 'express';
-import { getNotificationRepository } from '../repositories/factory.js';
+import { getNotificationRepository, getFcmTokenRepository } from '../repositories/factory.js';
 import { AuthenticatedRequest } from '../types/index.js';
-import { sendSuccess } from '../utils/response.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 
 export class NotificationController {
   private get notifRepo() {
     return getNotificationRepository();
+  }
+
+  private get fcmRepo() {
+    return getFcmTokenRepository();
   }
 
   async getNotifications(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -52,6 +56,46 @@ export class NotificationController {
       if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
       await this.notifRepo.markAllAsRead(req.user.userId);
       return sendSuccess(res, null, 'All notifications marked as read');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async registerFcmToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      const token = req.body?.fcmToken || req.body?.token;
+      const platform = req.body?.platform || 'android';
+      const deviceId = req.body?.deviceId;
+
+      if (!token || typeof token !== 'string' || !token.trim() || token.length > 512) {
+        return sendError(res, 'VALIDATION_ERROR', 'A valid FCM token string (1-512 characters) is required', 400);
+      }
+
+      const validPlatforms = ['android', 'ios', 'web'];
+      if (!validPlatforms.includes(platform.toLowerCase())) {
+        return sendError(res, 'VALIDATION_ERROR', 'Platform must be one of android, ios, or web', 400);
+      }
+
+      await this.fcmRepo.upsertToken(req.user.userId, token.trim(), platform.toLowerCase(), deviceId);
+      return sendSuccess(res, { success: true }, 'FCM token registered successfully');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async revokeFcmToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      const token = req.body?.fcmToken || req.body?.token;
+
+      if (token && typeof token === 'string' && token.trim()) {
+        const revoked = await this.fcmRepo.revokeToken(token.trim(), req.user.userId);
+        return sendSuccess(res, { success: revoked }, revoked ? 'FCM token revoked' : 'FCM token not found');
+      } else {
+        const count = await this.fcmRepo.revokeUserTokens(req.user.userId);
+        return sendSuccess(res, { success: true, count }, 'All user FCM tokens revoked');
+      }
     } catch (err) {
       next(err);
     }

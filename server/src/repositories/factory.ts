@@ -1,5 +1,5 @@
 import { getRepositoryManager } from './index.js';
-import { IUserRepository, IPostRepository, ICommentRepository, INotificationRepository, IStoryRepository, IReelRepository, IMessageRepository, IAuthRepository, ISecurityRepository } from './types.js';
+import { IUserRepository, IPostRepository, ICommentRepository, INotificationRepository, IStoryRepository, IReelRepository, IMessageRepository, IAuthRepository, ISecurityRepository, IFcmTokenRepository } from './types.js';
 import { GroupRepository, OracleGroupRepository } from './group.repository.js';
 import { BroadcastRepository, OracleBroadcastRepository } from './broadcast.repository.js';
 
@@ -41,6 +41,10 @@ export function getAuthRepository(): IAuthRepository {
 
 export function getSecurityRepository(): ISecurityRepository {
   return getRepositoryManager().securityRepo;
+}
+
+export function getFcmTokenRepository(): IFcmTokenRepository {
+  return getRepositoryManager().fcmTokenRepo;
 }
 
 export function getGroupRepository(): GroupRepository {

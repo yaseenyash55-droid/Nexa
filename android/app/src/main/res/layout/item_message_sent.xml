@@ -29,7 +29,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="end"
             android:layout_marginTop="4dp"
-            android:text="🔒 E2EE • Just now"
+            android:text="Just now"
             android:textColor="#C7D2FE"
             android:textSize="10sp" />
     </LinearLayout>

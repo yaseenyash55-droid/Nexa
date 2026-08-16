@@ -11,6 +11,7 @@ import com.nexa.social.MainActivity
 import com.nexa.social.NexaApiClient
 import com.nexa.social.data.repository.AuthRepository
 import com.nexa.social.databinding.ActivityLoginBinding
+import com.nexa.social.utils.SocketManager
 import com.nexa.social.utils.TokenManager
 import kotlinx.coroutines.launch
 
@@ -26,8 +27,12 @@ class LoginActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         NexaApiClient.init(this)
-        tokenManager = TokenManager(this)
-        authRepository = AuthRepository(tokenManager)
+        try {
+            tokenManager = TokenManager(this)
+            authRepository = AuthRepository(tokenManager)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Secure storage initialization failed: ${e.message}", Toast.LENGTH_LONG).show()
+        }
 
         binding.btnLogin.setOnClickListener {
             performLogin()
@@ -78,7 +83,7 @@ class LoginActivity : AppCompatActivity() {
             setLoading(false)
             result.onSuccess { user ->
                 tokenManager.accessToken?.let { token ->
-                    com.nexa.social.utils.SocketManager.connect(token)
+                    SocketManager.connect(token)
                 }
                 Toast.makeText(this@LoginActivity, "Welcome back, ${user.displayName}!", Toast.LENGTH_SHORT).show()
                 val intent = Intent(this@LoginActivity, MainActivity::class.java)

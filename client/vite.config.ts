@@ -17,6 +17,18 @@ export default defineConfig({
       }
     }
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-query': ['@tanstack/react-query', 'axios'],
+          'vendor-ui': ['lucide-react', 'clsx', 'tailwind-merge']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 600
+  },
   test: {
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     globals: true,

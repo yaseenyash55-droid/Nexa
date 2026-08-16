@@ -120,8 +120,7 @@
                 android:padding="4dp"
                 android:text="Forgot Password?"
                 android:textColor="@color/brand_cyan"
-                android:textSize="12sp"
-                android:textStyle="medium" />
+                android:textSize="12sp" />
 
             <!-- Sign In Button -->
             <com.google.android.material.button.MaterialButton

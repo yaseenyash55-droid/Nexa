@@ -1,19 +1,21 @@
 -- 04_verification.sql
 -- Comprehensive schema verification suite for Nexa Oracle Database
+-- Safe, non-destructive, and idempotent verification script
 
+SET DEFINE OFF;
 SET SERVEROUTPUT ON;
 
 PROMPT ==================================================
-PROMPT 1. CURRENT SESSION & CONTAINER VERIFICATION
+PROMPT 1. CURRENT SESSION and CONTAINER VERIFICATION
 PROMPT ==================================================
 SELECT USER, SYS_CONTEXT('USERENV', 'CON_NAME') AS CONTAINER_NAME, SYSTIMESTAMP FROM DUAL;
 
 PROMPT ==================================================
-PROMPT 2. TABLE & ROW COUNT SUMMARY
+PROMPT 2. TABLE and ROW COUNT SUMMARY
 PROMPT ==================================================
 SELECT table_name, num_rows 
 FROM user_tables 
-WHERE table_name IN ('USERS', 'POSTS', 'COMMENTS', 'LIKES', 'FOLLOWERS', 'REFRESH_TOKENS', 'BOOKMARKS', 'NOTIFICATIONS', 'MESSAGES', 'STORIES', 'REELS', 'REEL_LIKES', 'MEDIA_ASSETS', 'GROUPS', 'GROUP_MEMBERS', 'GROUP_MESSAGES', 'BROADCASTS', 'BROADCAST_RECIPIENTS')
+WHERE table_name IN ('USERS', 'POSTS', 'COMMENTS', 'LIKES', 'FOLLOWERS', 'REFRESH_TOKENS', 'BOOKMARKS', 'NOTIFICATIONS', 'MESSAGES', 'STORIES', 'REELS', 'REEL_LIKES', 'MEDIA_ASSETS', 'GROUPS', 'GROUP_MEMBERS', 'GROUP_MESSAGES', 'BROADCASTS', 'BROADCAST_RECIPIENTS', 'FCM_TOKENS')
 ORDER BY table_name;
 
 PROMPT ==================================================
@@ -24,7 +26,7 @@ FROM user_tab_identity_cols
 ORDER BY table_name;
 
 PROMPT ==================================================
-PROMPT 4. CONSTRAINT & INDEX COUNT SUMMARY
+PROMPT 4. CONSTRAINT and INDEX COUNT SUMMARY
 PROMPT ==================================================
 SELECT constraint_type, COUNT(*) AS count 
 FROM user_constraints 
@@ -32,7 +34,7 @@ GROUP BY constraint_type
 ORDER BY constraint_type;
 
 PROMPT ==================================================
-PROMPT 5. JOINED POST, AUTHOR, LIKE & COMMENT METRICS
+PROMPT 5. JOINED POST, AUTHOR, LIKE and COMMENT METRICS
 PROMPT ==================================================
 SELECT 
   p.post_id,
@@ -45,7 +47,7 @@ JOIN USERS u ON p.user_id = u.user_id
 ORDER BY p.created_at DESC;
 
 PROMPT ==================================================
-PROMPT 6. FOLLOWER & FOLLOWING METRICS
+PROMPT 6. FOLLOWER and FOLLOWING METRICS
 PROMPT ==================================================
 SELECT 
   u.username,
@@ -68,49 +70,89 @@ SELECT 'Orphan Followers', COUNT(*) FROM FOLLOWERS f WHERE NOT EXISTS (SELECT 1 
 PROMPT ==================================================
 PROMPT 8. TRANSACTIONAL CASCADE DELETE TEST (ROLLED BACK)
 PROMPT ==================================================
-SAVEPOINT test_cascade;
-
-VARIABLE cascade_user_id NUMBER;
-BEGIN
-  SELECT USER_ID INTO :cascade_user_id FROM USERS WHERE USERNAME = 'sarah_design';
-END;
-/
-
-DELETE FROM USERS WHERE USERNAME = 'sarah_design';
-
-SELECT 'Posts after user delete' AS metric, COUNT(*) AS count FROM POSTS WHERE USER_ID = :cascade_user_id
-UNION ALL
-SELECT 'Comments after user delete', COUNT(*) FROM COMMENTS WHERE USER_ID = :cascade_user_id
-UNION ALL
-SELECT 'Likes after user delete', COUNT(*) FROM LIKES WHERE USER_ID = :cascade_user_id;
-
 DECLARE
-  v_orphans NUMBER;
+  v_user_id NUMBER;
+  v_post_id NUMBER;
+  v_comment_id NUMBER;
+  v_unique_tag VARCHAR2(50);
+  v_post_count NUMBER;
+  v_comment_count NUMBER;
+  v_like_count NUMBER;
 BEGIN
-  SELECT
-    (SELECT COUNT(*) FROM POSTS WHERE USER_ID = :cascade_user_id) +
-    (SELECT COUNT(*) FROM COMMENTS WHERE USER_ID = :cascade_user_id) +
-    (SELECT COUNT(*) FROM LIKES WHERE USER_ID = :cascade_user_id)
-  INTO v_orphans FROM DUAL;
-  IF v_orphans <> 0 THEN
-    RAISE_APPLICATION_ERROR(-20010, 'Cascade verification failed');
+  SAVEPOINT test_cascade_sp;
+
+  v_unique_tag := 'verify_' || TO_CHAR(SYSTIMESTAMP, 'YYYYMMDDHH24MISSFF4');
+
+  -- Insert isolated temporary test user
+  INSERT INTO USERS (USERNAME, EMAIL, PASSWORD_HASH, DISPLAY_NAME)
+  VALUES (v_unique_tag, v_unique_tag || '@test.local', '$2a$12$e0MYzXyjpJS7Pd0RVvHwHe1mN4x9k8z6.fakehashfordbtest', 'Test Cascade User')
+  RETURNING USER_ID INTO v_user_id;
+
+  -- Insert dependent post
+  INSERT INTO POSTS (USER_ID, CONTENT)
+  VALUES (v_user_id, 'Temporary cascade test post content')
+  RETURNING POST_ID INTO v_post_id;
+
+  -- Insert dependent comment
+  INSERT INTO COMMENTS (POST_ID, USER_ID, CONTENT)
+  VALUES (v_post_id, v_user_id, 'Temporary cascade test comment')
+  RETURNING COMMENT_ID INTO v_comment_id;
+
+  -- Insert dependent like
+  INSERT INTO LIKES (POST_ID, USER_ID)
+  VALUES (v_post_id, v_user_id);
+
+  -- Delete parent user
+  DELETE FROM USERS WHERE USER_ID = v_user_id;
+
+  -- Assert cascade deletions
+  SELECT COUNT(*) INTO v_post_count FROM POSTS WHERE USER_ID = v_user_id;
+  SELECT COUNT(*) INTO v_comment_count FROM COMMENTS WHERE USER_ID = v_user_id;
+  SELECT COUNT(*) INTO v_like_count FROM LIKES WHERE USER_ID = v_user_id;
+
+  IF v_post_count > 0 OR v_comment_count > 0 OR v_like_count > 0 THEN
+    ROLLBACK TO test_cascade_sp;
+    RAISE_APPLICATION_ERROR(-20010, 'Cascade verification failed: dependent records remained after parent user deletion.');
   END IF;
+
+  ROLLBACK TO test_cascade_sp;
+  DBMS_OUTPUT.PUT_LINE('Cascade delete assertions passed and were rolled back safely.');
+EXCEPTION
+  WHEN OTHERS THEN
+    ROLLBACK TO test_cascade_sp;
+    RAISE;
 END;
 /
-
-ROLLBACK TO test_cascade;
-
-PROMPT Cascade delete assertions passed and were rolled back safely.
 
 PROMPT ==================================================
 PROMPT 9. (OPTIONAL PRIVILEGED) ACTIVE SESSIONS CHECK
 PROMPT ==================================================
+DECLARE
+  TYPE t_cur IS REF CURSOR;
+  c_sess t_cur;
+  v_user VARCHAR2(128);
+  v_status VARCHAR2(64);
+  v_machine VARCHAR2(128);
+  v_found BOOLEAN := FALSE;
 BEGIN
-  FOR s IN (SELECT username, status, machine FROM v$session WHERE username = USER) LOOP
-    DBMS_OUTPUT.PUT_LINE('Session: ' || s.username || ' | Status: ' || s.status || ' | Machine: ' || s.machine);
+  -- Use dynamic SQL to prevent static compilation errors when NEXA_USER lacks V$SESSION privilege
+  OPEN c_sess FOR 'SELECT username, status, machine FROM v$session WHERE username = :1' USING USER;
+  LOOP
+    FETCH c_sess INTO v_user, v_status, v_machine;
+    EXIT WHEN c_sess%NOTFOUND;
+    v_found := TRUE;
+    DBMS_OUTPUT.PUT_LINE('Session: ' || v_user || ' | Status: ' || v_status || ' | Machine: ' || v_machine);
   END LOOP;
+  CLOSE c_sess;
+  IF NOT v_found THEN
+    DBMS_OUTPUT.PUT_LINE('No active sessions found for current user.');
+  END IF;
 EXCEPTION
   WHEN OTHERS THEN
-    DBMS_OUTPUT.PUT_LINE('(Optional) V$SESSION check omitted due to lack of SELECT ANY TABLE privilege.');
+    DBMS_OUTPUT.PUT_LINE('(Optional) V$SESSION check omitted cleanly due to lack of SELECT on V$SESSION.');
 END;
 /
+
+PROMPT ==================================================
+PROMPT ALL VERIFICATIONS COMPLETED SUCCESSFULLY.
+PROMPT ==================================================

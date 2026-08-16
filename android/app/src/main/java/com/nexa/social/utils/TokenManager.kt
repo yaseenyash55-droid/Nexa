@@ -2,25 +2,36 @@ package com.nexa.social.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
 class TokenManager(context: Context) {
 
-    private val prefs: SharedPreferences = try {
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
+    private val prefs: SharedPreferences
 
-        EncryptedSharedPreferences.create(
-            context,
-            "nexa_encrypted_prefs",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-    } catch (e: Exception) {
-        context.getSharedPreferences("nexa_secure_prefs", Context.MODE_PRIVATE)
+    init {
+        val appContext = context.applicationContext
+        prefs = try {
+            val masterKey = MasterKey.Builder(appContext)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+
+            EncryptedSharedPreferences.create(
+                appContext,
+                ENCRYPTED_PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Fatal: Failed to initialize EncryptedSharedPreferences. Failing closed.", e)
+            // Fail closed: Purge corrupted encrypted keystore state and throw
+            try {
+                appContext.getSharedPreferences(ENCRYPTED_PREFS_NAME, Context.MODE_PRIVATE).edit().clear().apply()
+            } catch (_: Exception) {}
+            throw SecurityException("Secure token storage could not be initialized securely", e)
+        }
     }
 
     var accessToken: String?
@@ -75,6 +86,8 @@ class TokenManager(context: Context) {
     }
 
     companion object {
+        private const val TAG = "TokenManager"
+        private const val ENCRYPTED_PREFS_NAME = "nexa_encrypted_prefs"
         private const val KEY_ACCESS_TOKEN = "access_token"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_USER_ID = "user_id"

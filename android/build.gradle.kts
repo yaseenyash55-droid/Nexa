@@ -1,8 +1,8 @@
 // Top-level build file for Nexa Android application
 plugins {
-    id("com.android.application") version "8.2.2" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.22" apply false
-    id("com.google.gms.google-services") version "4.4.1" apply false
+    id("com.android.application") version "8.9.1" apply false
+    id("org.jetbrains.kotlin.android") version "2.0.21" apply false
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
 tasks.register<Delete>("clean") {

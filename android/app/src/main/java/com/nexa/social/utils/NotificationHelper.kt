@@ -29,6 +29,7 @@ object NotificationHelper {
                 enableLights(true)
                 lightColor = ContextCompat.getColor(context, R.color.brand_primary)
                 enableVibration(true)
+                lockscreenVisibility = NotificationCompat.VISIBILITY_PRIVATE
             }
 
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -45,11 +46,11 @@ object NotificationHelper {
     ) {
         createNotificationChannel(context)
 
+        val safeTargetUrl = UrlValidator.sanitizeTargetUrl(targetUrl)
+
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            if (!targetUrl.isNullOrEmpty()) {
-                putExtra(EXTRA_TARGET_URL, targetUrl)
-            }
+            putExtra(EXTRA_TARGET_URL, safeTargetUrl)
         }
 
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -67,13 +68,14 @@ object NotificationHelper {
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
 
         val notificationManager = NotificationManagerCompat.from(context)
         try {
             notificationManager.notify(notificationId, builder.build())
-        } catch (e: SecurityException) {
+        } catch (_: SecurityException) {
             // Permission missing or denied on Android 13+
         }
     }

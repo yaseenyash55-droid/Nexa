@@ -9,6 +9,8 @@ import { OracleMessageRepository } from './message.oracle.repo.js';
 import { OracleAuthRepository } from './auth.oracle.repo.js';
 import { OracleSecurityRepository } from './security.oracle.repo.js';
 
+import { OracleFcmTokenRepository } from './fcm.oracle.repo.js';
+
 export const oracleRepositoryManager: IRepositoryManager = {
   userRepo: new OracleUserRepository(),
   postRepo: new OraclePostRepository(),
@@ -19,6 +21,7 @@ export const oracleRepositoryManager: IRepositoryManager = {
   messageRepo: new OracleMessageRepository(),
   authRepo: new OracleAuthRepository(),
   securityRepo: new OracleSecurityRepository(),
+  fcmTokenRepo: new OracleFcmTokenRepository(),
   get users() { return this.userRepo; },
   get posts() { return this.postRepo; },
   get comments() { return this.commentRepo; },
@@ -27,5 +30,6 @@ export const oracleRepositoryManager: IRepositoryManager = {
   get reels() { return this.reelRepo; },
   get messages() { return this.messageRepo; },
   get auth() { return this.authRepo; },
-  get security() { return this.securityRepo; }
+  get security() { return this.securityRepo; },
+  get fcmTokens() { return this.fcmTokenRepo; }
 };

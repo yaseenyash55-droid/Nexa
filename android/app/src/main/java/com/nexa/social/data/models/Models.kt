@@ -39,6 +39,15 @@ data class LoginResponse(
     @SerializedName("refreshToken") val refreshToken: String?
 )
 
+data class RefreshTokenRequest(
+    @SerializedName("refreshToken") val refreshToken: String
+)
+
+data class RefreshTokenResponse(
+    @SerializedName("accessToken") val accessToken: String,
+    @SerializedName("refreshToken") val refreshToken: String?
+)
+
 data class Post(
     @SerializedName("postId") val postId: Int,
     @SerializedName("userId") val userId: Int,
@@ -59,6 +68,17 @@ data class Message(
     @SerializedName("content") val content: String,
     @SerializedName("isRead") val isRead: Boolean = false,
     @SerializedName("createdAt") val createdAt: String?
+)
+
+data class SendDirectMessageRequest(
+    @SerializedName("receiverId") val receiverId: Int,
+    @SerializedName("content") val content: String
+)
+
+data class MarkReadResponse(
+    @SerializedName("rowsAffected") val rowsAffected: Int?,
+    @SerializedName("read") val read: Boolean?,
+    @SerializedName("readAt") val readAt: String?
 )
 
 data class Group(
@@ -109,5 +129,16 @@ data class CreatePostRequest(
 )
 
 data class FcmTokenRequest(
-    @SerializedName("fcmToken") val fcmToken: String
+    @SerializedName("fcmToken") val fcmToken: String,
+    @SerializedName("platform") val platform: String = "android",
+    @SerializedName("deviceId") val deviceId: String? = null
+)
+
+data class DisplayMessage(
+    val id: Int,
+    val senderId: Int,
+    val senderName: String?,
+    val content: String,
+    val isSelf: Boolean,
+    val timestamp: String?
 )

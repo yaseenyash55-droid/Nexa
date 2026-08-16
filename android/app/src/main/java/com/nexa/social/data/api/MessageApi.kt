@@ -2,11 +2,12 @@ package com.nexa.social.data.api
 
 import com.nexa.social.data.models.ApiResponse
 import com.nexa.social.data.models.Broadcast
+import com.nexa.social.data.models.MarkReadResponse
 import com.nexa.social.data.models.Message
+import com.nexa.social.data.models.SendDirectMessageRequest
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
-import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 
@@ -16,20 +17,19 @@ interface MessageApi {
         @Path("userId") userId: Int
     ): Response<ApiResponse<List<Message>>>
 
-    @POST("messages/{userId}")
+    @POST("messages")
     suspend fun sendMessage(
-        @Path("userId") userId: Int,
-        @Body body: Map<String, String>
+        @Body request: SendDirectMessageRequest
     ): Response<ApiResponse<Message>>
 
-    @PATCH("messages/{messageId}/read")
+    @POST("messages/{messageId}/read")
     suspend fun markMessageRead(
         @Path("messageId") messageId: Int
-    ): Response<ApiResponse<Map<String, Boolean>>>
+    ): Response<ApiResponse<MarkReadResponse>>
 
     @POST("broadcasts")
     suspend fun createBroadcast(
-        @Body body: Map<String, Any>
+        @Body body: Map<String, @JvmSuppressWildcards Any>
     ): Response<ApiResponse<Map<String, Any>>>
 
     @GET("broadcasts")

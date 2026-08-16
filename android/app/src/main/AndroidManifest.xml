@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.nexa.social">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Network & Internet Access -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -8,20 +8,19 @@
 
     <!-- WebRTC Video Calling & Camera Permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- Push Notification Permission (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Media File Upload Permissions -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-
     <application
         android:name=".NexaApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="Nexa Social"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -38,7 +37,18 @@
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/brand_primary" />
 
-        <!-- Splash Launcher Activity -->
+        <!-- FileProvider for secure full-resolution camera captures -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Splash Launcher Activity (Only exported entry point) -->
         <activity
             android:name=".ui.SplashActivity"
             android:exported="true"
@@ -53,7 +63,7 @@
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
-            android:exported="true"
+            android:exported="false"
             android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize" />
 

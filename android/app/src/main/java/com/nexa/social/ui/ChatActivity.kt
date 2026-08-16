@@ -11,10 +11,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.nexa.social.NexaApiClient
+import com.nexa.social.data.models.DisplayMessage
+import com.nexa.social.data.models.SendDirectMessageRequest
 import com.nexa.social.databinding.ActivityChatBinding
-import com.nexa.social.utils.AndroidE2EE
-import com.nexa.social.utils.NexaSocketManager
 import com.nexa.social.utils.PreferenceManager
+import com.nexa.social.utils.SocketManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -54,6 +55,7 @@ class ChatActivity : AppCompatActivity() {
         setupRecyclerView()
         setupSendButton()
         setupTypingListeners()
+        setupRealtimeMessageListeners()
         setupTextWatcher()
 
         loadMessages()
@@ -61,21 +63,21 @@ class ChatActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        NexaSocketManager.removeTypingListeners()
+        SocketManager.removeTypingListeners()
+        SocketManager.unregisterMessageListener()
+        SocketManager.unregisterGroupMessageListener()
+        stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
     }
 
     private fun setupToolbar() {
         binding.toolbar.title = targetName
-        binding.toolbar.subtitle = if (chatType == "direct") "🔒 End-to-End Encrypted (AES-256)" else "Group Conversation"
+        binding.toolbar.subtitle = if (chatType == "direct") "Direct Conversation" else "Group Conversation"
         binding.toolbar.setNavigationOnClickListener { finish() }
     }
 
     private fun setupRecyclerView() {
         val currentUserId = prefManager.userId
-        adapter = MessagesAdapter(
-            currentUserId = currentUserId,
-            otherUserId = if (chatType == "direct") targetId else null
-        )
+        adapter = MessagesAdapter(currentUserId = currentUserId)
 
         binding.rvMessages.layoutManager = LinearLayoutManager(this).apply {
             stackFromEnd = true
@@ -83,8 +85,49 @@ class ChatActivity : AppCompatActivity() {
         binding.rvMessages.adapter = adapter
     }
 
+    private fun setupRealtimeMessageListeners() {
+        if (chatType == "direct") {
+            SocketManager.registerMessageListener { message ->
+                if (message.senderId == targetId) {
+                    val displayMsg = DisplayMessage(
+                        id = message.messageId,
+                        senderId = message.senderId,
+                        senderName = targetName,
+                        content = message.content,
+                        isSelf = false,
+                        timestamp = message.createdAt
+                    )
+                    adapter.addMessage(displayMsg)
+                    binding.rvMessages.smoothScrollToPosition(adapter.itemCount - 1)
+
+                    // Automatically acknowledge read receipt
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            NexaApiClient.messageApi.markMessageRead(message.messageId)
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+        } else {
+            SocketManager.registerGroupMessageListener { groupMsg ->
+                if (groupMsg.groupId == targetId && groupMsg.senderId != prefManager.userId) {
+                    val displayMsg = DisplayMessage(
+                        id = groupMsg.messageId,
+                        senderId = groupMsg.senderId,
+                        senderName = groupMsg.sender.displayName,
+                        content = groupMsg.content,
+                        isSelf = false,
+                        timestamp = groupMsg.createdAt
+                    )
+                    adapter.addMessage(displayMsg)
+                    binding.rvMessages.smoothScrollToPosition(adapter.itemCount - 1)
+                }
+            }
+        }
+    }
+
     private fun setupTypingListeners() {
-        NexaSocketManager.setTypingListeners(
+        SocketManager.setTypingListeners(
             onStart = { userId, username ->
                 if (chatType == "direct" && userId == targetId) {
                     binding.tvTypingIndicator.text = "${username ?: targetName} is typing..."
@@ -108,18 +151,18 @@ class ChatActivity : AppCompatActivity() {
                 if (!s.isNullOrEmpty()) {
                     if (!isEmittingTyping) {
                         isEmittingTyping = true
-                        NexaSocketManager.emitTypingStart(targetId)
+                        SocketManager.emitTypingStart(targetId)
                     }
 
                     stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
                     stopTypingRunnable = Runnable {
-                        NexaSocketManager.emitTypingStop(targetId)
+                        SocketManager.emitTypingStop(targetId)
                         isEmittingTyping = false
                     }
                     mainHandler.postDelayed(stopTypingRunnable!!, 2000)
                 } else {
                     stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
-                    NexaSocketManager.emitTypingStop(targetId)
+                    SocketManager.emitTypingStop(targetId)
                     isEmittingTyping = false
                 }
             }
@@ -147,8 +190,8 @@ class ChatActivity : AppCompatActivity() {
                         DisplayMessage(
                             id = m.messageId,
                             senderId = m.senderId,
-                            senderName = null,
-                            rawContent = m.content,
+                            senderName = if (m.senderId == currentUserId) null else targetName,
+                            content = m.content,
                             isSelf = m.senderId == currentUserId,
                             timestamp = m.createdAt
                         )
@@ -167,7 +210,7 @@ class ChatActivity : AppCompatActivity() {
                             id = m.messageId,
                             senderId = m.senderId,
                             senderName = m.sender.displayName,
-                            rawContent = m.content,
+                            content = m.content,
                             isSelf = m.senderId == currentUserId,
                             timestamp = m.createdAt
                         )
@@ -193,22 +236,22 @@ class ChatActivity : AppCompatActivity() {
 
         if (chatType == "direct") {
             stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
-            NexaSocketManager.emitTypingStop(targetId)
+            SocketManager.emitTypingStop(targetId)
             isEmittingTyping = false
         }
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 if (chatType == "direct") {
-                    val encrypted = AndroidE2EE.encryptMessage(currentUserId, targetId, content)
-                    val res = NexaApiClient.messageApi.sendMessage(targetId, mapOf("content" to encrypted))
+                    val req = SendDirectMessageRequest(receiverId = targetId, content = content)
+                    val res = NexaApiClient.messageApi.sendMessage(req)
                     val msg = res.body()?.data
                     if (msg != null) {
                         val displayMsg = DisplayMessage(
                             id = msg.messageId,
                             senderId = msg.senderId,
                             senderName = null,
-                            rawContent = msg.content,
+                            content = msg.content,
                             isSelf = true,
                             timestamp = msg.createdAt
                         )
@@ -225,7 +268,7 @@ class ChatActivity : AppCompatActivity() {
                             id = msg.messageId,
                             senderId = msg.senderId,
                             senderName = msg.sender.displayName,
-                            rawContent = msg.content,
+                            content = msg.content,
                             isSelf = true,
                             timestamp = msg.createdAt
                         )

@@ -17,10 +17,16 @@ class SplashActivity : AppCompatActivity() {
         setContentView(R.layout.activity_splash)
 
         NexaApiClient.init(this)
-        val tokenManager = TokenManager(this)
 
         Handler(Looper.getMainLooper()).postDelayed({
-            val destination = if (tokenManager.isLoggedIn) {
+            val isLoggedIn = try {
+                val tokenManager = TokenManager(this)
+                tokenManager.isLoggedIn
+            } catch (_: Exception) {
+                false
+            }
+
+            val destination = if (isLoggedIn) {
                 MainActivity::class.java
             } else {
                 LoginActivity::class.java
@@ -30,6 +36,6 @@ class SplashActivity : AppCompatActivity() {
             startActivity(intent)
             overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
             finish()
-        }, 2000)
+        }, 1500)
     }
 }

@@ -49,8 +49,7 @@
             android:layout_weight="1"
             android:text="You are currently offline. Browsing cached content."
             android:textColor="@color/text_white"
-            android:textSize="12sp"
-            android:textStyle="medium" />
+            android:textSize="12sp" />
     </LinearLayout>
 
     <!-- Pull To Refresh Layout Wrapping WebView -->

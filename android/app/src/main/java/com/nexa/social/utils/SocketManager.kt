@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.google.gson.Gson
+import com.nexa.social.BuildConfig
 import com.nexa.social.data.models.GroupMessage
 import com.nexa.social.data.models.Message
 import io.socket.client.IO
@@ -14,8 +15,8 @@ import java.net.URISyntaxException
 
 object SocketManager {
 
-    private const val TAG = "NexaSocketManager"
-    private const val SOCKET_SERVER_URL = "https://nexa-backend-in6s.onrender.com"
+    private const val TAG = "NexaSocket"
+    val SOCKET_SERVER_URL: String = BuildConfig.SOCKET_SERVER_URL
 
     private var socket: Socket? = null
     private val gson = Gson()
@@ -34,31 +35,38 @@ object SocketManager {
 
     @Synchronized
     fun connect(token: String) {
-        if (token.isEmpty()) return
+        if (token.isBlank()) return
         if (socket?.connected() == true) return
 
         try {
             val options = IO.Options().apply {
-                forceNew = true
+                forceNew = false
                 reconnection = true
-                reconnectionAttempts = Int.MAX_VALUE
+                reconnectionAttempts = 5
                 reconnectionDelay = 1000
-                timeout = 20000
+                reconnectionDelayMax = 10000
+                timeout = 15000
                 auth = mapOf("token" to token)
             }
 
             socket = IO.socket(SOCKET_SERVER_URL, options)
 
             socket?.on(Socket.EVENT_CONNECT) {
-                Log.d(TAG, "Socket connected successfully: ${socket?.id()}")
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Socket connected to server")
+                }
             }
 
             socket?.on(Socket.EVENT_DISCONNECT) { args ->
-                Log.d(TAG, "Socket disconnected: ${args.getOrNull(0)}")
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Socket disconnected: ${args.getOrNull(0)}")
+                }
             }
 
             socket?.on(Socket.EVENT_CONNECT_ERROR) { args ->
-                Log.e(TAG, "Socket connection error: ${args.getOrNull(0)}")
+                if (BuildConfig.DEBUG) {
+                    Log.w(TAG, "Socket connection error: ${args.getOrNull(0)}")
+                }
             }
 
             // Real-time Event Listeners
@@ -69,17 +77,11 @@ object SocketManager {
                         val message = gson.fromJson(jsonStr, Message::class.java)
                         mainHandler.post {
                             messageListener?.invoke(message)
-                            appContext?.let { ctx ->
-                                NotificationHelper.showNotification(
-                                    context = ctx,
-                                    title = "New Direct Message",
-                                    body = message.content,
-                                    targetUrl = "https://nexa-social-app.surge.sh/messages"
-                                )
-                            }
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error parsing message:created payload", e)
+                        if (BuildConfig.DEBUG) {
+                            Log.e(TAG, "Error parsing incoming message payload", e)
+                        }
                     }
                 }
             }
@@ -93,7 +95,9 @@ object SocketManager {
                             groupMessageListener?.invoke(groupMessage)
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error parsing group:message:created payload", e)
+                        if (BuildConfig.DEBUG) {
+                            Log.e(TAG, "Error parsing group message payload", e)
+                        }
                     }
                 }
             }
@@ -101,14 +105,16 @@ object SocketManager {
             socket?.on("typing:start") { args ->
                 if (args.isNotEmpty()) {
                     try {
-                        val json = args[0] as? JSONObject
-                        val userId = json?.optInt("userId") ?: 0
-                        val username = json?.optString("username")
+                        val json = if (args[0] is JSONObject) args[0] as JSONObject else JSONObject(args[0].toString())
+                        val userId = json.optInt("userId")
+                        val username = if (json.has("username") && !json.isNull("username")) json.getString("username") else null
                         mainHandler.post {
                             typingStartListener?.invoke(userId, username)
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error parsing typing:start payload", e)
+                        if (BuildConfig.DEBUG) {
+                            Log.e(TAG, "Error parsing typing:start event", e)
+                        }
                     }
                 }
             }
@@ -116,29 +122,37 @@ object SocketManager {
             socket?.on("typing:stop") { args ->
                 if (args.isNotEmpty()) {
                     try {
-                        val json = args[0] as? JSONObject
-                        val userId = json?.optInt("userId") ?: 0
+                        val json = if (args[0] is JSONObject) args[0] as JSONObject else JSONObject(args[0].toString())
+                        val userId = json.optInt("userId")
                         mainHandler.post {
                             typingStopListener?.invoke(userId)
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error parsing typing:stop payload", e)
+                        if (BuildConfig.DEBUG) {
+                            Log.e(TAG, "Error parsing typing:stop event", e)
+                        }
                     }
                 }
             }
 
             socket?.connect()
         } catch (e: URISyntaxException) {
-            Log.e(TAG, "Invalid Socket URL: $SOCKET_SERVER_URL", e)
+            Log.e(TAG, "Invalid socket URI configuration: $SOCKET_SERVER_URL", e)
         }
     }
 
     @Synchronized
     fun disconnect() {
-        socket?.disconnect()
         socket?.off()
+        socket?.disconnect()
         socket = null
-        Log.d(TAG, "Socket disconnected and cleaned up")
+        messageListener = null
+        groupMessageListener = null
+        typingStartListener = null
+        typingStopListener = null
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "Socket disconnected and listeners cleared")
+        }
     }
 
     fun isConnected(): Boolean = socket?.connected() == true
@@ -173,36 +187,30 @@ object SocketManager {
     }
 
     fun emitTypingStart(receiverId: Int) {
+        if (receiverId <= 0) return
         try {
             val json = JSONObject().apply {
                 put("receiverId", receiverId)
             }
             socket?.emit("typing:start", json)
         } catch (e: Exception) {
-            Log.e(TAG, "Error emitting typing:start", e)
+            if (BuildConfig.DEBUG) {
+                Log.e(TAG, "Failed to emit typing:start", e)
+            }
         }
     }
 
     fun emitTypingStop(receiverId: Int) {
+        if (receiverId <= 0) return
         try {
             val json = JSONObject().apply {
                 put("receiverId", receiverId)
             }
             socket?.emit("typing:stop", json)
         } catch (e: Exception) {
-            Log.e(TAG, "Error emitting typing:stop", e)
-        }
-    }
-
-    fun sendDirectMessage(receiverId: Int, content: String) {
-        try {
-            val json = JSONObject().apply {
-                put("receiverId", receiverId)
-                put("content", content)
+            if (BuildConfig.DEBUG) {
+                Log.e(TAG, "Failed to emit typing:stop", e)
             }
-            socket?.emit("message:send", json)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error emitting message:send", e)
         }
     }
 }

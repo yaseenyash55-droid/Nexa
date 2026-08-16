@@ -44,8 +44,7 @@
             android:letterSpacing="0.05"
             android:text="Share. Connect. Discover."
             android:textColor="@color/text_secondary"
-            android:textSize="15sp"
-            android:textStyle="medium" />
+            android:textSize="15sp" />
     </LinearLayout>
 
     <ProgressBar
