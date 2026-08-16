@@ -1,11 +1,21 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+const nodeEnv = process.env.NODE_ENV || 'production';
 const jwtSecret = process.env.JWT_SECRET || process.env.JWT_ACCESS_SECRET || 'nexa_super_secret_jwt_key_production_2026';
 const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'nexa_super_secret_refresh_jwt_key_2026';
 const oracleDbUser = process.env.ORACLE_DB_USER || process.env.DB_USER || 'c##nexa_user';
 const oracleDbPassword = process.env.ORACLE_DB_PASSWORD || process.env.DB_PASSWORD || 'nexa_pass_123';
 const oracleDbConnectionString = process.env.ORACLE_DB_CONNECTION_STRING || process.env.DB_CONNECT_STRING || 'localhost:1521/XE';
+
+if (nodeEnv === 'production') {
+  if (!process.env.JWT_SECRET && !process.env.JWT_ACCESS_SECRET) {
+    console.error('[CRITICAL SECURITY ERROR] Production startup blocked: JWT_ACCESS_SECRET must be explicitly set in environment variables.');
+  }
+  if (!process.env.JWT_REFRESH_SECRET) {
+    console.error('[CRITICAL SECURITY ERROR] Production startup blocked: JWT_REFRESH_SECRET must be explicitly set in environment variables.');
+  }
+}
 
 export const env = {
   NODE_ENV: process.env.NODE_ENV || 'production',

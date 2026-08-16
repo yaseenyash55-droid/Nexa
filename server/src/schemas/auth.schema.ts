@@ -22,3 +22,24 @@ export const loginSchema = z.object({
   emailOrUsername: z.string().min(1, 'Email or username is required'),
   password: z.string().min(1, 'Password is required')
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('Please enter a valid email address')
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Reset token is required'),
+  newPassword: z.string()
+    .min(8, 'Password must be at least 8 characters long')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number')
+});
+
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1, 'Verification token is required')
+});
+
+export const resendVerificationSchema = z.object({
+  email: z.string().email('Please enter a valid email address').optional()
+});
+

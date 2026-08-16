@@ -197,4 +197,48 @@ describe('Auth & Session Integration API', () => {
     expect(blockedRes.status).toBe(423);
     expect(blockedRes.body.error.code).toBe('ACCOUNT_LOCKED');
   });
+
+  it('should sanitize returned user objects and omit passwordHash and lockout fields', async () => {
+    const res = await request.post('/api/auth/login').send({
+      emailOrUsername: 'alex',
+      password: 'Password123!'
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.passwordHash).toBeUndefined();
+    expect(res.body.data.user.failedLoginAttempts).toBeUndefined();
+    expect(res.body.data.user.lockoutUntil).toBeUndefined();
+  });
+
+  it('should process forgot password requests without leaking account existence', async () => {
+    const res1 = await request.post('/api/auth/forgot-password').send({
+      email: 'nonexistent_email_999@nexa.app'
+    });
+    expect(res1.status).toBe(200);
+    expect(res1.body.data.message).toContain('password reset instructions have been sent');
+
+    const res2 = await request.post('/api/auth/forgot-password').send({
+      email: 'alex@nexa.app'
+    });
+    expect(res2.status).toBe(200);
+    expect(res2.body.data.message).toContain('password reset instructions have been sent');
+  });
+
+  it('should reject password reset with invalid or nonexistent token', async () => {
+    const res = await request.post('/api/auth/reset-password').send({
+      token: 'invalid_token_hex_string_12345',
+      newPassword: 'NewPassword123!'
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_RESET_TOKEN');
+  });
+
+  it('should reject email verification with invalid token', async () => {
+    const res = await request.post('/api/auth/verify-email').send({
+      token: 'invalid_verification_token'
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_VERIFICATION_TOKEN');
+  });
 });
+

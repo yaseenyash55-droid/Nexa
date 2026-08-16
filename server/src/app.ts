@@ -17,8 +17,12 @@ import { mediaRouter } from './routes/media.routes.js';
 import { groupRouter } from './routes/group.routes.js';
 import { broadcastRouter } from './routes/broadcast.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
+import { httpsEnforcementMiddleware, trafficMonitorMiddleware, botProtectionMiddleware } from './middleware/trafficMonitor.middleware.js';
+import { globalApiRateLimiter } from './middleware/rateLimit.middleware.js';
 
 export const app = express();
+
+app.set('trust proxy', 1);
 
 const ALLOWED_ORIGINS = [
   'https://nexa-social-app.surge.sh',
@@ -30,7 +34,24 @@ app.use(cors({
   origin: ALLOWED_ORIGINS,
   credentials: true
 }));
-app.use(helmet());
+
+app.use(helmet({
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  },
+  referrerPolicy: {
+    policy: 'strict-origin-when-cross-origin'
+  },
+  noSniff: true,
+  xssFilter: true
+}));
+
+app.use(httpsEnforcementMiddleware);
+app.use(botProtectionMiddleware);
+app.use(trafficMonitorMiddleware);
+app.use('/api', globalApiRateLimiter);
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 app.use(cookieParser());

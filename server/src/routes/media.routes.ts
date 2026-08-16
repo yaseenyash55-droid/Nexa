@@ -47,9 +47,11 @@ async function removeIfPresent(filePath?: string): Promise<void> {
   await fs.promises.unlink(filePath).catch(() => undefined);
 }
 
+import { aiAndMediaRateLimiter } from '../middleware/rateLimit.middleware.js';
+
 export const mediaRouter = Router();
 
-mediaRouter.post('/upload', requireAuth, upload.single('file'), async (req, res, next) => {
+mediaRouter.post('/upload', requireAuth, aiAndMediaRateLimiter, upload.single('file'), async (req, res, next) => {
   const uploaded = req.file;
   let finalPath: string | undefined;
   try {

@@ -98,8 +98,7 @@ export class PostService {
     if (!post) {
       throw { statusCode: 404, code: 'POST_NOT_FOUND', message: 'Post not found' };
     }
-    const isAdmin = [100, 101, 102].includes(userId);
-    if (post.userId !== userId && !isAdmin) {
+    if (post.userId !== userId) {
       throw { statusCode: 403, code: 'FORBIDDEN', message: 'You can only edit your own posts' };
     }
 

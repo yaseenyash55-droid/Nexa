@@ -89,6 +89,9 @@ let mockReels: Reel[] = [];
 let mockMessages: Message[] = [];
 let mockNotifications: Notification[] = [];
 let mockRefreshTokens: Map<string, { userId: number; expiresAt: Date; revokedAt: Date | null }> = new Map();
+let mockPasswordResetTokens: Map<string, { userId: number; expiresAt: Date; usedAt: Date | null }> = new Map();
+let mockEmailVerificationTokens: Map<string, { userId: number; expiresAt: Date; usedAt: Date | null }> = new Map();
+let mockSecuritySettings: Map<number, { emailVerifiedAt: Date | null; mfaEnabled: boolean; passwordChangedAt?: Date }> = new Map();
 
 let userIdCounter = 100;
 let postIdCounter = 1000;
@@ -313,7 +316,10 @@ export class MockReelRepository implements IReelRepository {
   async getReels(): Promise<Reel[]> { return mockReels; }
   async likeReel(): Promise<void> {}
   async unlikeReel(): Promise<void> {}
-  async deleteReel(reelId: number): Promise<boolean> {
+  async deleteReel(reelId: number, userId: number): Promise<boolean> {
+    const reel = mockReels.find(r => r.reelId === reelId);
+    if (!reel) return false;
+    if (reel.userId !== userId) return false;
     mockReels = mockReels.filter(r => r.reelId !== reelId);
     return true;
   }
@@ -350,11 +356,49 @@ export class MockAuthRepository implements IAuthRepository {
   async revokeAllUserTokens(userId: number): Promise<void> {
     await this.revokeAllUserRefreshTokens(userId);
   }
+  async savePasswordResetToken(userId: number, tokenHash: string, expiresAt: Date): Promise<void> {
+    mockPasswordResetTokens.set(tokenHash, { userId, expiresAt, usedAt: null });
+  }
+  async findPasswordResetToken(tokenHash: string): Promise<{ userId: number; expiresAt: Date; usedAt: Date | null } | null> {
+    const record = mockPasswordResetTokens.get(tokenHash);
+    if (!record) return null;
+    return { userId: record.userId, expiresAt: record.expiresAt, usedAt: record.usedAt };
+  }
+  async markPasswordResetTokenUsed(tokenHash: string): Promise<void> {
+    const record = mockPasswordResetTokens.get(tokenHash);
+    if (record) {
+      record.usedAt = new Date();
+    }
+  }
+  async saveEmailVerificationToken(userId: number, tokenHash: string, expiresAt: Date): Promise<void> {
+    mockEmailVerificationTokens.set(tokenHash, { userId, expiresAt, usedAt: null });
+  }
+  async findEmailVerificationToken(tokenHash: string): Promise<{ userId: number; expiresAt: Date; usedAt: Date | null } | null> {
+    const record = mockEmailVerificationTokens.get(tokenHash);
+    if (!record) return null;
+    return { userId: record.userId, expiresAt: record.expiresAt, usedAt: record.usedAt };
+  }
+  async markEmailVerificationTokenUsed(tokenHash: string): Promise<void> {
+    const record = mockEmailVerificationTokens.get(tokenHash);
+    if (record) {
+      record.usedAt = new Date();
+    }
+  }
 }
 
 export class MockSecurityRepository implements ISecurityRepository {
-  async getSecuritySettings(): Promise<any> { return null; }
-  async updateSecuritySettings(): Promise<void> {}
+  async getSecuritySettings(userId: number): Promise<any> {
+    const settings = mockSecuritySettings.get(userId);
+    if (!settings) return { emailVerifiedAt: null, mfaEnabled: false, lastProtectionCheckAt: new Date() };
+    return { ...settings, lastProtectionCheckAt: new Date() };
+  }
+  async updateSecuritySettings(userId: number, updates: any): Promise<void> {
+    const current = mockSecuritySettings.get(userId) || { emailVerifiedAt: null, mfaEnabled: false };
+    if (updates.emailVerifiedAt !== undefined) current.emailVerifiedAt = updates.emailVerifiedAt;
+    if (updates.mfaEnabled !== undefined) current.mfaEnabled = updates.mfaEnabled;
+    if (updates.passwordChangedAt !== undefined) current.passwordChangedAt = updates.passwordChangedAt;
+    mockSecuritySettings.set(userId, current);
+  }
   async createSession(): Promise<void> {}
   async getSessions(): Promise<any[]> { return []; }
   async getUserSessions(): Promise<any[]> { return []; }

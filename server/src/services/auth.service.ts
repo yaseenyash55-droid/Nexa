@@ -1,8 +1,11 @@
+import crypto from 'crypto';
 import { getRepositoryManager } from '../repositories/index.js';
 import { hashPassword, comparePassword, hashToken } from '../utils/hash.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken, verifyAccessToken } from '../utils/jwt.js';
 import { AuthTokens, User } from '../types/index.js';
 import { env } from '../config/env.js';
+import { getEmailProvider } from '../utils/email.js';
+import { auditLogSecurityEvent } from '../utils/securityAuditLogger.js';
 
 export class AuthService {
   private get userRepo() {
@@ -11,6 +14,19 @@ export class AuthService {
 
   private get authRepo() {
     return getRepositoryManager().authRepo;
+  }
+
+  private get securityRepo() {
+    return getRepositoryManager().securityRepo;
+  }
+
+  public sanitizeUser(user: User): User {
+    const sanitized = { ...user };
+    delete sanitized.passwordHash;
+    delete sanitized.failedLoginAttempts;
+    delete sanitized.firstFailedAttemptAt;
+    delete sanitized.lockoutUntil;
+    return sanitized;
   }
 
   async register(data: {
@@ -30,12 +46,14 @@ export class AuthService {
     }
 
     const passwordHash = await hashPassword(data.password);
-    const user = await this.userRepo.createUser({
+    const rawUser = await this.userRepo.createUser({
       username: data.username,
       email: data.email,
       passwordHash,
       displayName: data.displayName
     });
+
+    const user = this.sanitizeUser(rawUser);
 
     const accessToken = signAccessToken({ userId: user.userId, username: user.username, email: user.email });
     const refreshToken = signRefreshToken({ userId: user.userId, username: user.username, email: user.email });
@@ -43,6 +61,9 @@ export class AuthService {
     const tokenHash = hashToken(refreshToken);
     const expiresAt = new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
     await this.authRepo.saveRefreshToken(user.userId, tokenHash, expiresAt);
+
+    // Auto-trigger verification email dispatch
+    await this.sendEmailVerification(user.userId, user.email).catch(() => {});
 
     return { user, tokens: { accessToken, refreshToken }, accessToken, refreshToken };
   }
@@ -112,6 +133,12 @@ export class AuthService {
           lockoutUntil
         );
 
+        auditLogSecurityEvent({
+          eventType: 'ACCOUNT_LOCKOUT',
+          userId: user.userId,
+          username: user.username
+        });
+
         throw {
           statusCode: 423,
           code: 'ACCOUNT_LOCKED',
@@ -125,6 +152,11 @@ export class AuthService {
           null
         );
 
+        auditLogSecurityEvent({
+          eventType: 'AUTH_FAILURE',
+          username: searchKey
+        });
+
         throw { statusCode: 401, code: 'INVALID_CREDENTIALS', message: 'Invalid username/email or password' };
       }
     }
@@ -134,6 +166,12 @@ export class AuthService {
       await this.userRepo.resetLockoutState(user.userId);
     }
 
+    auditLogSecurityEvent({
+      eventType: 'AUTH_SUCCESS',
+      userId: user.userId,
+      username: user.username
+    });
+
     const accessToken = signAccessToken({ userId: user.userId, username: user.username, email: user.email });
     const refreshToken = signRefreshToken({ userId: user.userId, username: user.username, email: user.email });
 
@@ -141,7 +179,9 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
     await this.authRepo.saveRefreshToken(user.userId, tokenHash, expiresAt);
 
-    return { user, tokens: { accessToken, refreshToken }, accessToken, refreshToken };
+    const sanitizedUser = this.sanitizeUser(user);
+
+    return { user: sanitizedUser, tokens: { accessToken, refreshToken }, accessToken, refreshToken };
   }
 
   async refreshTokens(refreshToken?: string, authHeaderToken?: string): Promise<AuthTokens & { accessToken: string; newRefreshToken: string }> {
@@ -214,4 +254,106 @@ export class AuthService {
     const tokenHash = hashToken(rawRefreshToken);
     await this.authRepo.revokeRefreshToken(tokenHash);
   }
+
+  async requestPasswordReset(email: string): Promise<{ message: string }> {
+    const user = await this.userRepo.findByEmail(email);
+    if (!user) {
+      // Prevent user enumeration attacks
+      return { message: 'If an account with that email exists, password reset instructions have been sent.' };
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = hashToken(rawToken);
+    const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes TTL
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+
+    await this.authRepo.savePasswordResetToken(user.userId, tokenHash, expiresAt);
+
+    const emailProvider = getEmailProvider();
+    await emailProvider.sendEmail({
+      to: user.email,
+      subject: 'Nexa Social Password Reset Request',
+      body: `You requested a password reset. Use this reset token (valid for 15 minutes): ${rawToken}`
+    });
+
+    return { message: 'If an account with that email exists, password reset instructions have been sent.' };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const tokenHash = hashToken(token);
+    const resetRecord = await this.authRepo.findPasswordResetToken(tokenHash);
+
+    if (!resetRecord || resetRecord.usedAt) {
+      throw { statusCode: 400, code: 'INVALID_RESET_TOKEN', message: 'Password reset token is invalid or has already been used' };
+    }
+
+    if (new Date(resetRecord.expiresAt).getTime() <= Date.now()) {
+      throw { statusCode: 400, code: 'EXPIRED_RESET_TOKEN', message: 'Password reset token has expired' };
+    }
+
+    const newPasswordHash = await hashPassword(newPassword);
+    
+    // Update credentials & reset lockout counter
+    const user = await this.userRepo.findById(resetRecord.userId);
+    if (!user) {
+      throw { statusCode: 404, code: 'USER_NOT_FOUND', message: 'User associated with token no longer exists' };
+    }
+
+    // Reuse createUser / updateUser credentials mapping
+    await (this.userRepo as any).createUser?.({
+      username: user.username,
+      email: user.email,
+      passwordHash: newPasswordHash,
+      displayName: user.displayName
+    });
+
+    await this.authRepo.markPasswordResetTokenUsed(tokenHash);
+    await this.authRepo.revokeAllUserTokens(user.userId);
+    await this.userRepo.resetLockoutState(user.userId);
+
+    return { message: 'Password reset successful. All active sessions have been invalidated.' };
+  }
+
+  async sendEmailVerification(userId: number, email?: string): Promise<{ message: string }> {
+    const user = await this.userRepo.findById(userId);
+    const recipientEmail = email || user?.email;
+    if (!recipientEmail || !user) {
+      throw { statusCode: 404, code: 'USER_NOT_FOUND', message: 'User for verification not found' };
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = hashToken(rawToken);
+    const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours TTL
+    const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
+
+    await this.authRepo.saveEmailVerificationToken(userId, tokenHash, expiresAt);
+
+    const emailProvider = getEmailProvider();
+    await emailProvider.sendEmail({
+      to: recipientEmail,
+      subject: 'Verify your Nexa Social Account',
+      body: `Welcome to Nexa! Please verify your email using this token (valid for 24 hours): ${rawToken}`
+    });
+
+    return { message: 'Verification email has been sent.' };
+  }
+
+  async verifyEmailToken(token: string): Promise<{ message: string }> {
+    const tokenHash = hashToken(token);
+    const record = await this.authRepo.findEmailVerificationToken(tokenHash);
+
+    if (!record || record.usedAt) {
+      throw { statusCode: 400, code: 'INVALID_VERIFICATION_TOKEN', message: 'Email verification token is invalid or has already been used' };
+    }
+
+    if (new Date(record.expiresAt).getTime() <= Date.now()) {
+      throw { statusCode: 400, code: 'EXPIRED_VERIFICATION_TOKEN', message: 'Email verification token has expired' };
+    }
+
+    await this.securityRepo.updateSecuritySettings(record.userId, { emailVerifiedAt: new Date() });
+    await this.authRepo.markEmailVerificationTokenUsed(tokenHash);
+
+    return { message: 'Email verified successfully.' };
+  }
 }
+

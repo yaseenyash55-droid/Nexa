@@ -166,4 +166,83 @@ describe('Security, Authorization & Priority 0 Audit Suite', () => {
     expect(authData?.userId).toBe(alexUserId);
     expect(authData?.username).toBe('alex');
   });
+
+  it('should reject attempt to edit another user\'s post even if user claims special status', async () => {
+    const sarahPostId = 102;
+    const res = await request
+      .put(`/api/posts/${sarahPostId}`)
+      .set('Authorization', `Bearer ${alexToken}`)
+      .send({ content: 'Unauthorized edit attempt' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN');
+  });
+
+  it('should reject attempt to delete another user\'s reel', async () => {
+    const sarahReelId = 999;
+    const res = await request
+      .delete(`/api/reels/${sarahReelId}`)
+      .set('Authorization', `Bearer ${alexToken}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN');
+  });
+
+  it('should enforce deployment security headers including HSTS and nosniff', async () => {
+    const res = await request.get('/api/health');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['strict-transport-security']).toBeDefined();
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  it('should format and hash IP addresses in security audit log output', async () => {
+    const { hashIp, auditLogSecurityEvent } = await import('../src/utils/securityAuditLogger.js');
+    const hashed = hashIp('192.168.1.50');
+    expect(hashed).toBeDefined();
+    expect(hashed.length).toBe(16);
+
+    expect(() => {
+      auditLogSecurityEvent({
+        eventType: 'AUTH_SUCCESS',
+        userId: 101,
+        username: 'alex',
+        ip: '192.168.1.50'
+      });
+    }).not.toThrow();
+  });
+
+  it('should block automated web scraping bots with 403 BOT_ACCESS_DENIED', async () => {
+    const res = await request
+      .get('/api/health')
+      .set('User-Agent', 'Scrapy/2.5.0 (+https://scrapy.org)');
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('BOT_ACCESS_DENIED');
+  });
+
+  it('should sanitize script tags and dangerous event handlers from input strings', async () => {
+    const { sanitizeInputString } = await import('../src/utils/sanitize.js');
+    const maliciousInput = '<script>alert("XSS")</script><img src="x" onerror="alert(1)">Hello';
+    const sanitized = sanitizeInputString(maliciousInput);
+
+    expect(sanitized).not.toContain('<script>');
+    expect(sanitized).not.toContain('onerror=');
+    expect(sanitized).toBe('Hello');
+  });
+
+  it('should reject base64 uploads with invalid file signatures (magic bytes)', async () => {
+    const invalidBase64 = 'data:image/png;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=='; // <script>alert(1)</script>
+    const res = await request
+      .post('/api/stories')
+      .set('Authorization', `Bearer ${alexToken}`)
+      .send({ mediaUrl: invalidBase64, caption: 'Script spoof story' });
+
+    expect(res.status).toBe(415);
+    expect(res.body.error.code).toBe('INVALID_FILE_SIGNATURE');
+  });
 });
+
+
+
+

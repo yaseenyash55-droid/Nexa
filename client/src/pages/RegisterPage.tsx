@@ -9,7 +9,13 @@ import { Button } from '../components/ui/Button.js';
 import { Sparkles, Lock, Mail, User as UserIcon, Smile } from 'lucide-react';
 
 const registerSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters').max(30),
+  username: z.string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(30, 'Username cannot exceed 30 characters')
+    .regex(
+      /^[a-zA-Z0-9_]+$/,
+      'Use only letters, numbers, and underscores'
+    ),
   email: z.string().email('Please enter a valid email address'),
   displayName: z.string().min(2, 'Display name must be at least 2 characters').max(60),
   password: z.string().min(8, 'Password must be at least 8 characters').regex(/[A-Z]/, 'Must contain upper case').regex(/[0-9]/, 'Must contain number')

@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
+import { aiAndMediaRateLimiter } from '../middleware/rateLimit.middleware.js';
 import { getStoryRepository, getReelRepository, getMessageRepository } from '../repositories/factory.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { realtimeServer } from '../socket.js';
+import { validateMagicBytes } from '../services/media.service.js';
 
 export const socialRouter = Router();
 
@@ -23,8 +25,13 @@ function saveBase64StoryImageToDisk(base64Data: string, userId: number): string 
   const matches = base64Data.match(/^data:image\/([a-zA-Z0-9\+\/]+);base64,(.+)$/);
   if (!matches) return base64Data;
 
+  const mimeType = `image/${matches[1]}`;
   const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
   const buffer = Buffer.from(matches[2], 'base64');
+
+  if (!validateMagicBytes(buffer, mimeType)) {
+    throw { statusCode: 415, code: 'INVALID_FILE_SIGNATURE', message: 'Uploaded file signature does not match image format' };
+  }
 
   const uploadDir = path.join(process.cwd(), 'uploads', 'posts');
   if (!fs.existsSync(uploadDir)) {
@@ -38,7 +45,7 @@ function saveBase64StoryImageToDisk(base64Data: string, userId: number): string 
   return `/uploads/posts/${filename}`;
 }
 
-socialRouter.post('/stories', requireAuth, async (req: any, res, next) => {
+socialRouter.post('/stories', requireAuth, aiAndMediaRateLimiter, async (req: any, res, next) => {
   try {
     let { mediaUrl, caption } = req.body;
     if (!mediaUrl) {
@@ -94,10 +101,20 @@ function saveBase64ReelToDisk(base64Data: string, userId: number): string {
   if (!matches) return base64Data;
 
   let ext = 'mp4';
-  if (matches[1].includes('webm')) ext = 'webm';
-  else if (matches[1].includes('quicktime')) ext = 'mov';
+  let mimeType = 'video/mp4';
+  if (matches[1].includes('webm')) {
+    ext = 'webm';
+    mimeType = 'video/webm';
+  } else if (matches[1].includes('quicktime')) {
+    ext = 'mov';
+    mimeType = 'video/mp4';
+  }
 
   const buffer = Buffer.from(matches[2], 'base64');
+  if (!validateMagicBytes(buffer, mimeType)) {
+    throw { statusCode: 415, code: 'INVALID_FILE_SIGNATURE', message: 'Uploaded file signature does not match video format' };
+  }
+
   const uploadDir = path.join(process.cwd(), 'uploads', 'videos');
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -110,7 +127,7 @@ function saveBase64ReelToDisk(base64Data: string, userId: number): string {
   return `/uploads/videos/${filename}`;
 }
 
-socialRouter.post('/reels', requireAuth, async (req: any, res, next) => {
+socialRouter.post('/reels', requireAuth, aiAndMediaRateLimiter, async (req: any, res, next) => {
   try {
     let { videoUrl, caption } = req.body;
     if (!videoUrl) {
@@ -134,8 +151,12 @@ socialRouter.delete('/reels/:id', requireAuth, async (req: any, res, next) => {
   try {
     const reelId = parseInt(req.params.id, 10);
     const repo = getReelRepository();
+    let deleted = false;
     if (repo.deleteReel) {
-      await repo.deleteReel(reelId, req.user.userId);
+      deleted = await repo.deleteReel(reelId, req.user.userId);
+    }
+    if (!deleted) {
+      return sendError(res, 'FORBIDDEN', 'Reel not found or unauthorized to delete', 403);
     }
     return sendSuccess(res, { success: true }, 'Reel deleted');
   } catch (err) {

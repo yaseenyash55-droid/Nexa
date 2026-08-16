@@ -100,6 +100,12 @@ export interface IAuthRepository {
   findRefreshToken(tokenHash: string): Promise<{ userId: number; revokedAt: Date | null; expiresAt: Date } | null>;
   revokeRefreshToken(tokenHash: string): Promise<void>;
   revokeAllUserTokens(userId: number): Promise<void>;
+  savePasswordResetToken(userId: number, tokenHash: string, expiresAt: Date): Promise<void>;
+  findPasswordResetToken(tokenHash: string): Promise<{ userId: number; expiresAt: Date; usedAt: Date | null } | null>;
+  markPasswordResetTokenUsed(tokenHash: string): Promise<void>;
+  saveEmailVerificationToken(userId: number, tokenHash: string, expiresAt: Date): Promise<void>;
+  findEmailVerificationToken(tokenHash: string): Promise<{ userId: number; expiresAt: Date; usedAt: Date | null } | null>;
+  markEmailVerificationTokenUsed(tokenHash: string): Promise<void>;
 }
 
 export interface ISecurityRepository {

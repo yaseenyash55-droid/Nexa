@@ -107,4 +107,55 @@ export class AuthController {
       next(err);
     }
   }
+
+  async forgotPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = req.body;
+      const result = await authService.requestPasswordReset(email);
+      return sendSuccess(res, result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async resetPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { token, newPassword } = req.body;
+      const result = await authService.resetPassword(token, newPassword);
+      return sendSuccess(res, result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async verifyEmail(req: Request, res: Response, next: NextFunction) {
+    try {
+      const token = req.body.token || (req.query.token as string);
+      if (!token) {
+        return res.status(400).json({
+          error: { code: 'VALIDATION_ERROR', message: 'Verification token is required', details: [] }
+        });
+      }
+      const result = await authService.verifyEmailToken(token);
+      return sendSuccess(res, result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async resendVerification(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user?.userId;
+      const email = req.body.email || req.user?.email;
+      if (!userId && !email) {
+        return res.status(400).json({
+          error: { code: 'VALIDATION_ERROR', message: 'Email address or authenticated session is required', details: [] }
+        });
+      }
+      const result = await authService.sendEmailVerification(userId || 0, email);
+      return sendSuccess(res, result);
+    } catch (err) {
+      next(err);
+    }
+  }
 }

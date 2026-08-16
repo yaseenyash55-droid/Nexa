@@ -90,12 +90,8 @@ export class OracleReelRepository implements IReelRepository {
   }
 
   async deleteReel(reelId: number, userId: number): Promise<boolean> {
-    const isAdmin = [100, 101, 102].includes(userId);
-    const sql = isAdmin
-      ? 'DELETE FROM REELS WHERE REEL_ID = :reelId'
-      : 'DELETE FROM REELS WHERE REEL_ID = :reelId AND USER_ID = :userId';
-    const binds = isAdmin ? { reelId } : { reelId, userId };
-    const res = await executeSql(sql, binds);
+    const sql = 'DELETE FROM REELS WHERE REEL_ID = :reelId AND USER_ID = :userId';
+    const res = await executeSql(sql, { reelId, userId });
     return (res.rowsAffected || 0) > 0;
   }
 }
