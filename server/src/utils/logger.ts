@@ -5,12 +5,17 @@ export const logger = pino({
   redact: {
     paths: [
       'req.headers.authorization',
+      'req.body',
+      'req.headers.cookie',
       'password',
       'passwordHash',
       'token',
       'accessToken',
       'refreshToken',
       'DB_PASSWORD',
+      'DB_CONNECT_STRING',
+      'ORACLE_DB_PASSWORD',
+      'ORACLE_DB_CONNECTION_STRING',
       '*.password',
       '*.passwordHash',
       '*.token',

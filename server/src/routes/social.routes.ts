@@ -185,6 +185,15 @@ socialRouter.delete('/reels/:id/like', requireAuth, async (req: any, res, next) 
 });
 
 // Messages Routes
+socialRouter.get('/conversations', requireAuth, async (req: any, res, next) => {
+  try {
+    const conversations = await getMessageRepository().getConversations(req.user.userId);
+    return sendSuccess(res, conversations);
+  } catch (err) {
+    next(err);
+  }
+});
+
 socialRouter.get('/messages/:otherUserId', requireAuth, async (req: any, res, next) => {
   try {
     const otherUserId = parseInt(req.params.otherUserId, 10);

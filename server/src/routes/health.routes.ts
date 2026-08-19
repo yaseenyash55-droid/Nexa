@@ -19,7 +19,10 @@ router.get('/', async (_req, res) => {
     {
       status: isHealthy ? 'ok' : 'degraded',
       mode: 'oracle',
-      database: { reachable: dbHealth.reachable },
+      database: {
+        reachable: dbHealth.reachable,
+        details: isHealthy ? 'Connected' : dbHealth.details
+      },
       timestamp: new Date().toISOString()
     },
     isHealthy ? 'Process liveness check' : 'Database connection degraded',

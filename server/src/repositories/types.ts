@@ -10,6 +10,16 @@ export interface IUserRepository {
     location?: string;
     websiteUrl?: string;
   }): Promise<User>;
+  createUserOnConnection?(conn: any, user: {
+    username: string;
+    email: string;
+    passwordHash: string;
+    displayName: string;
+    bio?: string;
+    location?: string;
+    websiteUrl?: string;
+  }): Promise<User>;
+  findByIdOnConnection?(conn: any, userId: number): Promise<User | null>;
   findByUsername(username: string): Promise<User | null>;
   findByEmail(email: string): Promise<User | null>;
   findCredentialById(userId: number): Promise<{ userId: number; passwordHash: string } | null>;
@@ -93,10 +103,12 @@ export interface IMessageRepository {
   sendMessage(msg: { senderId: number; receiverId: number; content: string }): Promise<Message>;
   getMessagesBetweenUsers(userA: number, userB: number): Promise<Message[]>;
   markMessageAsRead(messageId: number, receiverUserId: number): Promise<{ rowsAffected: number; readAt: Date | null; senderId: number | null }>;
+  getConversations(userId: number): Promise<any[]>;
 }
 
 export interface IAuthRepository {
   saveRefreshToken(userId: number, tokenHash: string, expiresAt: Date): Promise<void>;
+  saveRefreshTokenOnConnection?(conn: any, userId: number, tokenHash: string, expiresAt: Date): Promise<void>;
   findRefreshToken(tokenHash: string): Promise<{ userId: number; revokedAt: Date | null; expiresAt: Date } | null>;
   revokeRefreshToken(tokenHash: string): Promise<void>;
   revokeAllUserTokens(userId: number): Promise<void>;

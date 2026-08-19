@@ -48,7 +48,29 @@ export class OracleUserRepository implements IUserRepository {
     };
   }
 
+  /**
+   * Insert a new user and return the full User object.
+   * Uses RETURNING USER_ID only (avoids TIMESTAMP WITH TIME ZONE output-bind
+   * errors with oracledb.DATE) then re-selects the row for all columns.
+   */
   async createUser(user: {
+    username: string;
+    email: string;
+    passwordHash: string;
+    displayName: string;
+    bio?: string;
+    location?: string;
+    websiteUrl?: string;
+  }): Promise<User> {
+    return this.createUserOnConnection(null, user);
+  }
+
+  /**
+   * Connection-aware createUser — when `conn` is provided the caller owns
+   * the transaction (no auto-commit); when `conn` is null, falls back to
+   * the pool helper with auto-commit.
+   */
+  async createUserOnConnection(conn: any | null, user: {
     username: string;
     email: string;
     passwordHash: string;
@@ -60,42 +82,82 @@ export class OracleUserRepository implements IUserRepository {
     const sql = `
       INSERT INTO USERS (USERNAME, EMAIL, PASSWORD_HASH, DISPLAY_NAME, BIO, LOCATION, WEBSITE_URL)
       VALUES (:username, :email, :passwordHash, :displayName, :bio, :location, :websiteUrl)
-      RETURNING USER_ID, CREATED_AT, UPDATED_AT INTO :userId, :createdAt, :updatedAt
+      RETURNING USER_ID INTO :userId
     `;
 
+    const normalizedUsername = user.username.trim().toLowerCase();
+    const normalizedEmail = user.email.trim().toLowerCase();
+
     const binds = {
-      username: user.username.toLowerCase().trim(),
-      email: user.email.toLowerCase().trim(),
+      username: normalizedUsername,
+      email: normalizedEmail,
       passwordHash: user.passwordHash,
       displayName: user.displayName.trim(),
       bio: user.bio || null,
       location: user.location || null,
       websiteUrl: user.websiteUrl || null,
-      userId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT },
-      createdAt: { type: oracledb.DATE, dir: oracledb.BIND_OUT },
-      updatedAt: { type: oracledb.DATE, dir: oracledb.BIND_OUT }
+      userId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
     };
 
-    const res = await executeSql<never>(sql, binds);
+    let res: any;
+    try {
+      if (conn) {
+        res = await conn.execute(sql, binds, {
+          outFormat: oracledb.OUT_FORMAT_OBJECT,
+          autoCommit: false
+        });
+      } else {
+        res = await executeSql<never>(sql, binds);
+      }
+    } catch (err: any) {
+      // Map ORA-00001 (unique constraint) to a structured 409 error
+      if (err.errorNum === 1 || (err.message && err.message.includes('ORA-00001'))) {
+        const msg = (err.message || '').toUpperCase();
+        if (msg.includes('UQ_USERS_USERNAME')) {
+          throw { statusCode: 409, code: 'USERNAME_TAKEN', message: 'Username is already registered' };
+        }
+        if (msg.includes('UQ_USERS_EMAIL')) {
+          throw { statusCode: 409, code: 'EMAIL_TAKEN', message: 'Email is already registered' };
+        }
+        // Generic duplicate fallback
+        throw { statusCode: 409, code: 'DUPLICATE_ENTRY', message: 'A user with this username or email already exists' };
+      }
+      throw err;
+    }
+
     const outBinds = res.outBinds as any;
+    const newUserId: number = outBinds.userId[0];
 
-    return {
-      userId: outBinds.userId[0],
-      username: user.username.toLowerCase().trim(),
-      email: user.email.toLowerCase().trim(),
-      displayName: user.displayName.trim(),
-      bio: user.bio || null,
-      location: user.location || null,
-      websiteUrl: user.websiteUrl || null,
-      failedLoginAttempts: 0,
-      firstFailedAttemptAt: null,
-      lockoutUntil: null,
-      createdAt: outBinds.createdAt[0].toISOString(),
-      updatedAt: outBinds.updatedAt[0].toISOString(),
-      followersCount: 0,
-      followingCount: 0,
-      isFollowing: false
-    };
+    // Re-select the created user to get TIMESTAMP WITH TIME ZONE columns safely
+    const created = conn
+      ? await this.findByIdOnConnection(conn, newUserId)
+      : await this.findById(newUserId);
+
+    if (!created) {
+      throw new Error('User not found immediately after insertion');
+    }
+
+    return created;
+  }
+
+  /**
+   * Connection-aware findById — operates on a given connection within a
+   * transaction so the caller can read-back rows before commit.
+   */
+  async findByIdOnConnection(conn: any, userId: number): Promise<User | null> {
+    const sql = `
+      SELECT u.USER_ID, u.USERNAME, u.EMAIL, u.DISPLAY_NAME, u.BIO, u.PROFILE_IMAGE_URL,
+             u.COVER_IMAGE_URL, u.LOCATION, u.WEBSITE_URL, u.CREATED_AT, u.UPDATED_AT,
+             0 AS FOLLOWERS_COUNT, 0 AS FOLLOWING_COUNT, 0 AS IS_FOLLOWING
+      FROM USERS u
+      WHERE u.USER_ID = :userId
+    `;
+    const res = await conn.execute(sql, { userId }, {
+      outFormat: oracledb.OUT_FORMAT_OBJECT,
+      autoCommit: false
+    });
+    if (!res.rows || res.rows.length === 0) return null;
+    return this.mapRowToUser(res.rows[0]);
   }
 
   async findByUsername(username: string): Promise<User | null> {

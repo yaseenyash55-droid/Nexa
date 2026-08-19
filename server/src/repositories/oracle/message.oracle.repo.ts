@@ -122,4 +122,38 @@ export class OracleMessageRepository implements IMessageRepository {
       await conn.execute(sql, { receiverId, senderId });
     });
   }
+
+  async getConversations(userId: number): Promise<any[]> {
+    const sql = `
+      SELECT
+          other_user_id,
+          u.username,
+          u.display_name,
+          u.profile_image_url,
+          m.content AS last_message,
+          m.created_at AS last_message_at,
+          (SELECT COUNT(*) FROM MESSAGES WHERE SENDER_ID = other_user_id AND RECEIVER_ID = :userId AND READ_AT IS NULL) AS unread_count
+      FROM (
+          SELECT
+              CASE WHEN SENDER_ID = :userId THEN RECEIVER_ID ELSE SENDER_ID END AS other_user_id,
+              MAX(MESSAGE_ID) as max_id
+          FROM MESSAGES
+          WHERE SENDER_ID = :userId OR RECEIVER_ID = :userId
+          GROUP BY CASE WHEN SENDER_ID = :userId THEN RECEIVER_ID ELSE SENDER_ID END
+      ) conv
+      JOIN MESSAGES m ON conv.max_id = m.MESSAGE_ID
+      JOIN USERS u ON conv.other_user_id = u.USER_ID
+      ORDER BY m.MESSAGE_ID DESC
+    `;
+    const res = await executeSql(sql, { userId });
+    return (res.rows || []).map((row: any) => ({
+      otherUserId: row.OTHER_USER_ID,
+      username: row.USERNAME,
+      displayName: row.DISPLAY_NAME,
+      profileImageUrl: row.PROFILE_IMAGE_URL,
+      lastMessage: row.LAST_MESSAGE,
+      lastMessageAt: row.LAST_MESSAGE_AT ? row.LAST_MESSAGE_AT.toISOString() : null,
+      unreadCount: row.UNREAD_COUNT
+    }));
+  }
 }

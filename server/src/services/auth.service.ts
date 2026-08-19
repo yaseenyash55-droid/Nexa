@@ -6,6 +6,7 @@ import { AuthTokens, User } from '../types/index.js';
 import { env } from '../config/env.js';
 import { getEmailProvider } from '../utils/email.js';
 import { auditLogSecurityEvent } from '../utils/securityAuditLogger.js';
+import { withTransaction } from '../db/pool.js';
 
 export class AuthService {
   private get userRepo() {
@@ -35,37 +36,59 @@ export class AuthService {
     password: string;
     displayName: string;
   }): Promise<{ user: User; tokens: AuthTokens; accessToken: string; refreshToken: string }> {
-    const existingUsername = await this.userRepo.findByUsername(data.username);
+    // Normalize inputs before any duplicate checks
+    const normalizedUsername = data.username.trim().toLowerCase();
+    const normalizedEmail = data.email.trim().toLowerCase();
+
+    const existingUsername = await this.userRepo.findByUsername(normalizedUsername);
     if (existingUsername) {
       throw { statusCode: 409, code: 'USERNAME_TAKEN', message: 'Username is already registered' };
     }
 
-    const existingEmail = await this.userRepo.findByEmail(data.email);
+    const existingEmail = await this.userRepo.findByEmail(normalizedEmail);
     if (existingEmail) {
       throw { statusCode: 409, code: 'EMAIL_TAKEN', message: 'Email is already registered' };
     }
 
     const passwordHash = await hashPassword(data.password);
-    const rawUser = await this.userRepo.createUser({
-      username: data.username,
-      email: data.email,
-      passwordHash,
-      displayName: data.displayName
+
+    // Generate tokens before transaction (no DB dependency)
+    const accessTokenPayload = { userId: 0, username: normalizedUsername, email: normalizedEmail };
+
+    // Atomic: insert user + refresh token in one transaction
+    const result = await withTransaction(async (conn) => {
+      // 1. Insert user
+      const rawUser = await (this.userRepo as any).createUserOnConnection(conn, {
+        username: normalizedUsername,
+        email: normalizedEmail,
+        passwordHash,
+        displayName: data.displayName.trim()
+      });
+
+      // 2. Generate tokens with the real userId
+      const tokenPayload = { userId: rawUser.userId, username: rawUser.username, email: rawUser.email };
+      const accessToken = signAccessToken(tokenPayload);
+      const refreshToken = signRefreshToken(tokenPayload);
+
+      // 3. Insert refresh token (same transaction)
+      const tokenHash = hashToken(refreshToken);
+      const expiresAt = new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+      await (this.authRepo as any).saveRefreshTokenOnConnection(conn, rawUser.userId, tokenHash, expiresAt);
+
+      return { rawUser, accessToken, refreshToken };
     });
 
-    const user = this.sanitizeUser(rawUser);
+    const user = this.sanitizeUser(result.rawUser);
 
-    const accessToken = signAccessToken({ userId: user.userId, username: user.username, email: user.email });
-    const refreshToken = signRefreshToken({ userId: user.userId, username: user.username, email: user.email });
-
-    const tokenHash = hashToken(refreshToken);
-    const expiresAt = new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
-    await this.authRepo.saveRefreshToken(user.userId, tokenHash, expiresAt);
-
-    // Auto-trigger verification email dispatch
+    // Auto-trigger verification email dispatch (fire-and-forget, outside transaction)
     await this.sendEmailVerification(user.userId, user.email).catch(() => {});
 
-    return { user, tokens: { accessToken, refreshToken }, accessToken, refreshToken };
+    return {
+      user,
+      tokens: { accessToken: result.accessToken, refreshToken: result.refreshToken },
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken
+    };
   }
 
   async login(loginId: any, password?: string): Promise<{ user: User; tokens: AuthTokens; accessToken: string; refreshToken: string }> {

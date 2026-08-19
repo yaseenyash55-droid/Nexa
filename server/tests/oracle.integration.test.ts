@@ -63,12 +63,8 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
 
   afterAll(async () => {
     if (isOracleLive && createdUserIds.length > 0) {
-      for (const uid of createdUserIds) {
-        try {
-          await executeSql('DELETE FROM USERS WHERE USER_ID = :uid', { uid });
-        } catch {
-          // Cascade handles child rows automatically
-        }
+      for (const testUserId of createdUserIds) {
+        await executeSql('DELETE FROM USERS WHERE USER_ID = :testUserId', { testUserId });
       }
     }
     await closeOraclePool();
@@ -437,23 +433,30 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   it('updates user profile details and verifies search indexing', async () => {
     if (!isOracleLive) return;
 
+    const testRunId = Date.now();
+    const uniqueDisplayName = `Searchable User ${testRunId}`;
+
     const user = await authService.register({
-      username: 'srch_usr_' + Date.now(),
-      email: `srch_usr_${Date.now()}@test.local`,
+      username: 'srch_usr_' + testRunId,
+      email: `srch_usr_${testRunId}@test.local`,
       password: 'SecurePassword123!',
-      displayName: 'Searchable User'
+      displayName: 'Initial Name'
     });
     createdUserIds.push(user.user.userId);
 
     const updated = await userRepo.updateUser(user.user.userId, {
-      displayName: 'Updated Display Name',
+      displayName: uniqueDisplayName,
       bio: 'Bio text for search verification'
     });
-    expect(updated?.displayName).toBe('Updated Display Name');
-    expect(updated?.bio).toBe('Bio text for search verification');
+    expect(updated?.displayName).toBe(uniqueDisplayName);
 
-    const searchRes = await userRepo.searchUsers('Updated Display', 10);
-    expect(searchRes.some(u => u.userId === user.user.userId)).toBe(true);
+    // Verify findById returns updated value
+    const found = await userRepo.findById(user.user.userId);
+    expect(found?.displayName).toBe(uniqueDisplayName);
+
+    const searchRes = await userRepo.searchUsers(uniqueDisplayName, undefined, 10);
+    expect(searchRes.length).toBeGreaterThan(0);
+    expect(searchRes[0].userId).toBe(user.user.userId);
   });
 
   it('creates and manages user notifications with read status', async () => {

@@ -1,3 +1,4 @@
+import oracledb from 'oracledb';
 import { executeSql } from '../../db/pool.js';
 import { IAuthRepository } from '../types.js';
 
@@ -8,6 +9,21 @@ export class OracleAuthRepository implements IAuthRepository {
       VALUES (:userId, :tokenHash, :expiresAt)
     `;
     await executeSql(sql, { userId, tokenHash, expiresAt });
+  }
+
+  /**
+   * Connection-aware variant — executes on the given connection without
+   * auto-commit so the caller can wrap it in a transaction.
+   */
+  async saveRefreshTokenOnConnection(conn: any, userId: number, tokenHash: string, expiresAt: Date): Promise<void> {
+    const sql = `
+      INSERT INTO REFRESH_TOKENS (USER_ID, TOKEN_HASH, EXPIRES_AT)
+      VALUES (:userId, :tokenHash, :expiresAt)
+    `;
+    await conn.execute(sql, { userId, tokenHash, expiresAt }, {
+      outFormat: oracledb.OUT_FORMAT_OBJECT,
+      autoCommit: false
+    });
   }
 
   async findRefreshToken(tokenHash: string): Promise<{ userId: number; revokedAt: Date | null; expiresAt: Date } | null> {
