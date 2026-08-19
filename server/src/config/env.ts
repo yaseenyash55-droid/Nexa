@@ -1,44 +1,102 @@
 import dotenv from 'dotenv';
-// Load environment variables from .env file in non-production environments
+
 dotenv.config();
-const isProduction = process.env.NODE_ENV === 'production';
-const useMockData = process.env.USE_MOCK_DATA === 'true';
-/**
- * Retrieves environment variable or enforces strict missing-variable failure in production.
- */
-function getRequiredEnv(key: string, altKeys: string[] = []): string {
-  const value = process.env[key] || altKeys.map(k => process.env[k]).find(Boolean);
-  if (!value && isProduction && !useMockData) {
-    console.error(`[CRITICAL SECURITY FAILURE] Mandatory environment variable is missing: ${key}`);
+
+const nodeEnv = process.env.NODE_ENV || 'development';
+const isProduction = nodeEnv === 'production';
+
+function getRequiredEnv(keys: string[], label: string): string {
+  for (const key of keys) {
+    const value = process.env[key];
+
+    if (value) {
+      return value;
+    }
   }
-  return value || '';
-}
-// Strict Production Secret Enforcement
-if (isProduction && !useMockData) {
-  const missingSecrets: string[] = [];
-  if (!process.env.JWT_SECRET) missingSecrets.push('JWT_SECRET');
-  if (!process.env.JWT_REFRESH_SECRET) missingSecrets.push('JWT_REFRESH_SECRET');
-  const hasDbUser = Boolean(process.env.DB_USER || process.env.ORACLE_DB_USER);
-  const hasDbPass = Boolean(process.env.DB_PASSWORD || process.env.ORACLE_DB_PASSWORD);
-  const hasDbConn = Boolean(process.env.DB_CONNECT_STRING || process.env.ORACLE_DB_CONNECTION_STRING);
-  if (!hasDbUser) missingSecrets.push('DB_USER (or ORACLE_DB_USER)');
-  if (!hasDbPass) missingSecrets.push('DB_PASSWORD (or ORACLE_DB_PASSWORD)');
-  if (!hasDbConn) missingSecrets.push('DB_CONNECT_STRING (or ORACLE_DB_CONNECTION_STRING)');
-  if (missingSecrets.length > 0) {
-    console.error(`[FATAL ERROR] Production deployment halted. Missing required production secrets:\n  - ${missingSecrets.join('\n  - ')}`);
-    process.exit(1);
+
+  if (isProduction) {
+    throw new Error(
+      `[FATAL CONFIGURATION ERROR] Missing required environment variable: ${label}`
+    );
   }
+
+  return '';
 }
+
+function getPositiveInteger(key: string, fallback: number): number {
+  const rawValue = process.env[key];
+
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const value = Number.parseInt(rawValue, 10);
+
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(
+      `[FATAL CONFIGURATION ERROR] ${key} must be a positive integer`
+    );
+  }
+
+  return value;
+}
+
+const jwtAccessSecret = getRequiredEnv(
+  ['JWT_SECRET', 'JWT_ACCESS_SECRET'],
+  'JWT_SECRET'
+);
+
+const jwtRefreshSecret = getRequiredEnv(
+  ['JWT_REFRESH_SECRET'],
+  'JWT_REFRESH_SECRET'
+);
+
+const databaseUser = getRequiredEnv(
+  ['DB_USER', 'ORACLE_DB_USER'],
+  'DB_USER'
+);
+
+const databasePassword = getRequiredEnv(
+  ['DB_PASSWORD', 'ORACLE_DB_PASSWORD'],
+  'DB_PASSWORD'
+);
+
+const databaseConnectString = getRequiredEnv(
+  ['DB_CONNECT_STRING', 'ORACLE_DB_CONNECTION_STRING'],
+  'DB_CONNECT_STRING'
+);
+
 export const env = {
-  NODE_ENV: process.env.NODE_ENV || 'development',
-  PORT: parseInt(process.env.PORT || '4000', 10),
-  CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || 'https://nexa-social-app.surge.sh',
-  // JWT Configuration (Strictly requires environment variable in production)
-  JWT_SECRET: getRequiredEnv('JWT_SECRET'),
-  JWT_REFRESH_SECRET: getRequiredEnv('JWT_REFRESH_SECRET'),
-  // Oracle Database Credentials (Mapped to render.yaml secret definitions)
-  ORACLE_DB_USER: process.env.DB_USER || process.env.ORACLE_DB_USER || '',
-  ORACLE_DB_PASSWORD: process.env.DB_PASSWORD || process.env.ORACLE_DB_PASSWORD || '',
-  ORACLE_DB_CONNECTION_STRING: process.env.DB_CONNECT_STRING || process.env.ORACLE_DB_CONNECTION_STRING || '',
-  USE_MOCK_DATA: useMockData
+  NODE_ENV: nodeEnv,
+  PORT: getPositiveInteger('PORT', 4000),
+  CLIENT_ORIGIN:
+    process.env.CLIENT_ORIGIN || 'https://nexa-social-app.surge.sh',
+
+  JWT_SECRET: jwtAccessSecret,
+  JWT_ACCESS_SECRET: jwtAccessSecret,
+  JWT_REFRESH_SECRET: jwtRefreshSecret,
+
+  DB_USER: databaseUser,
+  DB_PASSWORD: databasePassword,
+  DB_CONNECT_STRING: databaseConnectString,
+
+  ORACLE_DB_USER: databaseUser,
+  ORACLE_DB_PASSWORD: databasePassword,
+  ORACLE_DB_CONNECTION_STRING: databaseConnectString,
+
+  DB_POOL_MIN: getPositiveInteger('DB_POOL_MIN', 1),
+  DB_POOL_MAX: getPositiveInteger('DB_POOL_MAX', 5),
+  DB_POOL_INCREMENT: getPositiveInteger('DB_POOL_INCREMENT', 1),
+
+  BCRYPT_ROUNDS: getPositiveInteger('BCRYPT_ROUNDS', 12),
+  REFRESH_TOKEN_TTL_DAYS: getPositiveInteger(
+    'REFRESH_TOKEN_TTL_DAYS',
+    7
+  ),
+
+  COOKIE_SECURE:
+    isProduction || process.env.COOKIE_SECURE === 'true',
+
+  DATA_SOURCE: 'oracle' as const,
+  USE_MOCK_DATA: false
 };
