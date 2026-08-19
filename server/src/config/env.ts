@@ -1,39 +1,44 @@
 import dotenv from 'dotenv';
+// Load environment variables from .env file in non-production environments
 dotenv.config();
-
-const nodeEnv = process.env.NODE_ENV || 'production';
-const jwtSecret = process.env.JWT_SECRET || process.env.JWT_ACCESS_SECRET || 'nexa_super_secret_jwt_key_production_2026';
-const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'nexa_super_secret_refresh_jwt_key_2026';
-const oracleDbUser = process.env.ORACLE_DB_USER || process.env.DB_USER || 'c##nexa_user';
-const oracleDbPassword = process.env.ORACLE_DB_PASSWORD || process.env.DB_PASSWORD || 'nexa_pass_123';
-const oracleDbConnectionString = process.env.ORACLE_DB_CONNECTION_STRING || process.env.DB_CONNECT_STRING || 'localhost:1521/XE';
-
-if (nodeEnv === 'production') {
-  if (!process.env.JWT_SECRET && !process.env.JWT_ACCESS_SECRET) {
-    console.error('[CRITICAL SECURITY ERROR] Production startup blocked: JWT_ACCESS_SECRET must be explicitly set in environment variables.');
+const isProduction = process.env.NODE_ENV === 'production';
+const useMockData = process.env.USE_MOCK_DATA === 'true';
+/**
+ * Retrieves environment variable or enforces strict missing-variable failure in production.
+ */
+function getRequiredEnv(key: string, altKeys: string[] = []): string {
+  const value = process.env[key] || altKeys.map(k => process.env[k]).find(Boolean);
+  if (!value && isProduction && !useMockData) {
+    console.error(`[CRITICAL SECURITY FAILURE] Mandatory environment variable is missing: ${key}`);
   }
-  if (!process.env.JWT_REFRESH_SECRET) {
-    console.error('[CRITICAL SECURITY ERROR] Production startup blocked: JWT_REFRESH_SECRET must be explicitly set in environment variables.');
+  return value || '';
+}
+// Strict Production Secret Enforcement
+if (isProduction && !useMockData) {
+  const missingSecrets: string[] = [];
+  if (!process.env.JWT_SECRET) missingSecrets.push('JWT_SECRET');
+  if (!process.env.JWT_REFRESH_SECRET) missingSecrets.push('JWT_REFRESH_SECRET');
+  const hasDbUser = Boolean(process.env.DB_USER || process.env.ORACLE_DB_USER);
+  const hasDbPass = Boolean(process.env.DB_PASSWORD || process.env.ORACLE_DB_PASSWORD);
+  const hasDbConn = Boolean(process.env.DB_CONNECT_STRING || process.env.ORACLE_DB_CONNECTION_STRING);
+  if (!hasDbUser) missingSecrets.push('DB_USER (or ORACLE_DB_USER)');
+  if (!hasDbPass) missingSecrets.push('DB_PASSWORD (or ORACLE_DB_PASSWORD)');
+  if (!hasDbConn) missingSecrets.push('DB_CONNECT_STRING (or ORACLE_DB_CONNECTION_STRING)');
+  if (missingSecrets.length > 0) {
+    console.error(`[FATAL ERROR] Production deployment halted. Missing required production secrets:\n  - ${missingSecrets.join('\n  - ')}`);
+    process.exit(1);
   }
 }
-
 export const env = {
-  NODE_ENV: process.env.NODE_ENV || 'production',
+  NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: parseInt(process.env.PORT || '4000', 10),
-  JWT_SECRET: jwtSecret,
-  JWT_ACCESS_SECRET: jwtSecret,
-  JWT_REFRESH_SECRET: jwtRefreshSecret,
-  ORACLE_DB_USER: oracleDbUser,
-  ORACLE_DB_PASSWORD: oracleDbPassword,
-  ORACLE_DB_CONNECTION_STRING: oracleDbConnectionString,
-  DB_USER: oracleDbUser,
-  DB_PASSWORD: oracleDbPassword,
-  DB_CONNECT_STRING: oracleDbConnectionString,
   CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || 'https://nexa-social-app.surge.sh',
-  DB_POOL_MIN: parseInt(process.env.DB_POOL_MIN || '1', 10),
-  DB_POOL_MAX: parseInt(process.env.DB_POOL_MAX || '5', 10),
-  DB_POOL_INCREMENT: parseInt(process.env.DB_POOL_INCREMENT || '1', 10),
-  BCRYPT_ROUNDS: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
-  REFRESH_TOKEN_TTL_DAYS: parseInt(process.env.REFRESH_TOKEN_TTL_DAYS || '7', 10),
-  COOKIE_SECURE: process.env.COOKIE_SECURE === 'true'
+  // JWT Configuration (Strictly requires environment variable in production)
+  JWT_SECRET: getRequiredEnv('JWT_SECRET'),
+  JWT_REFRESH_SECRET: getRequiredEnv('JWT_REFRESH_SECRET'),
+  // Oracle Database Credentials (Mapped to render.yaml secret definitions)
+  ORACLE_DB_USER: process.env.DB_USER || process.env.ORACLE_DB_USER || '',
+  ORACLE_DB_PASSWORD: process.env.DB_PASSWORD || process.env.ORACLE_DB_PASSWORD || '',
+  ORACLE_DB_CONNECTION_STRING: process.env.DB_CONNECT_STRING || process.env.ORACLE_DB_CONNECTION_STRING || '',
+  USE_MOCK_DATA: useMockData
 };
