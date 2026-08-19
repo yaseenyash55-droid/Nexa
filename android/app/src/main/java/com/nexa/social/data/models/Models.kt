@@ -29,8 +29,31 @@ data class User(
 )
 
 data class LoginRequest(
-    @SerializedName("username") val username: String,
+    @SerializedName("emailOrUsername") val emailOrUsername: String,
     @SerializedName("password") val password: String
+)
+
+data class RegisterRequest(
+    @SerializedName("username") val username: String,
+    @SerializedName("email") val email: String,
+    @SerializedName("password") val password: String,
+    @SerializedName("displayName") val displayName: String,
+    @SerializedName("bio") val bio: String? = null,
+    @SerializedName("location") val location: String? = null,
+    @SerializedName("websiteUrl") val websiteUrl: String? = null
+)
+
+data class ForgotPasswordRequest(
+    @SerializedName("email") val email: String
+)
+
+data class VerifyEmailRequest(
+    @SerializedName("token") val token: String
+)
+
+data class ResetPasswordRequest(
+    @SerializedName("token") val token: String,
+    @SerializedName("newPassword") val newPassword: String
 )
 
 data class LoginResponse(
@@ -61,6 +84,17 @@ data class Post(
     @SerializedName("createdAt") val createdAt: String?
 )
 
+data class Reel(
+    @SerializedName("reelId") val reelId: Int,
+    @SerializedName("userId") val userId: Int,
+    @SerializedName("videoUrl") val videoUrl: String,
+    @SerializedName("caption") val caption: String?,
+    @SerializedName("likesCount") val likesCount: Int = 0,
+    @SerializedName("isLiked") val isLiked: Boolean = false,
+    @SerializedName("author") val author: User,
+    @SerializedName("createdAt") val createdAt: String?
+)
+
 data class Message(
     @SerializedName("messageId") val messageId: Int,
     @SerializedName("senderId") val senderId: Int,
@@ -79,6 +113,16 @@ data class MarkReadResponse(
     @SerializedName("rowsAffected") val rowsAffected: Int?,
     @SerializedName("read") val read: Boolean?,
     @SerializedName("readAt") val readAt: String?
+)
+
+data class Conversation(
+    @SerializedName("otherUserId") val otherUserId: Int,
+    @SerializedName("username") val username: String,
+    @SerializedName("displayName") val displayName: String,
+    @SerializedName("profileImageUrl") val profileImageUrl: String?,
+    @SerializedName("lastMessage") val lastMessage: String,
+    @SerializedName("lastMessageAt") val lastMessageAt: String,
+    @SerializedName("unreadCount") val unreadCount: Int
 )
 
 data class Group(

@@ -16,7 +16,9 @@ object NotificationHelper {
 
     const val CHANNEL_ID = "nexa_notifications_channel"
     const val CHANNEL_NAME = "Nexa Notifications"
-    const val EXTRA_TARGET_URL = "extra_target_url"
+    const val EXTRA_DESTINATION = "extra_destination"
+    const val EXTRA_RESOURCE_ID = "extra_resource_id"
+    const val EXTRA_SECONDARY_ID = "extra_secondary_id"
 
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -41,16 +43,18 @@ object NotificationHelper {
         context: Context,
         title: String,
         body: String,
-        targetUrl: String? = null,
+        destination: String? = null,
+        resourceId: String? = null,
+        secondaryId: String? = null,
         notificationId: Int = System.currentTimeMillis().toInt()
     ) {
         createNotificationChannel(context)
 
-        val safeTargetUrl = UrlValidator.sanitizeTargetUrl(targetUrl)
-
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra(EXTRA_TARGET_URL, safeTargetUrl)
+            putExtra(EXTRA_DESTINATION, destination)
+            putExtra(EXTRA_RESOURCE_ID, resourceId)
+            putExtra(EXTRA_SECONDARY_ID, secondaryId)
         }
 
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

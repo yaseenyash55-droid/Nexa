@@ -23,4 +23,6 @@
     <color name="text_dark_secondary">#475569</color>
     <color name="text_dark_muted">#94A3B8</color>
     <color name="border_light">#E2E8F0</color>
+    <color name="ic_launcher_background">#020806</color>
+    <color name="splash_background">#020806</color>
 </resources>

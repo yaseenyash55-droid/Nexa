@@ -1,7 +1,6 @@
 package com.nexa.social.ui
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -39,22 +38,19 @@ class LoginActivity : AppCompatActivity() {
         }
 
         binding.tvCreateAccount.setOnClickListener {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://nexa-social-app.surge.sh/register"))
-            startActivity(intent)
+            startActivity(Intent(this, RegisterActivity::class.java))
         }
 
         binding.tvForgotPassword.setOnClickListener {
-            Toast.makeText(this, "Forgot password? Reset link is available at https://nexa-social-app.surge.sh/login", Toast.LENGTH_LONG).show()
+            startActivity(Intent(this, ForgotPasswordActivity::class.java))
         }
 
         binding.btnGoogleLogin.setOnClickListener {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://nexa-social-app.surge.sh/login"))
-            startActivity(intent)
+            Toast.makeText(this, "Google Sign-In will be implemented with Credential Manager soon", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnGithubLogin.setOnClickListener {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://nexa-social-app.surge.sh/login"))
-            startActivity(intent)
+            Toast.makeText(this, "GitHub Sign-In not supported natively yet", Toast.LENGTH_SHORT).show()
         }
     }
 

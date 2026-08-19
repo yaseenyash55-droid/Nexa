@@ -11,3 +11,4 @@
 *.keystore
 key.properties
 **/build/
+.artifacts/

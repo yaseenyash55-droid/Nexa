@@ -40,28 +40,28 @@ class ConversationsAdapter(
     override fun getItemCount(): Int = items.size
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val tvName: TextView = itemView.findViewById(R.id.tvName)
-        private val tvSubtitle: TextView = itemView.findViewById(R.id.tvSubtitle)
-        private val tvBadge: TextView = itemView.findViewById(R.id.tvBadge)
+        private val tvName: TextView = itemView.findViewById(R.id.tvDisplayName)
+        private val tvSubtitle: TextView = itemView.findViewById(R.id.tvLastMessage)
+        private val tvBadge: TextView = itemView.findViewById(R.id.unreadBadge)
 
         fun bind(item: ConversationItem) {
             when (item) {
                 is ConversationItem.Direct -> {
                     tvName.text = item.user.displayName
                     tvSubtitle.text = "@${item.user.username}"
-                    tvBadge.text = "E2EE 🔒"
+                    tvBadge.text = "🔒"
                     tvBadge.visibility = View.VISIBLE
                 }
                 is ConversationItem.GroupChat -> {
                     tvName.text = item.group.name
-                    tvSubtitle.text = "${item.group.membersCount} members • ${item.group.description ?: "Group conversation"}"
-                    tvBadge.text = "GROUP"
+                    tvSubtitle.text = "${item.group.membersCount} members"
+                    tvBadge.text = "GRP"
                     tvBadge.visibility = View.VISIBLE
                 }
                 is ConversationItem.BroadcastList -> {
-                    tvName.text = item.broadcast.title ?: "Broadcast List"
-                    tvSubtitle.text = "${item.broadcast.recipientsCount} recipients • ${item.broadcast.content}"
-                    tvBadge.text = "BROADCAST"
+                    tvName.text = item.broadcast.title ?: "Broadcast"
+                    tvSubtitle.text = "${item.broadcast.recipientsCount} recipients"
+                    tvBadge.text = "BC"
                     tvBadge.visibility = View.VISIBLE
                 }
             }

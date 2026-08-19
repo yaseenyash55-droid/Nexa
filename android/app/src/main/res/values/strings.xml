@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NEXA</string>
+
+    <!-- Auth Labels -->
+    <string name="label_display_name">DISPLAY NAME</string>
+    <string name="label_username">USERNAME</string>
+    <string name="label_email">EMAIL ADDRESS</string>
+    <string name="label_password">PASSWORD</string>
+    <string name="label_confirm_password">CONFIRM PASSWORD</string>
+    <string name="label_login_id">EMAIL OR USERNAME</string>
+
+    <!-- Auth Hints -->
+    <string name="hint_display_name">Enter your display name</string>
+    <string name="hint_username">Choose a username</string>
+    <string name="hint_email">Enter your email address</string>
+    <string name="hint_password">Enter your password</string>
+    <string name="hint_confirm_password">Re-enter your password</string>
+    <string name="hint_login_id">Enter your email or username</string>
+
+    <!-- Auth Screen Text -->
+    <string name="auth_welcome_title">Welcome to Nexa</string>
+    <string name="auth_welcome_subtitle">Sign in to continue connecting with your network</string>
+    <string name="auth_join_title">Join NEXA</string>
+    <string name="auth_join_subtitle">Create an account to start connecting</string>
+    <string name="auth_forgot_password">Forgot Password?</string>
+    <string name="auth_sign_in">Sign In</string>
+    <string name="auth_create_account">Create Account</string>
+    <string name="auth_or_continue">OR CONTINUE WITH</string>
+    <string name="auth_google_login">Continue with Google</string>
+    <string name="auth_github_login">Continue with GitHub</string>
+    <string name="auth_no_account">Don\'t have an account? </string>
+    <string name="auth_already_account">Already have an account? </string>
+
+    <!-- Accessibility -->
+    <string name="acc_password_visibility">Toggle password visibility</string>
+</resources>

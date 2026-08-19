@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -32,7 +32,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="Welcome to Nexa"
+                android:text="@string/auth_welcome_title"
                 android:textColor="@color/text_white"
                 android:textSize="26sp"
                 android:textStyle="bold" />
@@ -41,7 +41,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="Sign in to continue connecting with your network"
+                android:text="@string/auth_welcome_subtitle"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
         </LinearLayout>
@@ -57,30 +57,44 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/headerContainer">
 
+            <!-- Username/Email Label -->
+            <TextView
+                style="@style/NexaFormLabel"
+                android:labelFor="@+id/etUsername"
+                android:text="@string/label_login_id" />
+
             <!-- Username/Email Field -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilUsername"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Email or Username"
-                android:textColorHint="@color/text_muted"
+                android:layout_marginBottom="16dp"
                 app:boxBackgroundColor="@color/background_card"
                 app:boxCornerRadiusBottomEnd="12dp"
                 app:boxCornerRadiusBottomStart="12dp"
                 app:boxCornerRadiusTopEnd="12dp"
                 app:boxCornerRadiusTopStart="12dp"
-                app:boxStrokeColor="@color/brand_primary"
-                app:hintTextColor="@color/brand_primary">
+                app:boxStrokeColor="@color/brand_emerald"
+                app:hintEnabled="false">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etUsername"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:autofillHints="username"
+                    android:hint="@string/hint_login_id"
+                    android:imeOptions="actionNext"
                     android:inputType="textEmailAddress"
                     android:textColor="@color/text_white"
                     android:textSize="14sp" />
             </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Password Label -->
+            <TextView
+                style="@style/NexaFormLabel"
+                android:labelFor="@+id/etPassword"
+                android:text="@string/label_password" />
 
             <!-- Password Field -->
             <com.google.android.material.textfield.TextInputLayout
@@ -88,16 +102,14 @@
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:hint="Password"
-                android:textColorHint="@color/text_muted"
                 app:boxBackgroundColor="@color/background_card"
                 app:boxCornerRadiusBottomEnd="12dp"
                 app:boxCornerRadiusBottomStart="12dp"
                 app:boxCornerRadiusTopEnd="12dp"
                 app:boxCornerRadiusTopStart="12dp"
-                app:boxStrokeColor="@color/brand_primary"
-                app:hintTextColor="@color/brand_primary"
+                app:boxStrokeColor="@color/brand_emerald"
+                app:hintEnabled="false"
+                app:passwordToggleContentDescription="@string/acc_password_visibility"
                 app:passwordToggleEnabled="true"
                 app:passwordToggleTint="@color/text_secondary">
 
@@ -105,6 +117,9 @@
                     android:id="@+id/etPassword"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:autofillHints="password"
+                    android:hint="@string/hint_password"
+                    android:imeOptions="actionDone"
                     android:inputType="textPassword"
                     android:textColor="@color/text_white"
                     android:textSize="14sp" />
@@ -118,8 +133,8 @@
                 android:layout_gravity="end"
                 android:layout_marginTop="8dp"
                 android:padding="4dp"
-                android:text="Forgot Password?"
-                android:textColor="@color/brand_cyan"
+                android:text="@string/auth_forgot_password"
+                android:textColor="@color/brand_emerald"
                 android:textSize="12sp" />
 
             <!-- Sign In Button -->
@@ -128,8 +143,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:layout_marginTop="16dp"
-                android:backgroundTint="@color/brand_primary"
-                android:text="Sign In"
+                android:backgroundTint="@color/brand_emerald"
+                android:text="@string/auth_sign_in"
                 android:textColor="@color/text_white"
                 android:textSize="15sp"
                 android:textStyle="bold"
@@ -141,7 +156,7 @@
                 android:layout_height="32dp"
                 android:layout_gravity="center"
                 android:layout_marginTop="16dp"
-                android:indeterminateTint="@color/brand_primary"
+                android:indeterminateTint="@color/brand_emerald"
                 android:visibility="gone" />
 
             <!-- Social Login Divider -->
@@ -163,7 +178,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="12dp"
                     android:layout_marginEnd="12dp"
-                    android:text="OR CONTINUE WITH"
+                    android:text="@string/auth_or_continue"
                     android:textColor="@color/text_muted"
                     android:textSize="11sp"
                     android:textStyle="bold" />
@@ -187,7 +202,7 @@
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:text="Continue with Google"
+                    android:text="@string/auth_google_login"
                     android:textColor="@color/text_white"
                     android:textSize="13sp"
                     app:cornerRadius="12dp"
@@ -200,7 +215,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:layout_marginTop="8dp"
-                    android:text="Continue with GitHub"
+                    android:text="@string/auth_github_login"
                     android:textColor="@color/text_white"
                     android:textSize="13sp"
                     app:cornerRadius="12dp"
@@ -219,7 +234,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Don't have an account? "
+                    android:text="@string/auth_no_account"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
 
@@ -227,7 +242,7 @@
                     android:id="@+id/tvCreateAccount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Create Account"
+                    android:text="@string/auth_create_account"
                     android:textColor="@color/brand_cyan"
                     android:textSize="13sp"
                     android:textStyle="bold" />
@@ -235,4 +250,4 @@
         </LinearLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
-</ScrollView>
+</androidx.core.widget.NestedScrollView>

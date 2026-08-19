@@ -2,6 +2,7 @@ package com.nexa.social.data.api
 
 import com.nexa.social.data.models.ApiResponse
 import com.nexa.social.data.models.Broadcast
+import com.nexa.social.data.models.Conversation
 import com.nexa.social.data.models.MarkReadResponse
 import com.nexa.social.data.models.Message
 import com.nexa.social.data.models.SendDirectMessageRequest
@@ -12,6 +13,9 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 
 interface MessageApi {
+    @GET("conversations")
+    suspend fun getConversations(): Response<ApiResponse<List<Conversation>>>
+
     @GET("messages/{userId}")
     suspend fun getMessagesWithUser(
         @Path("userId") userId: Int

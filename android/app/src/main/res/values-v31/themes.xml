@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ (API 31+) Splash Screen theme overlay -->
+    <style name="Theme.Nexa.Splash" parent="Theme.Nexa">
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/nexa_splash_branding</item>
+    </style>
+</resources>

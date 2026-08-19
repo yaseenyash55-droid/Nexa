@@ -7,11 +7,6 @@
 -keep class com.nexa.social.data.models.** { *; }
 -keep class com.nexa.social.data.api.** { *; }
 
-# Keep WebAppInterface methods accessible from JavaScript in WebView
--keepclassmembers class com.nexa.social.utils.NexaWebAppInterface {
-    @android.webkit.JavascriptInterface <methods>;
-}
-
 # Retrofit & OkHttp
 -dontwarn retrofit2.**
 -keep class retrofit2.** { *; }

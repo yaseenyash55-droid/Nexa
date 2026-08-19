@@ -2,8 +2,8 @@ package com.nexa.social.service
 
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.nexa.social.data.models.NotificationDestination
 import com.nexa.social.utils.NotificationHelper
-import com.nexa.social.utils.UrlValidator
 
 class NexaFirebaseMessagingService : FirebaseMessagingService() {
 
@@ -24,17 +24,44 @@ class NexaFirebaseMessagingService : FirebaseMessagingService() {
             ?: remoteMessage.data["message"]
             ?: "You have a new update on Nexa."
 
-        val rawUrl = remoteMessage.data["targetUrl"]
-            ?: remoteMessage.data["url"]
-            ?: remoteMessage.data["postId"]?.let { "/post/$it" }
+        // Parse destination and validate
+        val destinationStr = remoteMessage.data["destination"]
+            ?: remoteMessage.data["type"]
+            ?: "HOME"
 
-        val targetUrl = UrlValidator.sanitizeTargetUrl(rawUrl)
+        val destination = NotificationDestination.fromString(destinationStr)
+
+        // Parse and validate resource identifiers
+        val resourceId = remoteMessage.data["resourceId"]
+            ?: remoteMessage.data["postId"]
+            ?: remoteMessage.data["userId"]
+            ?: remoteMessage.data["reelId"]
+
+        val secondaryId = remoteMessage.data["secondaryId"]
+
+        // Validation: Positive numeric IDs for relevant destinations
+        val isValid = when (destination) {
+            NotificationDestination.CHAT,
+            NotificationDestination.POST,
+            NotificationDestination.REEL -> {
+                val id = resourceId?.toIntOrNull()
+                id != null && id > 0
+            }
+            NotificationDestination.PROFILE -> !resourceId.isNullOrBlank()
+            else -> true
+        }
+
+        val safeDestination = if (isValid) destination.name else NotificationDestination.HOME.name
+        val safeResourceId = if (isValid) resourceId else null
+        val safeSecondaryId = if (isValid) secondaryId else null
 
         NotificationHelper.showNotification(
             context = applicationContext,
             title = title,
             body = body,
-            targetUrl = targetUrl
+            destination = safeDestination,
+            resourceId = safeResourceId,
+            secondaryId = safeSecondaryId
         )
     }
 }

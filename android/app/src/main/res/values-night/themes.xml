@@ -20,4 +20,12 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:navigationBarColor">@color/background_card</item>
     </style>
+
+    <!-- Splash screen theme (night mode, pre-API 31 fallback) -->
+    <style name="Theme.Nexa.Splash" parent="Theme.Nexa">
+        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:statusBarColor">@color/splash_background</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>

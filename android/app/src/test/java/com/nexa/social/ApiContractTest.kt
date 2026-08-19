@@ -8,9 +8,13 @@ import com.nexa.social.data.api.PostApi
 import com.nexa.social.data.api.UserApi
 import com.nexa.social.data.models.CreatePostRequest
 import com.nexa.social.data.models.FcmTokenRequest
+import com.nexa.social.data.models.ForgotPasswordRequest
 import com.nexa.social.data.models.LoginRequest
 import com.nexa.social.data.models.RefreshTokenRequest
+import com.nexa.social.data.models.RegisterRequest
+import com.nexa.social.data.models.ResetPasswordRequest
 import com.nexa.social.data.models.SendDirectMessageRequest
+import com.nexa.social.data.models.VerifyEmailRequest
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -187,15 +191,119 @@ class ApiContractTest {
                 .setBody(mockResponseBody)
         )
 
-        val response = authApi.login(LoginRequest(username = "tester", password = "SecretPassword123!"))
+        val response = authApi.login(LoginRequest(emailOrUsername = "tester", password = "SecretPassword123!"))
 
         val recordedRequest = mockServer.takeRequest()
         assertEquals("POST", recordedRequest.method)
         assertEquals("/auth/login", recordedRequest.path)
 
+        val requestJson = JSONObject(recordedRequest.body.readUtf8())
+        assertEquals("tester", requestJson.getString("emailOrUsername"))
+
         assertTrue(response.isSuccessful)
         assertEquals("mock.jwt.token", response.body()?.data?.accessToken)
         assertEquals(10, response.body()?.data?.user?.userId)
+    }
+
+    @Test
+    fun `auth register contract matches POST auth register`() = runBlocking {
+        val mockResponseBody = """
+            {
+                "data": {
+                    "user": {
+                        "userId": 11,
+                        "username": "newuser",
+                        "displayName": "New User",
+                        "email": "new@test.com"
+                    },
+                    "accessToken": "new.jwt.token",
+                    "refreshToken": "new.refresh.token"
+                }
+            }
+        """.trimIndent()
+
+        mockServer.enqueue(
+            MockResponse()
+                .setResponseCode(201)
+                .setHeader("Content-Type", "application/json")
+                .setBody(mockResponseBody)
+        )
+
+        val response = authApi.register(
+            RegisterRequest(
+                username = "newuser",
+                email = "new@test.com",
+                password = "SecretPassword123!",
+                displayName = "New User"
+            )
+        )
+
+        val recordedRequest = mockServer.takeRequest()
+        assertEquals("POST", recordedRequest.method)
+        assertEquals("/auth/register", recordedRequest.path)
+
+        val requestJson = JSONObject(recordedRequest.body.readUtf8())
+        assertEquals("newuser", requestJson.getString("username"))
+        assertEquals("new@test.com", requestJson.getString("email"))
+
+        assertTrue(response.isSuccessful)
+        assertEquals(11, response.body()?.data?.user?.userId)
+    }
+
+    @Test
+    fun `auth forgot password contract matches POST auth forgot-password`() = runBlocking {
+        val mockResponseBody = """
+            {
+                "message": "Reset instructions sent"
+            }
+        """.trimIndent()
+
+        mockServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(mockResponseBody)
+        )
+
+        val response = authApi.forgotPassword(ForgotPasswordRequest(email = "test@test.com"))
+
+        val recordedRequest = mockServer.takeRequest()
+        assertEquals("POST", recordedRequest.method)
+        assertEquals("/auth/forgot-password", recordedRequest.path)
+
+        val requestJson = JSONObject(recordedRequest.body.readUtf8())
+        assertEquals("test@test.com", requestJson.getString("email"))
+
+        assertTrue(response.isSuccessful)
+        assertEquals("Reset instructions sent", response.body()?.message)
+    }
+
+    @Test
+    fun `auth verify email contract matches POST auth verify-email`() = runBlocking {
+        val mockResponseBody = """
+            {
+                "message": "Email verified successfully"
+            }
+        """.trimIndent()
+
+        mockServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(mockResponseBody)
+        )
+
+        val response = authApi.verifyEmail(VerifyEmailRequest(token = "valid_token_123"))
+
+        val recordedRequest = mockServer.takeRequest()
+        assertEquals("POST", recordedRequest.method)
+        assertEquals("/auth/verify-email", recordedRequest.path)
+
+        val requestJson = JSONObject(recordedRequest.body.readUtf8())
+        assertEquals("valid_token_123", requestJson.getString("token"))
+
+        assertTrue(response.isSuccessful)
+        assertEquals("Email verified successfully", response.body()?.message)
     }
 
     @Test
