@@ -64,10 +64,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: web-and-server
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    env:
-      DB_CONNECT_STRING: ${{ secrets['TEST_ORACLE_CONNECT_STRING'] }}
-      DB_USER: ${{ secrets['TEST_ORACLE_USER'] }}
-      DB_PASSWORD: ${{ secrets['TEST_ORACLE_PASSWORD'] }}
 
     steps:
       - name: Checkout Repository
@@ -84,9 +80,17 @@ jobs:
 
       - name: Check Oracle Test Database Credentials
         id: check-creds
+        env:
+          SECRETS_CONTEXT: ${{ toJson(secrets) }}
         run: |
-          if [ -n "$DB_CONNECT_STRING" ] && [ -n "$DB_USER" ] && [ -n "$DB_PASSWORD" ]; then
+          DB_CONN=$(echo "$SECRETS_CONTEXT" | jq -r '.TEST_ORACLE_CONNECT_STRING // empty')
+          DB_USR=$(echo "$SECRETS_CONTEXT" | jq -r '.TEST_ORACLE_USER // empty')
+          DB_PWD=$(echo "$SECRETS_CONTEXT" | jq -r '.TEST_ORACLE_PASSWORD // empty')
+          if [ -n "$DB_CONN" ] && [ -n "$DB_USR" ] && [ -n "$DB_PWD" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "DB_CONNECT_STRING=$DB_CONN" >> "$GITHUB_ENV"
+            echo "DB_USER=$DB_USR" >> "$GITHUB_ENV"
+            echo "DB_PASSWORD=$DB_PWD" >> "$GITHUB_ENV"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
             echo "::warning::Oracle integration secrets are not configured. Integration tests will be explicitly skipped."
