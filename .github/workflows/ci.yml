@@ -65,14 +65,18 @@ jobs:
         run: npm ci
 
       - name: Execute Live Oracle Integration Tests
-        if: secrets.TEST_ORACLE_CONNECT_STRING != ''
-        run: npm run test:integration --workspace=server
+        run: |
+          if [ -n "$ORACLE_CONNECT_STRING" ]; then
+            npm run test:integration --workspace=server
+          else
+            echo "TEST_ORACLE_CONNECT_STRING secret is not configured. Skipping live integration tests."
+          fi
         env:
           NODE_ENV: test
           RUN_ORACLE_INTEGRATION_TESTS: 'true'
-          ORACLE_CONNECT_STRING: "${{ secrets.TEST_ORACLE_CONNECT_STRING }}"
-          ORACLE_DB_USER: "${{ secrets.TEST_ORACLE_USER }}"
-          ORACLE_DB_PASSWORD: "${{ secrets.TEST_ORACLE_PASSWORD }}"
+          ORACLE_CONNECT_STRING: ${{ secrets.TEST_ORACLE_CONNECT_STRING }}
+          ORACLE_DB_USER: ${{ secrets.TEST_ORACLE_USER }}
+          ORACLE_DB_PASSWORD: ${{ secrets.TEST_ORACLE_PASSWORD }}
           JWT_SECRET: test_jwt_secret_key_minimum_32_bytes_long_123456
           JWT_REFRESH_SECRET: test_jwt_refresh_secret_key_minimum_32_bytes_123456
           ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
