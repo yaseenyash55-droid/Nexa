@@ -65,9 +65,9 @@ jobs:
     needs: web-and-server
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     env:
-      DB_CONNECT_STRING: ${{ secrets.TEST_ORACLE_CONNECT_STRING }}
-      DB_USER: ${{ secrets.TEST_ORACLE_USER }}
-      DB_PASSWORD: ${{ secrets.TEST_ORACLE_PASSWORD }}
+      DB_CONNECT_STRING: ${{ secrets['TEST_ORACLE_CONNECT_STRING'] }}
+      DB_USER: ${{ secrets['TEST_ORACLE_USER'] }}
+      DB_PASSWORD: ${{ secrets['TEST_ORACLE_PASSWORD'] }}
 
     steps:
       - name: Checkout Repository
