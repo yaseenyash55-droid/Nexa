@@ -27,6 +27,7 @@ export async function initializeOraclePool(): Promise<void> {
     };
 
     if (env.WALLET_LOCATION) {
+      poolConfig.configDir = env.WALLET_LOCATION;
       poolConfig.walletLocation = env.WALLET_LOCATION;
       if (env.WALLET_PASSWORD) {
         poolConfig.walletPassword = env.WALLET_PASSWORD;
