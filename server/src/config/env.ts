@@ -80,25 +80,113 @@ const jwtRefreshSecret = getRequiredEnv(
 );
 
 const databaseUser = getRequiredEnv(
-  ['DB_USER', 'ORACLE_DB_USER'],
+  ['DB_USER', 'ORACLE_DB_USER', 'ORACLE_USER'],
   'DB_USER'
 );
 
 const databasePassword = getRequiredEnv(
-  ['DB_PASSWORD', 'ORACLE_DB_PASSWORD'],
+  ['DB_PASSWORD', 'ORACLE_DB_PASSWORD', 'ORACLE_PASSWORD'],
   'DB_PASSWORD'
 );
 
 const databaseConnectString = getRequiredEnv(
-  ['DB_CONNECT_STRING', 'ORACLE_DB_CONNECTION_STRING'],
+  [
+    'DB_CONNECT_STRING',
+    'ORACLE_CONNECT_STRING',
+    'ORACLE_DB_CONNECTION_STRING',
+    'ORACLE_DB_CONNECT_STRING'
+  ],
   'DB_CONNECT_STRING'
 );
 
-const walletLocation = process.env.TNS_ADMIN || process.env.ORACLE_WALLET_LOCATION || process.env.WALLET_LOCATION || '';
+const walletLocation =
+  process.env.TNS_ADMIN ||
+  process.env.ORACLE_WALLET_LOCATION ||
+  process.env.WALLET_LOCATION ||
+  process.env.WALLET_DIR ||
+  '';
 const walletPassword = process.env.WALLET_PASSWORD || '';
 
 // Validate connect string against localhost in production mode
 validateProductionConnectString(databaseConnectString, isProduction);
+
+const rawStorageProvider = (
+  process.env.STORAGE_PROVIDER ||
+  (isProduction ? 's3' : 'local')
+).toLowerCase().trim();
+
+export function normalizeStorageProvider(provider: string): 's3' | 'local' {
+  const p = provider.toLowerCase().trim();
+  if (p === 'oci_object_storage' || p === 's3_compatible' || p === 's3' || p === 'oci') {
+    return 's3';
+  }
+  return 'local';
+}
+
+const storageProvider = normalizeStorageProvider(rawStorageProvider);
+
+export function validateStorageConfiguration(
+  provider: 's3' | 'local',
+  enforceProd = isProduction
+): void {
+  if (enforceProd && provider === 'local') {
+    throw new Error(
+      '[FATAL CONFIGURATION ERROR] Local disk storage provider is not permitted in production. A persistent object storage provider (STORAGE_PROVIDER=s3) with valid endpoint, bucket, and credentials is required.'
+    );
+  }
+
+  if (provider === 's3' && enforceProd) {
+    const endpoint = process.env.S3_ENDPOINT || process.env.OCI_OBJECT_STORAGE_ENDPOINT;
+    const bucket = process.env.S3_BUCKET || process.env.OCI_BUCKET_NAME || process.env.OCI_OBJECT_STORAGE_BUCKET;
+    const accessKeyId = process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || process.env.OCI_CUSTOMER_SECRET_KEY_ID;
+    const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY || process.env.OCI_CUSTOMER_SECRET_KEY;
+
+    const missing: string[] = [];
+    if (!endpoint) missing.push('S3_ENDPOINT');
+    if (!bucket) missing.push('S3_BUCKET');
+    if (!accessKeyId) missing.push('S3_ACCESS_KEY_ID');
+    if (!secretAccessKey) missing.push('S3_SECRET_ACCESS_KEY');
+
+    if (missing.length > 0) {
+      throw new Error(
+        `[FATAL CONFIGURATION ERROR] Missing required persistent storage configuration: ${missing.join(', ')}`
+      );
+    }
+  }
+}
+
+// Run validation for storage configuration
+validateStorageConfiguration(storageProvider, isProduction);
+
+const s3Endpoint =
+  process.env.S3_ENDPOINT ||
+  process.env.OCI_OBJECT_STORAGE_ENDPOINT ||
+  '';
+
+const s3Region =
+  process.env.S3_REGION ||
+  process.env.AWS_REGION ||
+  'us-ashburn-1';
+
+const s3Bucket =
+  process.env.S3_BUCKET ||
+  process.env.OCI_BUCKET_NAME ||
+  process.env.OCI_OBJECT_STORAGE_BUCKET ||
+  '';
+
+const s3AccessKeyId =
+  process.env.S3_ACCESS_KEY_ID ||
+  process.env.AWS_ACCESS_KEY_ID ||
+  process.env.OCI_CUSTOMER_SECRET_KEY_ID ||
+  '';
+
+const s3SecretAccessKey =
+  process.env.S3_SECRET_ACCESS_KEY ||
+  process.env.AWS_SECRET_ACCESS_KEY ||
+  process.env.OCI_CUSTOMER_SECRET_KEY ||
+  '';
+
+const cdnBaseUrl = process.env.CDN_BASE_URL || '';
 
 export const env = {
   NODE_ENV: nodeEnv,
@@ -114,6 +202,9 @@ export const env = {
   DB_PASSWORD: databasePassword,
   DB_CONNECT_STRING: databaseConnectString,
 
+  ORACLE_USER: databaseUser,
+  ORACLE_PASSWORD: databasePassword,
+  ORACLE_CONNECT_STRING: databaseConnectString,
   ORACLE_DB_USER: databaseUser,
   ORACLE_DB_PASSWORD: databasePassword,
   ORACLE_DB_CONNECTION_STRING: databaseConnectString,
@@ -134,6 +225,14 @@ export const env = {
 
   COOKIE_SECURE:
     isProduction || process.env.COOKIE_SECURE === 'true',
+
+  STORAGE_PROVIDER: storageProvider,
+  S3_ENDPOINT: s3Endpoint,
+  S3_REGION: s3Region,
+  S3_BUCKET: s3Bucket,
+  S3_ACCESS_KEY_ID: s3AccessKeyId,
+  S3_SECRET_ACCESS_KEY: s3SecretAccessKey,
+  CDN_BASE_URL: cdnBaseUrl,
 
   DATA_SOURCE: 'oracle' as const,
   USE_MOCK_DATA: false

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import supertest from 'supertest';
 import { app } from '../src/app.js';
 import {
@@ -6,6 +6,7 @@ import {
   getRequiredEnv,
   getPositiveInteger
 } from '../src/config/env.js';
+import * as poolModule from '../src/db/pool.js';
 
 describe('Oracle Configuration and Production Environment Security', () => {
   const request = supertest(app);
@@ -58,7 +59,7 @@ describe('Oracle Configuration and Production Environment Security', () => {
     });
   });
 
-  describe('Required Environment Variable Validation', () => {
+  describe('Required Environment Variable Validation & Aliases', () => {
     it('throws fatal configuration error when required variable is missing in production', () => {
       expect(() => {
         getRequiredEnv(['NON_EXISTENT_VAR_1', 'NON_EXISTENT_VAR_2'], 'TEST_VAR', true);
@@ -70,15 +71,29 @@ describe('Oracle Configuration and Production Environment Security', () => {
       expect(val).toBe('');
     });
 
-    it('resolves alias keys in priority order', () => {
-      process.env.TEST_PRIMARY_KEY = 'primary_val';
-      process.env.TEST_SECONDARY_KEY = 'secondary_val';
+    it('resolves alias keys in priority order (canonical DB_USER over ORACLE_DB_USER)', () => {
+      process.env.DB_USER = 'canonical_user';
+      process.env.ORACLE_DB_USER = 'alias_user';
 
-      const resolved = getRequiredEnv(['TEST_PRIMARY_KEY', 'TEST_SECONDARY_KEY'], 'TEST', true);
-      expect(resolved).toBe('primary_val');
+      const resolved = getRequiredEnv(['DB_USER', 'ORACLE_DB_USER', 'ORACLE_USER'], 'DB_USER', true);
+      expect(resolved).toBe('canonical_user');
 
-      delete process.env.TEST_PRIMARY_KEY;
-      delete process.env.TEST_SECONDARY_KEY;
+      delete process.env.DB_USER;
+      delete process.env.ORACLE_DB_USER;
+    });
+
+    it('resolves fallback alias if canonical key is omitted (ORACLE_CONNECT_STRING)', () => {
+      delete process.env.DB_CONNECT_STRING;
+      process.env.ORACLE_CONNECT_STRING = 'remote-oracle.db.com:1522/SERVICE';
+
+      const resolved = getRequiredEnv(
+        ['DB_CONNECT_STRING', 'ORACLE_CONNECT_STRING', 'ORACLE_DB_CONNECTION_STRING'],
+        'DB_CONNECT_STRING',
+        true
+      );
+      expect(resolved).toBe('remote-oracle.db.com:1522/SERVICE');
+
+      delete process.env.ORACLE_CONNECT_STRING;
     });
 
     it('validates positive integers properly', () => {
@@ -90,6 +105,12 @@ describe('Oracle Configuration and Production Environment Security', () => {
 
       delete process.env.TEST_INT;
     });
+
+    it('sanitizes Oracle connection strings to scrub embedded passwords', () => {
+      const sanitized = poolModule.sanitizeConnectString('user:superSecretPassword@db.cloud.oracle.com:1522/PROD');
+      expect(sanitized).toBe('user:***@db.cloud.oracle.com:1522/PROD');
+      expect(sanitized).not.toContain('superSecretPassword');
+    });
   });
 
   describe('Sanitized Health Responses (No Information Leakage)', () => {
@@ -100,7 +121,9 @@ describe('Oracle Configuration and Production Environment Security', () => {
       expect(response.body.data.status).toBe('degraded');
       expect(response.body.data.mode).toBe('oracle');
       expect(response.body.data.database.reachable).toBe(false);
+      expect(response.body.data.database.status).toBe('unreachable');
       expect(response.body.data.database.details).toBe('Database unreachable');
+      expect(response.body.data.timestamp).toBeDefined();
 
       // Ensure no internal errors, credentials, hosts or ports are exposed
       const bodyStr = JSON.stringify(response.body);
@@ -113,13 +136,52 @@ describe('Oracle Configuration and Production Environment Security', () => {
       expect(bodyStr).not.toContain('password');
     });
 
-    it('returns sanitized readiness probe without stack trace', async () => {
+    it('returns sanitized readiness probe without stack trace when unready', async () => {
       const response = await request.get('/api/health/ready');
 
       expect(response.status).toBe(503);
       expect(response.body.data.status).toBe('unready');
-      expect(response.body.data.database).toBe('unreachable');
+      expect(response.body.data.mode).toBe('oracle');
+      expect(response.body.data.database.reachable).toBe(false);
+      expect(response.body.data.database.status).toBe('unreachable');
       expect(response.body.stack).toBeUndefined();
+    });
+
+    it('returns sanitized HTTP 200 response when Oracle is healthy', async () => {
+      const checkSpy = vi.spyOn(poolModule, 'checkOracleHealth').mockResolvedValueOnce({
+        reachable: true,
+        details: 'Connected'
+      });
+
+      const response = await request.get('/api/health');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.status).toBe('ok');
+      expect(response.body.data.mode).toBe('oracle');
+      expect(response.body.data.database.reachable).toBe(true);
+      expect(response.body.data.database.status).toBe('connected');
+      expect(response.body.data.database.details).toBe('Connected');
+      expect(response.body.data.timestamp).toBeDefined();
+
+      checkSpy.mockRestore();
+    });
+
+    it('returns sanitized HTTP 200 for readiness probe when Oracle is healthy', async () => {
+      const checkSpy = vi.spyOn(poolModule, 'checkOracleHealth').mockResolvedValueOnce({
+        reachable: true,
+        details: 'Connected'
+      });
+
+      const response = await request.get('/api/health/ready');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.status).toBe('ready');
+      expect(response.body.data.mode).toBe('oracle');
+      expect(response.body.data.database.reachable).toBe(true);
+      expect(response.body.data.database.status).toBe('connected');
+      expect(response.body.data.timestamp).toBeDefined();
+
+      checkSpy.mockRestore();
     });
   });
 });

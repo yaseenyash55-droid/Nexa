@@ -10,6 +10,7 @@ import { postsApi } from '../../api/posts.api.js';
 import { CommentList } from './CommentList.js';
 import { MediaPreviewModal } from '../ui/MediaPreviewModal.js';
 import { PostOptionsModal } from './PostOptionsModal.js';
+import { ReportModal } from '../ui/ReportModal.js';
 import { getMediaUrl, handleImageError } from '../../utils/media.js';
 
 interface PostCardProps {
@@ -22,6 +23,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const [showComments, setShowComments] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
 
   // Optimistic like state
@@ -92,10 +94,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const canDelete =
     Boolean(currentUser) &&
     (currentUser?.userId === post.userId ||
-      currentUser?.username === post.author.username ||
-      currentUser?.username === 'vash_ofzl' ||
-      currentUser?.username === 'leon_yash_8763' ||
-      Boolean(currentUser?.email && (currentUser.email.includes('yash') || currentUser.email.includes('yaseen'))));
+      currentUser?.role === 'ADMIN' ||
+      currentUser?.role === 'MODERATOR');
 
   const createdDate = post.createdAt ? new Date(post.createdAt) : new Date();
   const resolvedImageUrl = getMediaUrl(post.imageUrl);
@@ -243,7 +243,16 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
         canEdit={canDelete}
         onDelete={() => deleteMutation.mutate()}
         onSaveEdit={(data) => updatePostMutation.mutate(data)}
+        onReport={() => setIsReportOpen(true)}
         isSaving={updatePostMutation.isPending}
+      />
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        targetType="post"
+        targetId={post.postId}
       />
     </article>
   );

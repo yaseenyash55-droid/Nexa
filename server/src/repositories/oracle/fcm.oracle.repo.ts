@@ -1,5 +1,5 @@
 import { IFcmTokenRepository } from '../types.js';
-import { executeSql, getConnection } from '../../db/pool.js';
+import { executeSql } from '../../db/pool.js';
 import { logger } from '../../utils/logger.js';
 
 export class OracleFcmTokenRepository implements IFcmTokenRepository {

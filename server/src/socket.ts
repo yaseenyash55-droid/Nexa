@@ -1,4 +1,3 @@
-import { Server as HttpServer } from 'http';
 import { verifyAccessToken } from './utils/jwt.js';
 import { getMessageRepository } from './repositories/factory.js';
 
@@ -91,6 +90,19 @@ export class NexaRealtimeServer {
     });
     this.emitToUser(receiverId, 'message:created', msg);
     return msg;
+  }
+
+  public async handleMessageRead(messageId: number, receiverUserId: number) {
+    if (!messageId || isNaN(messageId)) return;
+    const repo = getMessageRepository();
+    const result = await repo.markMessageAsRead(messageId, receiverUserId);
+    if (result.rowsAffected > 0 && result.senderId) {
+      this.emitToUser(result.senderId, 'message:read', {
+        messageId,
+        readAt: result.readAt ? result.readAt.toISOString() : new Date().toISOString(),
+        readByUserId: receiverUserId
+      });
+    }
   }
 }
 

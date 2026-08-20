@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Modal } from './Modal.js';
 import { Button } from './Button.js';
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react';
+import { privacyApi } from '../../api/privacy.api.js';
 
 interface ReportModalProps {
   isOpen: boolean;
@@ -15,19 +16,38 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
   const [details, setDetails] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    const numericTargetId = Number(targetId);
+    if (!numericTargetId || isNaN(numericTargetId)) {
+      setErrorMessage('Invalid target identifier for reporting.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setErrorMessage(null);
+      await privacyApi.submitReport({
+        targetType,
+        targetId: numericTargetId,
+        reason,
+        details: details.trim() || undefined
+      });
       setIsSubmitted(true);
-    }, 500);
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.message || 'Failed to submit report. Please try again.';
+      setErrorMessage(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClose = () => {
     setIsSubmitted(false);
     setDetails('');
+    setErrorMessage(null);
     onClose();
   };
 
@@ -38,7 +58,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
           <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
           <h3 className="text-base font-bold text-white">Report Submitted</h3>
           <p className="text-xs text-slate-300 max-w-xs mx-auto">
-            Thank you for helping keep Nexa safe. Our moderation team will review this report within 24 hours.
+            Thank you for helping keep Nexa safe. Your report has been recorded in our moderation queue and will be reviewed by administrators.
           </p>
           <Button size="sm" onClick={handleClose}>
             Done
@@ -50,6 +70,13 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>Reports are confidential. The account user will not be notified of who reported them.</span>
           </div>
+
+          {errorMessage && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">

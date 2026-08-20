@@ -186,3 +186,25 @@ data class DisplayMessage(
     val isSelf: Boolean,
     val timestamp: String?
 )
+
+data class Comment(
+    @SerializedName("commentId") val commentId: Int,
+    @SerializedName("postId") val postId: Int,
+    @SerializedName("userId") val userId: Int,
+    @SerializedName("content") val content: String,
+    @SerializedName("createdAt") val createdAt: String?,
+    @SerializedName("author") val author: User? = null
+)
+
+data class CreateCommentRequest(
+    @SerializedName("content") val content: String
+)
+
+data class UpdateProfileRequest(
+    @SerializedName("displayName") val displayName: String?,
+    @SerializedName("bio") val bio: String? = null,
+    @SerializedName("location") val location: String? = null,
+    @SerializedName("websiteUrl") val websiteUrl: String? = null,
+    @SerializedName("profileImageUrl") val profileImageUrl: String? = null,
+    @SerializedName("coverImageUrl") val coverImageUrl: String? = null
+)

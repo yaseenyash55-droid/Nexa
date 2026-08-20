@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AppShell } from '../components/layout/AppShell.js';
 import { DrDoomOrbLogo } from '../components/ui/DrDoomOrbLogo.js';
-import { BookOpen, Search, UserPlus, Edit3, MessageSquare, ShieldCheck, Smartphone, ChevronDown, ChevronUp, ArrowRight, Users, CheckCircle2, Camera, Video, Film } from 'lucide-react';
+import { BookOpen, Search, UserPlus, Edit3, MessageSquare, ShieldCheck, Smartphone, ChevronDown, ChevronUp, ArrowRight, Users, CheckCircle2, Camera, Video } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface ManualSection {
@@ -246,8 +246,8 @@ export const UserManualPage: React.FC = () => {
           desc: 'Integrates `io.socket:socket.io-client:2.1.1` with JWT token handshake authentication for real-time messages.'
         },
         {
-          title: 'Step 3: Native E2EE Cryptography',
-          desc: 'Uses native Java `javax.crypto.Cipher` (AES-256-GCM + PBKDF2 100,000 iterations) fully compatible with the web app.'
+          title: 'Step 3: Secure Mobile Communications',
+          desc: 'Transmits all messages over TLS-encrypted WebSocket and HTTPS channels with local Keystore credential security.'
         },
         {
           title: 'Step 4: Network Callback Offline Detection',
@@ -269,7 +269,7 @@ export const UserManualPage: React.FC = () => {
               <BookOpen className="w-4 h-4" /> Nexa User Manual & Project Viva Guide
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Nexa Project User Manual</h1>
-            <p className="text-sm text-slate-300 leading-relaxed">Learn how to use Nexa step by step. Explore guides on account setup, Instagram profile uploads, progress-tracked media streaming, short Reels vs Long Videos, 256-bit AES-GCM encrypted messaging, group chats, broadcasts, and the Android mobile app.</p>
+            <p className="text-sm text-slate-300 leading-relaxed">Learn how to use Nexa step by step. Explore guides on account setup, Instagram profile uploads, progress-tracked media streaming, short Reels vs Long Videos, TLS-encrypted messaging, group chats, broadcasts, and the Android mobile app.</p>
 
             {/* Search Box */}
             <div className="relative max-w-md pt-2">

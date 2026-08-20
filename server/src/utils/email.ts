@@ -20,7 +20,7 @@ export class FakeEmailProvider implements IEmailProvider {
 }
 
 export class ProductionEmailProvider implements IEmailProvider {
-  async sendEmail(message: EmailMessage): Promise<boolean> {
+  async sendEmail(_message: EmailMessage): Promise<boolean> {
     if (!process.env.SMTP_HOST) {
       throw new Error('Production email provider is not configured. Email delivery failed closed.');
     }

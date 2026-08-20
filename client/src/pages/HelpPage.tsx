@@ -7,15 +7,11 @@ import {
   Edit3, 
   MessageSquare, 
   ShieldCheck, 
-  Smartphone, 
-  ArrowRight, 
-  Users, 
-  Radio, 
-  Lock, 
-  CheckCircle2, 
-  Heart, 
-  Bookmark, 
-  Bell 
+  Smartphone,
+  ArrowRight,
+  Users,
+  Radio,
+  CheckCircle2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -28,7 +24,7 @@ export const HelpPage: React.FC = () => {
     { id: 'all', label: 'All Guides' },
     { id: 'getting-started', label: '🚀 Getting Started' },
     { id: 'messaging', label: '💬 Messages & Groups' },
-    { id: 'security', label: '🔒 E2EE & Security' },
+    { id: 'security', label: '🔒 Privacy & Security' },
     { id: 'android', label: '📱 Android Mobile App' }
   ];
 
@@ -68,15 +64,15 @@ export const HelpPage: React.FC = () => {
     {
       id: 'direct-messages',
       category: 'messaging',
-      title: '1-on-1 End-to-End Encrypted Messages',
+      title: '1-on-1 Direct Messages',
       icon: MessageSquare,
       color: 'text-emerald-400',
       bg: 'bg-emerald-500/10 border-emerald-500/20',
       steps: [
         'Open the Messages tab from the sidebar navigation.',
         'Select any contact to open a private direct chat channel.',
-        'All direct messages are automatically encrypted in your browser using 256-bit AES-GCM before transmission.',
-        'Green lock icons signify verified End-to-End Encryption.'
+        'All direct messages are transmitted securely over TLS (HTTPS and WSS) connections.',
+        'Real-time typing indicators and read receipts keep your conversations synchronized.'
       ],
       actionText: 'Open Messages',
       actionTarget: '/messages'
@@ -114,17 +110,17 @@ export const HelpPage: React.FC = () => {
       actionTarget: '/messages'
     },
     {
-      id: 'e2ee-explained',
+      id: 'privacy-explained',
       category: 'security',
-      title: 'How Privacy & E2EE Work in Nexa',
+      title: 'How Privacy & Security Work in Nexa',
       icon: ShieldCheck,
       color: 'text-emerald-400',
       bg: 'bg-emerald-500/10 border-emerald-500/20',
       steps: [
-        'Nexa uses Web Crypto API (`window.crypto.subtle`) directly in your web browser or Android app.',
-        'Cryptographic keys are derived locally using PBKDF2 with HMAC-SHA-256 (100,000 iterations).',
-        'Message text is converted into ciphertext `E2EE::<iv>::<cipher>` before leaving your device.',
-        'Neither the database nor server administrators can read your encrypted chat content.'
+        'All communication between client apps and backend APIs is protected by TLS 1.3 encryption in transit.',
+        'Authentication uses short-lived in-memory access tokens and secure HTTP-only cookies.',
+        'Account privacy controls allow you to switch to a private profile, restrict messaging, and manage hidden words.',
+        'All application state is securely stored and audited in enterprise Oracle Database tables.'
       ],
       actionText: 'Security Settings',
       actionTarget: '/settings'
@@ -138,12 +134,12 @@ export const HelpPage: React.FC = () => {
       bg: 'bg-purple-500/10 border-purple-500/20',
       steps: [
         'Enjoy native Android bottom navigation across Home, Explore, Messages, Reels, and Profile.',
-        'Real-time push notifications keep you updated when new messages arrive.',
-        'Integrated offline banner alerts you when network connectivity drops.',
-        'Native camera & gallery integration for seamless media creation.'
+        'Secure credentials are encrypted locally using Android Keystore and EncryptedSharedPreferences.',
+        'Receive instant real-time message delivery and typing indicators over WebSocket.',
+        'Explore reels, stories, and global trends on any Android device.'
       ],
-      actionText: 'Explore Mobile Features',
-      actionTarget: '/'
+      actionText: 'Download APK',
+      actionTarget: '/settings'
     }
   ];
 
@@ -167,7 +163,7 @@ export const HelpPage: React.FC = () => {
             How Nexa Works: Interactive User Guide
           </h1>
           <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">
-            Welcome to Nexa Social! Learn how to share updates, send end-to-end encrypted direct messages, manage group chats, dispatch broadcasts, and use our Android mobile app.
+            Welcome to Nexa Social! Learn how to share updates, send secure direct messages, manage group chats, dispatch broadcasts, and use our Android mobile app.
           </p>
 
           {/* Search Box */}

@@ -38,13 +38,28 @@ class HomeFragment : Fragment() {
                 viewModel.toggleLike(post)
             },
             onCommentClick = { post ->
-                Toast.makeText(context, "Comments (${post.commentsCount}) for @${post.author.username}'s post", Toast.LENGTH_SHORT).show()
+                val dialog = com.nexa.social.ui.CommentsBottomSheetDialogFragment.newInstance(post.postId)
+                dialog.show(childFragmentManager, "comments_dialog")
             },
             onBookmarkClick = { post ->
                 viewModel.toggleBookmark(post)
             }
         )
         binding.rvFeed.adapter = postAdapter
+
+        binding.rvFeed.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+                if (dy > 0) {
+                    val layoutManager = recyclerView.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+                    val totalItemCount = layoutManager?.itemCount ?: 0
+                    val lastVisibleItem = layoutManager?.findLastVisibleItemPosition() ?: 0
+                    if (totalItemCount > 0 && lastVisibleItem >= totalItemCount - 4) {
+                        viewModel.loadFeed(isLoadMore = true)
+                    }
+                }
+            }
+        })
     }
 
     private fun setupSwipeRefresh() {
@@ -67,11 +82,21 @@ class HomeFragment : Fragment() {
                         binding.tvError.visibility = View.GONE
                         postAdapter.submitList(state.posts)
                     }
+                    is HomeUiState.Empty -> {
+                        binding.progressBar.visibility = View.GONE
+                        binding.swipeRefresh.isRefreshing = false
+                        binding.tvError.visibility = View.VISIBLE
+                        binding.tvError.text = "No posts yet. Follow people or create a post to get started!"
+                        postAdapter.submitList(emptyList())
+                    }
                     is HomeUiState.Error -> {
                         binding.progressBar.visibility = View.GONE
                         binding.swipeRefresh.isRefreshing = false
                         binding.tvError.visibility = View.VISIBLE
-                        binding.tvError.text = state.message
+                        binding.tvError.text = "${state.message}\nTap to retry"
+                        binding.tvError.setOnClickListener {
+                            viewModel.loadFeed(isRefresh = true)
+                        }
                     }
                 }
             }

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppShell } from '../components/layout/AppShell.js';
 import { Palette, Eye, Sparkles, Check } from 'lucide-react';
-import { Button } from '../components/ui/Button.js';
 
 export const AppearanceSettingsPage: React.FC = () => {
   const [theme, setTheme] = useState<'aurora-dark' | 'midnight-dark' | 'aurora-light'>('aurora-dark');

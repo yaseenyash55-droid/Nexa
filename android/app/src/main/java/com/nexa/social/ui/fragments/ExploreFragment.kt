@@ -41,12 +41,12 @@ class ExploreFragment : Fragment() {
 
     private fun setupRecyclerView() {
         userAdapter = UserAdapter { user ->
-            val bundle = Bundle().apply {
-                putString("username", user.username)
-            }
-            try {
+            if (user.username.isNotBlank()) {
+                val bundle = Bundle().apply {
+                    putString("username", user.username)
+                }
                 findNavController().navigate(R.id.navigation_profile, bundle)
-            } catch (_: Exception) {}
+            }
         }
         binding.rvResults.adapter = userAdapter
     }
@@ -82,17 +82,28 @@ class ExploreFragment : Fragment() {
                 when (state) {
                     is ExploreUiState.Idle -> {
                         binding.progressBar.visibility = View.GONE
+                        binding.tvStatusMessage.visibility = View.VISIBLE
+                        binding.tvStatusMessage.text = "Search for Nexa creators, friends and topics."
                         userAdapter.submitList(emptyList())
                     }
                     is ExploreUiState.Loading -> {
                         binding.progressBar.visibility = View.VISIBLE
+                        binding.tvStatusMessage.visibility = View.GONE
                     }
                     is ExploreUiState.Success -> {
                         binding.progressBar.visibility = View.GONE
                         userAdapter.submitList(state.users)
+                        if (state.users.isEmpty()) {
+                            binding.tvStatusMessage.visibility = View.VISIBLE
+                            binding.tvStatusMessage.text = "No users found matching your search."
+                        } else {
+                            binding.tvStatusMessage.visibility = View.GONE
+                        }
                     }
                     is ExploreUiState.Error -> {
                         binding.progressBar.visibility = View.GONE
+                        binding.tvStatusMessage.visibility = View.VISIBLE
+                        binding.tvStatusMessage.text = state.message
                     }
                 }
             }

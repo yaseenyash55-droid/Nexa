@@ -11,7 +11,8 @@ import kotlinx.coroutines.launch
 
 sealed class ReelsUiState {
     object Loading : ReelsUiState()
-    data class Success(val reels: List<Reel>) : ReelsUiState()
+    data class Success(val reels: List<Reel>, val hasMore: Boolean = true) : ReelsUiState()
+    object Empty : ReelsUiState()
     data class Error(val message: String) : ReelsUiState()
 }
 
@@ -21,20 +22,42 @@ class ReelsViewModel(private val repository: PostRepository = PostRepository()) 
     val uiState: StateFlow<ReelsUiState> = _uiState.asStateFlow()
 
     private var currentReels: MutableList<Reel> = mutableListOf()
+    private var currentOffset: Int = 0
+    private var isLoadingMore: Boolean = false
+    private val pageSize: Int = 20
 
     init {
         loadReels()
     }
 
-    fun loadReels(isRefresh: Boolean = false) {
+    fun loadReels(isRefresh: Boolean = false, isLoadMore: Boolean = false) {
+        if (isLoadMore && (isLoadingMore || _uiState.value is ReelsUiState.Loading)) return
+
         viewModelScope.launch {
-            if (!isRefresh && currentReels.isEmpty()) {
+            if (isRefresh) {
+                currentOffset = 0
+            } else if (isLoadMore) {
+                isLoadingMore = true
+            } else if (currentReels.isEmpty()) {
                 _uiState.value = ReelsUiState.Loading
             }
-            repository.getReels().onSuccess { reels ->
-                currentReels = reels.toMutableList()
-                _uiState.value = ReelsUiState.Success(currentReels.toList())
+
+            repository.getReels(limit = pageSize, offset = if (isLoadMore) currentOffset else 0).onSuccess { reels ->
+                if (isRefresh || !isLoadMore) {
+                    currentReels = reels.toMutableList()
+                    currentOffset = reels.size
+                } else {
+                    currentReels.addAll(reels)
+                    currentOffset += reels.size
+                }
+                isLoadingMore = false
+                if (currentReels.isEmpty()) {
+                    _uiState.value = ReelsUiState.Empty
+                } else {
+                    _uiState.value = ReelsUiState.Success(currentReels.toList(), hasMore = reels.size >= pageSize)
+                }
             }.onFailure { exception ->
+                isLoadingMore = false
                 if (currentReels.isEmpty()) {
                     _uiState.value = ReelsUiState.Error(exception.message ?: "Failed to load reels")
                 }

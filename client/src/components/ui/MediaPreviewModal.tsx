@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ZoomIn, ZoomOut, Download, Maximize2, RotateCcw } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Download, RotateCcw } from 'lucide-react';
 import { Avatar } from './Avatar.js';
 
 interface MediaPreviewModalProps {
@@ -22,7 +22,6 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
   caption
 }) => {
   const [zoom, setZoom] = useState(1);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

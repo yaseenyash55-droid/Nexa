@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { AppShell } from '../components/layout/AppShell.js';
-import { useAuth } from '../contexts/AuthContext.js';
 import { 
   ShieldCheck, 
   KeyRound, 
   Smartphone, 
-  UserX, 
   Filter, 
   Moon, 
-  AlertTriangle, 
   Check, 
   Lock, 
   Sparkles,
@@ -30,7 +27,6 @@ interface SessionItem {
 }
 
 export const ProtectionCenterPage: React.FC = () => {
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'security' | 'privacy' | 'moderation' | 'wellbeing'>('security');
 
   // Security Status & Sessions from backend

@@ -1,8 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import http from 'http';
-import https from 'https';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '../config/env.js';
 
 export type UploadKind = 'avatar' | 'photo' | 'story' | 'reel' | 'video' | 'chat';
@@ -51,6 +56,7 @@ export interface IMediaStorageProvider {
   ): Promise<MediaAssetMetadata>;
   deleteMedia(storageKey: string): Promise<boolean>;
   cleanupOrphans(maxAgeMs?: number): Promise<number>;
+  getSignedDeliveryUrl?(storageKey: string, expiresInSeconds?: number): Promise<string>;
 }
 
 export class LocalDiskMediaStorageProvider implements IMediaStorageProvider {
@@ -58,6 +64,11 @@ export class LocalDiskMediaStorageProvider implements IMediaStorageProvider {
   private tmpDir: string;
 
   constructor() {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        '[FATAL CONFIGURATION ERROR] LocalDiskMediaStorageProvider cannot be instantiated in production.'
+      );
+    }
     this.uploadsDir = path.resolve(process.cwd(), 'uploads');
     this.tmpDir = path.join(this.uploadsDir, '.tmp');
     if (!fs.existsSync(this.uploadsDir)) {
@@ -139,27 +150,56 @@ export class LocalDiskMediaStorageProvider implements IMediaStorageProvider {
   }
 }
 
+export interface S3StorageConfig {
+  endpoint?: string;
+  bucket?: string;
+  region?: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  cdnBaseUrl?: string;
+  s3Client?: S3Client;
+}
+
 export class S3CompatibleMediaStorageProvider implements IMediaStorageProvider {
   private endpoint: string;
   private bucket: string;
   private region: string;
   private accessKeyId: string;
   private secretAccessKey: string;
-  private fallbackLocal: LocalDiskMediaStorageProvider;
+  private cdnBaseUrl: string;
+  private s3Client: S3Client;
+  private tmpDir: string;
 
-  constructor(config: {
-    endpoint?: string;
-    bucket?: string;
-    region?: string;
-    accessKeyId?: string;
-    secretAccessKey?: string;
-  }) {
-    this.endpoint = config.endpoint || process.env.S3_ENDPOINT || process.env.OCI_OBJECT_STORAGE_ENDPOINT || '';
-    this.bucket = config.bucket || process.env.S3_BUCKET || process.env.OCI_BUCKET_NAME || '';
-    this.region = config.region || process.env.S3_REGION || 'us-ashburn-1';
-    this.accessKeyId = config.accessKeyId || process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || '';
-    this.secretAccessKey = config.secretAccessKey || process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY || '';
-    this.fallbackLocal = new LocalDiskMediaStorageProvider();
+  constructor(config: S3StorageConfig = {}) {
+    this.endpoint = config.endpoint || env.S3_ENDPOINT || process.env.S3_ENDPOINT || process.env.OCI_OBJECT_STORAGE_ENDPOINT || '';
+    this.bucket = config.bucket || env.S3_BUCKET || process.env.S3_BUCKET || process.env.OCI_BUCKET_NAME || '';
+    this.region = config.region || env.S3_REGION || process.env.S3_REGION || 'us-ashburn-1';
+    this.accessKeyId = config.accessKeyId || env.S3_ACCESS_KEY_ID || process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || '';
+    this.secretAccessKey = config.secretAccessKey || env.S3_SECRET_ACCESS_KEY || process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY || '';
+    this.cdnBaseUrl = config.cdnBaseUrl || env.CDN_BASE_URL || process.env.CDN_BASE_URL || '';
+
+    if (config.s3Client) {
+      this.s3Client = config.s3Client;
+    } else {
+      this.s3Client = new S3Client({
+        endpoint: this.endpoint || undefined,
+        region: this.region,
+        credentials: {
+          accessKeyId: this.accessKeyId,
+          secretAccessKey: this.secretAccessKey
+        },
+        forcePathStyle: true
+      });
+    }
+
+    this.tmpDir = path.resolve(process.cwd(), 'uploads', '.tmp');
+    if (!fs.existsSync(this.tmpDir)) {
+      try {
+        fs.mkdirSync(this.tmpDir, { recursive: true });
+      } catch {
+        // Ignore directory creation errors if read-only filesystem
+      }
+    }
   }
 
   async storeMedia(
@@ -170,7 +210,9 @@ export class S3CompatibleMediaStorageProvider implements IMediaStorageProvider {
     kind: UploadKind
   ): Promise<MediaAssetMetadata> {
     if (!this.bucket || !this.endpoint) {
-      return this.fallbackLocal.storeMedia(tempFilePath, originalName, mimeType, userId, kind);
+      throw new Error(
+        '[STORAGE ERROR] Persistent S3/OCI storage is missing required endpoint or bucket configuration'
+      );
     }
 
     const assetId = crypto.randomUUID();
@@ -180,39 +222,28 @@ export class S3CompatibleMediaStorageProvider implements IMediaStorageProvider {
     const fileStream = fs.createReadStream(tempFilePath);
     const stats = await fs.promises.stat(tempFilePath);
 
-    // Stream file to S3-compatible endpoint via HTTP/HTTPS PUT
-    await new Promise<void>((resolve, reject) => {
-      const url = new URL(`${this.endpoint.replace(/\/$/, '')}/${this.bucket}/${storageKey}`);
-      const isHttps = url.protocol === 'https:';
-      const client = isHttps ? https : http;
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: storageKey,
+        Body: fileStream,
+        ContentType: mimeType,
+        ContentLength: stats.size
+      });
 
-      const req = client.request(
-        url,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': mimeType,
-            'Content-Length': stats.size,
-            'x-amz-acl': 'public-read'
-          }
-        },
-        (res) => {
-          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-            resolve();
-          } else {
-            reject(new Error(`S3 upload failed with HTTP status ${res.statusCode}`));
-          }
-        }
-      );
-
-      req.on('error', (err) => reject(err));
-      fileStream.pipe(req);
-    }).finally(async () => {
-      // Remove local temp file after streaming to S3
+      await this.s3Client.send(command);
+    } finally {
+      // Always remove local temp file after streaming upload
       await fs.promises.unlink(tempFilePath).catch(() => undefined);
-    });
+    }
 
-    const publicUrl = `${this.endpoint.replace(/\/$/, '')}/${this.bucket}/${storageKey}`;
+    let publicUrl: string;
+    if (this.cdnBaseUrl) {
+      publicUrl = `${this.cdnBaseUrl.replace(/\/$/, '')}/${storageKey}`;
+    } else {
+      publicUrl = `${this.endpoint.replace(/\/$/, '')}/${this.bucket}/${storageKey}`;
+    }
+
     const mediaType = mimeType.startsWith('video/') ? 'video' : 'image';
 
     return {
@@ -228,29 +259,53 @@ export class S3CompatibleMediaStorageProvider implements IMediaStorageProvider {
     };
   }
 
+  async getSignedDeliveryUrl(storageKey: string, expiresInSeconds = 3600): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: storageKey
+    });
+    return getSignedUrl(this.s3Client, command, { expiresIn: expiresInSeconds });
+  }
+
   async deleteMedia(storageKey: string): Promise<boolean> {
-    if (!this.bucket || !this.endpoint) {
-      return this.fallbackLocal.deleteMedia(storageKey);
+    if (!this.bucket) {
+      return false;
     }
     try {
-      const url = new URL(`${this.endpoint.replace(/\/$/, '')}/${this.bucket}/${storageKey}`);
-      const isHttps = url.protocol === 'https:';
-      const client = isHttps ? https : http;
-
-      return await new Promise<boolean>((resolve) => {
-        const req = client.request(url, { method: 'DELETE' }, (res) => {
-          resolve(Boolean(res.statusCode && res.statusCode >= 200 && res.statusCode < 300));
-        });
-        req.on('error', () => resolve(false));
-        req.end();
+      const command = new DeleteObjectCommand({
+        Bucket: this.bucket,
+        Key: storageKey
       });
+      await this.s3Client.send(command);
+      return true;
     } catch {
       return false;
     }
   }
 
-  async cleanupOrphans(maxAgeMs?: number): Promise<number> {
-    return this.fallbackLocal.cleanupOrphans(maxAgeMs);
+  async cleanupOrphans(maxAgeMs = 60 * 60 * 1000): Promise<number> {
+    let cleaned = 0;
+    try {
+      if (!fs.existsSync(this.tmpDir)) return 0;
+      const files = await fs.promises.readdir(this.tmpDir);
+      const cutoff = Date.now() - maxAgeMs;
+
+      for (const file of files) {
+        const filePath = path.join(this.tmpDir, file);
+        try {
+          const stats = await fs.promises.stat(filePath);
+          if (stats.mtimeMs < cutoff) {
+            await fs.promises.unlink(filePath);
+            cleaned++;
+          }
+        } catch {
+          // ignore individual unlink errors
+        }
+      }
+    } catch {
+      // ignore directory errors
+    }
+    return cleaned;
   }
 }
 
@@ -259,15 +314,16 @@ let activeStorageProvider: IMediaStorageProvider | null = null;
 export function getMediaStorageProvider(): IMediaStorageProvider {
   if (activeStorageProvider) return activeStorageProvider;
 
-  const s3Endpoint = process.env.S3_ENDPOINT || process.env.OCI_OBJECT_STORAGE_ENDPOINT;
-  const s3Bucket = process.env.S3_BUCKET || process.env.OCI_BUCKET_NAME;
+  const providerType = env.STORAGE_PROVIDER || (process.env.NODE_ENV === 'production' ? 's3' : 'local');
 
-  if (s3Endpoint && s3Bucket) {
-    activeStorageProvider = new S3CompatibleMediaStorageProvider({
-      endpoint: s3Endpoint,
-      bucket: s3Bucket
-    });
+  if (providerType === 's3') {
+    activeStorageProvider = new S3CompatibleMediaStorageProvider();
   } else {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        '[FATAL CONFIGURATION ERROR] Local disk storage provider is not permitted in production. A persistent object storage provider (STORAGE_PROVIDER=s3) is required.'
+      );
+    }
     activeStorageProvider = new LocalDiskMediaStorageProvider();
   }
 

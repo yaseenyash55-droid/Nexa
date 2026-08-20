@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, Compass, Film, MessageSquare, Bookmark, Bell, User as UserIcon, Settings as SettingsIcon, BookOpen, ShieldCheck, BarChart3, ShieldAlert, LogOut, PlusSquare, Sparkles } from 'lucide-react';
+import { Home, Compass, Film, MessageSquare, Bell, User as UserIcon, Settings as SettingsIcon, BookOpen, LogOut, PlusSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.js';
 import { Avatar } from '../ui/Avatar.js';
 import { DrDoomOrbLogo } from '../ui/DrDoomOrbLogo.js';
@@ -107,6 +107,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onOpenComp
           <button
             onClick={handleLogout}
             title="Log out"
+            aria-label="Log out"
             className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
           >
             <LogOut className="w-4 h-4" />

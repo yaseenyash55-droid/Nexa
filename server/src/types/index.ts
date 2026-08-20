@@ -184,7 +184,70 @@ export interface AuthenticatedRequest extends Request {
     userId: number;
     username: string;
     email?: string;
+    role?: 'ADMIN' | 'MODERATOR' | 'USER';
   };
+}
+
+export interface UserPrivacySettings {
+  userId: number;
+  isPrivate: boolean;
+  whoCanMessage: 'EVERYONE' | 'FOLLOWING' | 'NOBODY';
+  whoCanComment: 'EVERYONE' | 'FOLLOWING' | 'NOBODY';
+  activityStatusVisible: boolean;
+  readReceiptsEnabled: boolean;
+  hideLikeCounts: boolean;
+  updatedAt: string;
+}
+
+export interface UserBlock {
+  blockId: number;
+  blockerUserId: number;
+  blockedUserId: number;
+  blockedUser?: {
+    userId: number;
+    username: string;
+    displayName: string;
+    profileImageUrl?: string | null;
+  };
+  createdAt: string;
+}
+
+export interface FollowRequest {
+  requestId: number;
+  requesterUserId: number;
+  targetUserId: number;
+  requester: {
+    userId: number;
+    username: string;
+    displayName: string;
+    profileImageUrl?: string | null;
+  };
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserReport {
+  reportId: number;
+  reporterUserId: number;
+  targetType: 'USER' | 'POST' | 'COMMENT' | 'STORY' | 'REEL' | 'MESSAGE';
+  targetId: number;
+  reason: string;
+  details?: string | null;
+  status: 'PENDING' | 'INVESTIGATING' | 'RESOLVED' | 'DISMISSED';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ModerationAction {
+  actionId: number;
+  reportId?: number | null;
+  moderatorUserId: number;
+  actionType: 'WARN' | 'HIDE_CONTENT' | 'DELETE_CONTENT' | 'SUSPEND_USER' | 'BAN_USER' | 'DISMISS_REPORT';
+  targetType: string;
+  targetId: number;
+  notes?: string | null;
+  createdAt: string;
 }
 
 export interface CursorPaginationOptions {

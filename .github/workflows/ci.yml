@@ -7,15 +7,14 @@ on:
     branches: [main]
 
 jobs:
-  backend-and-web:
-    name: Backend & Web Test & Build
+  web-and-server:
+    name: Web & Server Verification
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 0
 
       - name: Set up Node.js 20
@@ -27,13 +26,13 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: TypeScript Check
+      - name: Strict TypeScript Verification
         run: npm run typecheck
 
-      - name: ESLint Check
+      - name: ESLint Verification (Zero Warnings Enforced)
         run: npm run lint
 
-      - name: Run Backend & Web Unit Tests
+      - name: Run Backend & Frontend Unit/Component Tests
         run: npm test
         env:
           NODE_ENV: test
@@ -44,16 +43,31 @@ jobs:
       - name: Compile Production Bundles
         run: npm run build
 
+      - name: Install Playwright Browsers & Dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Execute Playwright E2E Test Suite
+        run: npm run test:e2e
+
+      - name: Upload Playwright Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+
   oracle-integration:
-    name: Oracle Integration Suite (Optional)
+    name: Oracle Database Integration Suite
     runs-on: ubuntu-latest
-    needs: backend-and-web
+    needs: web-and-server
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
@@ -64,32 +78,41 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Execute Live Oracle Integration Tests
+      - name: Check Oracle Test Database Credentials
+        id: check-creds
         run: |
-          if [ -n "$ORACLE_CONNECT_STRING" ]; then
-            npm run test:integration --workspace=server
+          if [ -n "$DB_CONNECT_STRING" ] && [ -n "$DB_USER" ] && [ -n "$DB_PASSWORD" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
           else
-            echo "TEST_ORACLE_CONNECT_STRING secret is not configured. Skipping live integration tests."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Oracle integration secrets are not configured. Integration tests will be explicitly skipped."
           fi
+        env:
+          DB_CONNECT_STRING: ${{ secrets.TEST_ORACLE_CONNECT_STRING }}
+          DB_USER: ${{ secrets.TEST_ORACLE_USER }}
+          DB_PASSWORD: ${{ secrets.TEST_ORACLE_PASSWORD }}
+
+      - name: Execute Live Oracle Integration Suite
+        if: steps.check-creds.outputs.configured == 'true'
+        run: npm run test:integration --workspace=server
         env:
           NODE_ENV: test
           RUN_ORACLE_INTEGRATION_TESTS: 'true'
-          ORACLE_CONNECT_STRING: ${{ secrets.TEST_ORACLE_CONNECT_STRING }}
-          ORACLE_DB_USER: ${{ secrets.TEST_ORACLE_USER }}
-          ORACLE_DB_PASSWORD: ${{ secrets.TEST_ORACLE_PASSWORD }}
+          DB_CONNECT_STRING: ${{ secrets.TEST_ORACLE_CONNECT_STRING }}
+          DB_USER: ${{ secrets.TEST_ORACLE_USER }}
+          DB_PASSWORD: ${{ secrets.TEST_ORACLE_PASSWORD }}
           JWT_SECRET: test_jwt_secret_key_minimum_32_bytes_long_123456
           JWT_REFRESH_SECRET: test_jwt_refresh_secret_key_minimum_32_bytes_123456
           ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
   android-native:
-    name: Android Build, Lint & Unit Tests
+    name: Native Android Build, Lint & Unit Tests
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 0
 
       - name: Set up JDK 21

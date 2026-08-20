@@ -4,9 +4,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { socialApi } from '../api/social.api.js';
 import { Reel } from '../types/index.js';
 import { Avatar } from '../components/ui/Avatar.js';
-import { Heart, MessageSquare, Share2, Plus, Sparkles, Upload, Volume2, VolumeX, X, Loader2, Video, Film, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Heart, Share2, Plus, Sparkles, Upload, Volume2, VolumeX, X, Loader2, Video, Film, AlertCircle, Trash2, AlertTriangle } from 'lucide-react';
 import { Modal } from '../components/ui/Modal.js';
 import { Button } from '../components/ui/Button.js';
+import { ReportModal } from '../components/ui/ReportModal.js';
 import { useAuth } from '../contexts/AuthContext.js';
 import { mediaApi } from '../api/media.api.js';
 import { getMediaUrl, handleImageError } from '../utils/media.js';
@@ -251,10 +252,17 @@ export const ReelsPage: React.FC = () => {
 };
 
 const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => void }> = ({ reel, isMuted, onToggleMute }) => {
-  const { requireAuth } = useAuth();
+  const { user: currentUser, requireAuth } = useAuth();
   const queryClient = useQueryClient();
   const [isLiked, setIsLiked] = useState(reel.isLiked || false);
   const [likesCount, setLikesCount] = useState(reel.likesCount || 0);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+
+  const isOwnerOrModerator =
+    Boolean(currentUser) &&
+    (currentUser?.userId === reel.userId ||
+      currentUser?.role === 'ADMIN' ||
+      currentUser?.role === 'MODERATOR');
 
   const likeMutation = useMutation({
     mutationFn: () => (isLiked ? socialApi.unlikeReel(reel.reelId) : socialApi.likeReel(reel.reelId)),
@@ -263,6 +271,13 @@ const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => voi
       setLikesCount((prev) => (isLiked ? prev - 1 : prev + 1));
     },
     onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['reels'] });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => socialApi.deleteReel(reel.reelId),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reels'] });
     }
   });
@@ -290,7 +305,20 @@ const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => voi
       )}
 
       {/* Top Controls Bar */}
-      <div className="absolute top-4 right-4 z-20">
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        {isOwnerOrModerator && (
+          <button
+            onClick={() => {
+              if (confirm('Delete this video reel?')) {
+                deleteMutation.mutate();
+              }
+            }}
+            title="Delete video reel"
+            className="p-2 bg-rose-900/60 backdrop-blur-md rounded-full text-rose-300 hover:text-white hover:bg-rose-600 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
         <button
           onClick={onToggleMute}
           className="p-2 bg-black/50 backdrop-blur-md rounded-full text-white/80 hover:text-white"
@@ -315,11 +343,15 @@ const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => voi
           <span className="text-xs font-bold shadow-sm">{likesCount}</span>
         </button>
 
-        <button className="flex flex-col items-center gap-1 text-white group">
-          <div className="p-3 bg-black/50 backdrop-blur-md rounded-full text-white group-hover:scale-110 transition-transform">
-            <MessageSquare className="w-6 h-6" />
+        <button
+          onClick={() => setIsReportOpen(true)}
+          className="flex flex-col items-center gap-1 text-white group"
+          title="Report Reel"
+        >
+          <div className="p-3 bg-black/50 backdrop-blur-md rounded-full text-amber-400 group-hover:scale-110 transition-transform">
+            <AlertTriangle className="w-5 h-5" />
           </div>
-          <span className="text-xs font-bold shadow-sm">Reply</span>
+          <span className="text-[10px] font-bold shadow-sm text-slate-300">Report</span>
         </button>
 
         <button
@@ -349,6 +381,14 @@ const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => voi
         </div>
         {reel.caption && <p className="text-xs text-white/90 leading-relaxed font-medium">{reel.caption}</p>}
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        targetType="reel"
+        targetId={reel.reelId}
+      />
     </div>
   );
 };

@@ -11,7 +11,8 @@ import kotlinx.coroutines.launch
 
 sealed class HomeUiState {
     object Loading : HomeUiState()
-    data class Success(val posts: List<Post>) : HomeUiState()
+    data class Success(val posts: List<Post>, val hasMore: Boolean = true) : HomeUiState()
+    object Empty : HomeUiState()
     data class Error(val message: String) : HomeUiState()
 }
 
@@ -21,20 +22,42 @@ class HomeViewModel(private val repository: PostRepository = PostRepository()) :
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     private var currentPosts: MutableList<Post> = mutableListOf()
+    private var currentOffset: Int = 0
+    private var isLoadingMore: Boolean = false
+    private val pageSize: Int = 20
 
     init {
         loadFeed()
     }
 
-    fun loadFeed(isRefresh: Boolean = false) {
+    fun loadFeed(isRefresh: Boolean = false, isLoadMore: Boolean = false) {
+        if (isLoadMore && (isLoadingMore || _uiState.value is HomeUiState.Loading)) return
+
         viewModelScope.launch {
-            if (!isRefresh && currentPosts.isEmpty()) {
+            if (isRefresh) {
+                currentOffset = 0
+            } else if (isLoadMore) {
+                isLoadingMore = true
+            } else if (currentPosts.isEmpty()) {
                 _uiState.value = HomeUiState.Loading
             }
-            repository.getFeed().onSuccess { posts ->
-                currentPosts = posts.toMutableList()
-                _uiState.value = HomeUiState.Success(currentPosts.toList())
+
+            repository.getFeed(limit = pageSize, offset = if (isLoadMore) currentOffset else 0).onSuccess { posts ->
+                if (isRefresh || !isLoadMore) {
+                    currentPosts = posts.toMutableList()
+                    currentOffset = posts.size
+                } else {
+                    currentPosts.addAll(posts)
+                    currentOffset += posts.size
+                }
+                isLoadingMore = false
+                if (currentPosts.isEmpty()) {
+                    _uiState.value = HomeUiState.Empty
+                } else {
+                    _uiState.value = HomeUiState.Success(currentPosts.toList(), hasMore = posts.size >= pageSize)
+                }
             }.onFailure { exception ->
+                isLoadingMore = false
                 if (currentPosts.isEmpty()) {
                     _uiState.value = HomeUiState.Error(exception.message ?: "Failed to load feed")
                 }

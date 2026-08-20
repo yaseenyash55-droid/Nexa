@@ -174,4 +174,51 @@ describe('Web Authentication and Accessibility Suite', () => {
       });
     });
   });
+
+  describe('Session Hydration & Auth State Recovery', () => {
+    it('hydrates user on page load when silent refresh succeeds', async () => {
+      const { authApi } = await import('../../api/auth.api.js');
+      vi.mocked(authApi.refresh).mockResolvedValueOnce('new-access-token');
+      vi.mocked(authApi.me).mockResolvedValueOnce({
+        userId: 1,
+        username: 'hydrateduser',
+        email: 'hydrated@nexa.app',
+        displayName: 'Hydrated User',
+        isVerified: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      } as any);
+
+      render(
+        <AuthProvider>
+          <BrowserRouter>
+            <LoginPage />
+          </BrowserRouter>
+        </AuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(authApi.refresh).toHaveBeenCalled();
+        expect(authApi.me).toHaveBeenCalled();
+      });
+    });
+
+    it('clears session when silent refresh fails', async () => {
+      const { authApi } = await import('../../api/auth.api.js');
+      vi.mocked(authApi.refresh).mockRejectedValueOnce(new Error('No refresh cookie'));
+
+      render(
+        <AuthProvider>
+          <BrowserRouter>
+            <LoginPage />
+          </BrowserRouter>
+        </AuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(authApi.refresh).toHaveBeenCalled();
+        expect(getAccessToken()).toBeNull();
+      });
+    });
+  });
 });

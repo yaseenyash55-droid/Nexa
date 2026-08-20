@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Sparkles, X, ArrowRight, ShieldCheck, Smartphone, HelpCircle } from 'lucide-react';
+import { BookOpen, Sparkles, X, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const OnboardingBanner: React.FC = () => {
@@ -36,7 +36,7 @@ export const OnboardingBanner: React.FC = () => {
       </div>
 
       <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
-        Learn how to navigate the feed, send 256-bit AES-GCM end-to-end encrypted direct messages, manage group chats, dispatch broadcasts, and install the Android app.
+        Learn how to navigate the feed, send TLS-encrypted direct messages, manage group chats, dispatch broadcasts, and install the Android app.
       </p>
 
       <div className="flex items-center justify-between pt-1">

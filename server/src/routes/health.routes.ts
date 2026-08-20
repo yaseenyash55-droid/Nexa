@@ -21,6 +21,7 @@ router.get('/', async (_req, res) => {
       mode: 'oracle',
       database: {
         reachable: dbHealth.reachable,
+        status: isHealthy ? 'connected' : 'unreachable',
         details: isHealthy ? 'Connected' : 'Database unreachable'
       },
       timestamp: new Date().toISOString()
@@ -46,7 +47,12 @@ router.get('/ready', async (_req, res) => {
     res,
     {
       status: isReady ? 'ready' : 'unready',
-      database: isReady ? 'connected' : 'unreachable',
+      mode: 'oracle',
+      database: {
+        reachable: isReady,
+        status: isReady ? 'connected' : 'unreachable',
+        details: isReady ? 'Connected' : 'Database unreachable'
+      },
       timestamp: new Date().toISOString()
     },
     'Readiness check status',

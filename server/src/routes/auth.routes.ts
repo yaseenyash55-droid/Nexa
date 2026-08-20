@@ -23,7 +23,7 @@ router.get('/me', requireAuth, (req, res, next) => controller.me(req, res, next)
 
 router.post('/forgot-password', authRateLimiter, validate(forgotPasswordSchema), (req, res, next) => controller.forgotPassword(req, res, next));
 router.post('/reset-password', authRateLimiter, validate(resetPasswordSchema), (req, res, next) => controller.resetPassword(req, res, next));
-router.post('/verify-email', authRateLimiter, (req, res, next) => controller.verifyEmail(req, res, next));
+router.post('/verify-email', authRateLimiter, validate(verifyEmailSchema), (req, res, next) => controller.verifyEmail(req, res, next));
 router.post('/resend-verification', authRateLimiter, validate(resendVerificationSchema), (req, res, next) => controller.resendVerification(req, res, next));
 
 export default router;

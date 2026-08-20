@@ -32,4 +32,16 @@ interface UserApi {
 
     @DELETE("users/{id}/follow")
     suspend fun unfollowUser(@Path("id") id: Int): Response<ApiResponse<Map<String, Any>>>
+
+    @retrofit2.http.PUT("users/{id}")
+    suspend fun updateProfile(
+        @Path("id") id: Int,
+        @retrofit2.http.Body request: com.nexa.social.data.models.UpdateProfileRequest
+    ): Response<ApiResponse<User>>
+
+    @GET("users/{id}/followers")
+    suspend fun getFollowers(@Path("id") id: Int): Response<ApiResponse<List<User>>>
+
+    @GET("users/{id}/following")
+    suspend fun getFollowing(@Path("id") id: Int): Response<ApiResponse<List<User>>>
 }

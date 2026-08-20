@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext.js';
 import { useTheme } from '../contexts/ThemeContext.js';
 import { AppShell } from '../components/layout/AppShell.js';
@@ -14,47 +14,35 @@ import { PostSkeleton } from '../components/ui/Skeleton.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
 import { userApi, authApi, api } from '../api/client.js';
 import { postsApi } from '../api/posts.api.js';
-import { 
-  User, 
-  ShieldCheck, 
-  Bell, 
+import { privacyApi } from '../api/privacy.api.js';
+import {
+  User,
+  ShieldCheck,
   HelpCircle,
-  Eye, 
-  KeyRound, 
-  LogOut, 
-  Check, 
   Sparkles,
+  Bell,
+  Eye,
+  KeyRound,
+  LogOut,
   Sliders,
+  Check,
   Moon,
   Sun,
   Palette,
-  Volume2,
   Download,
   Trash2,
   HeartOff,
   Users,
   Camera,
   Upload,
-  Crop as CropIcon,
   Bookmark,
   BarChart3,
   ShieldAlert,
   TrendingUp,
   Heart,
-  MessageSquare,
-  FolderPlus,
-  Folder,
-  Plus,
   Smartphone,
-  EyeOff,
-  UserX,
-  Filter,
-  AlertTriangle,
-  CheckCircle2,
-  RefreshCw,
   Lock,
-  Copy,
-  BellRing
+  AlertCircle
 } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
@@ -117,8 +105,6 @@ export const SettingsPage: React.FC = () => {
   // Preference toggles
   const [emailNotifs, setEmailNotifs] = useState(true);
   const [pushNotifs, setPushNotifs] = useState(true);
-  const [privateAccount, setPrivateAccount] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
   const [hideLikeCounts, setHideLikeCounts] = useState(false);
   const [closeFriendsOnly, setCloseFriendsOnly] = useState(false);
 
@@ -184,19 +170,22 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleExportUserData = () => {
-    setIsExportingData(true);
-    setTimeout(() => {
+  const handleExportUserData = async () => {
+    try {
+      setIsExportingData(true);
+      const [privacyRes, bookmarksRes] = await Promise.allSettled([
+        privacyApi.getPrivacySettings(),
+        postsApi.getBookmarks()
+      ]);
+
       const exportObject = {
         user,
         exportedAt: new Date().toISOString(),
-        settings: {
-          privateAccount,
-          hideLikeCounts,
-          reducedMotion,
-          closeFriendsOnly
-        }
+        privacySettings: privacyRes.status === 'fulfilled' ? privacyRes.value.data : null,
+        bookmarksCount: bookmarksRes.status === 'fulfilled' ? (bookmarksRes.value.data || []).length : 0,
+        source: 'Nexa Oracle Database 23ai'
       };
+
       const blob = new Blob([JSON.stringify(exportObject, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -204,8 +193,11 @@ export const SettingsPage: React.FC = () => {
       a.download = `nexa-data-export-${user?.username || 'account'}.json`;
       a.click();
       URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export data:', err);
+    } finally {
       setIsExportingData(false);
-    }, 600);
+    }
   };
 
   const tabs = [
@@ -450,6 +442,11 @@ export const SettingsPage: React.FC = () => {
                   <Check className="w-4 h-4" /> {passwordSuccessMsg}
                 </div>
               )}
+              {passwordErrorMsg && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-medium flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" /> {passwordErrorMsg}
+                </div>
+              )}
               <Input label="Current Password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label="New Password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
@@ -598,8 +595,6 @@ export const SettingsPage: React.FC = () => {
 
 const AppearanceTabSection: React.FC = () => {
   const { themeMode, setThemeMode, autoDayNightShift, setAutoDayNightShift } = useTheme();
-  const [reduceTransparency, setReduceTransparency] = useState(false);
-  const [reduceMotion, setReduceMotion] = useState(false);
   const [accentColor, setAccentColor] = useState('#2DD4BF');
 
   const themeOptions = [
@@ -688,14 +683,6 @@ const AppearanceTabSection: React.FC = () => {
 };
 
 const BookmarksTabSection: React.FC = () => {
-  const [collections] = useState([
-    { id: 'all', name: 'All Saved', count: 0 },
-    { id: 'tech', name: 'Tech & Oracle', count: 1 },
-    { id: 'design', name: 'UI/UX Inspiration', count: 1 },
-    { id: 'favs', name: 'Favorites', count: 0 }
-  ]);
-  const [activeCollection, setActiveCollection] = useState('all');
-
   const { data: bookmarksRes, isLoading } = useQuery({
     queryKey: ['bookmarks'],
     queryFn: () => postsApi.getBookmarks()
@@ -705,21 +692,12 @@ const BookmarksTabSection: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {collections.map(c => (
-          <button
-            key={c.id}
-            onClick={() => setActiveCollection(c.id)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              activeCollection === c.id
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Folder className="w-3.5 h-3.5" />
-            <span>{c.name}</span>
-          </button>
-        ))}
+      <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl flex items-center justify-between text-xs text-slate-300">
+        <div className="flex items-center gap-2">
+          <Bookmark className="w-4 h-4 text-brand-400" />
+          <span>Oracle Persisted Bookmarks ({posts.length})</span>
+        </div>
+        <span className="text-[11px] text-slate-500">Custom folders unavailable in v1</span>
       </div>
 
       {isLoading ? (
@@ -860,15 +838,24 @@ const ProtectionTabSection: React.FC = () => {
 
 const ModerationTabSection: React.FC = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const isModeratorOrAdmin = user?.role === 'ADMIN' || user?.role === 'MODERATOR';
 
-  const [reports, setReports] = useState([
-    { id: 1, type: 'Post', targetId: 102, reporter: 'user_alex', reason: 'Spam or Scam Content', detail: 'Promoting unverified crypto links.', status: 'Pending' },
-    { id: 2, type: 'Reel', targetId: 4, reporter: 'sarah_design', reason: 'Copyright Issue', detail: 'Uncredited music audio track.', status: 'Pending' }
-  ]);
+  const { data: reportsRes, isLoading } = useQuery({
+    queryKey: ['moderation-reports'],
+    queryFn: () => privacyApi.getModerationReports('PENDING'),
+    enabled: isModeratorOrAdmin
+  });
 
-  const handleAction = (reportId: number) => {
-    setReports(prev => prev.filter(r => r.id !== reportId));
+  const reports = reportsRes?.data || [];
+
+  const handleAction = async (reportId: number, action: 'DISMISS' | 'REMOVE_CONTENT') => {
+    try {
+      await privacyApi.actionModerationReport(reportId, action);
+      queryClient.invalidateQueries({ queryKey: ['moderation-reports'] });
+    } catch (err) {
+      console.error('Failed to action moderation report:', err);
+    }
   };
 
   if (!isModeratorOrAdmin) {
@@ -883,26 +870,28 @@ const ModerationTabSection: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {reports.length === 0 ? (
-        <EmptyState title="Queue Empty" description="There are currently no pending moderation reports requiring action." />
+      {isLoading ? (
+        <p className="text-xs text-slate-400 text-center py-4">Loading reports from Oracle...</p>
+      ) : reports.length === 0 ? (
+        <EmptyState title="Queue Empty" description="There are currently no pending moderation reports requiring action in Oracle Database." />
       ) : (
         <div className="space-y-3">
-          {reports.map(report => (
-            <div key={report.id} className="p-4 bg-slate-900/80 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          {reports.map((report: any) => (
+            <div key={report.reportId} className="p-4 bg-slate-900/80 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-rose-400 uppercase tracking-wider">{report.type} Report #{report.id}</span>
+                  <span className="font-bold text-rose-400 uppercase tracking-wider">{report.targetType} Report #{report.reportId}</span>
                   <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-semibold text-[10px]">{report.status}</span>
                 </div>
                 <p className="text-slate-200 font-medium">{report.reason}</p>
-                <p className="text-slate-400 text-[11px]">Reported by <span className="text-slate-200">@{report.reporter}</span>: {report.detail}</p>
+                <p className="text-slate-400 text-[11px]">Reported by <span className="text-slate-200">@{report.reporterUsername || `user_${report.reporterUserId}`}</span>: {report.details || 'No details provided'}</p>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <Button size="sm" variant="ghost" onClick={() => handleAction(report.id)}>
+                <Button size="sm" variant="ghost" onClick={() => handleAction(report.reportId, 'DISMISS')}>
                   Dismiss
                 </Button>
-                <Button size="sm" variant="danger" onClick={() => handleAction(report.id)}>
+                <Button size="sm" variant="danger" onClick={() => handleAction(report.reportId, 'REMOVE_CONTENT')}>
                   Remove Content
                 </Button>
               </div>

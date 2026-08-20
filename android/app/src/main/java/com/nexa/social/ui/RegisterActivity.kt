@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.nexa.social.MainActivity
+import com.nexa.social.NexaApiClient
 import com.nexa.social.data.models.RegisterRequest
 import com.nexa.social.data.repository.AuthRepository
 import com.nexa.social.databinding.ActivityRegisterBinding
@@ -17,16 +18,32 @@ import kotlinx.coroutines.launch
 class RegisterActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityRegisterBinding
-    private lateinit var authRepository: AuthRepository
-    private lateinit var tokenManager: TokenManager
+    private var authRepository: AuthRepository? = null
+    private var tokenManager: TokenManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityRegisterBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        tokenManager = TokenManager(this)
-        authRepository = AuthRepository(tokenManager)
+        NexaApiClient.init(this)
+        try {
+            val tm = TokenManager(this)
+            tokenManager = tm
+            authRepository = AuthRepository(tm)
+        } catch (_: Exception) {
+            Toast.makeText(
+                this,
+                "Secure credential storage is unavailable on this device. Registration is disabled.",
+                Toast.LENGTH_LONG
+            ).show()
+            binding.btnRegister.isEnabled = false
+            binding.tilDisplayName.isEnabled = false
+            binding.tilUsername.isEnabled = false
+            binding.tilEmail.isEnabled = false
+            binding.tilPassword.isEnabled = false
+            binding.tilConfirmPassword.isEnabled = false
+        }
 
         binding.btnRegister.setOnClickListener {
             performRegistration()
@@ -38,6 +55,12 @@ class RegisterActivity : AppCompatActivity() {
     }
 
     private fun performRegistration() {
+        val repo = authRepository
+        if (repo == null) {
+            Toast.makeText(this, "Secure storage is not available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val displayName = binding.etDisplayName.text.toString().trim()
         val username = binding.etUsername.text.toString().trim().lowercase()
         val email = binding.etEmail.text.toString().trim().lowercase()
@@ -58,7 +81,7 @@ class RegisterActivity : AppCompatActivity() {
                 displayName = displayName
             )
 
-            val result = authRepository.register(request)
+            val result = repo.register(request)
             setLoading(false)
 
             result.onSuccess {
@@ -133,7 +156,7 @@ class RegisterActivity : AppCompatActivity() {
 
     private fun setLoading(isLoading: Boolean) {
         binding.registerProgressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
-        binding.btnRegister.isEnabled = !isLoading
+        binding.btnRegister.isEnabled = !isLoading && authRepository != null
         binding.etDisplayName.isEnabled = !isLoading
         binding.etUsername.isEnabled = !isLoading
         binding.etEmail.isEnabled = !isLoading

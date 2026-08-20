@@ -7,7 +7,7 @@ import { groupsApi, Group, GroupMessage } from '../api/groups.api.js';
 import { broadcastsApi, Broadcast } from '../api/broadcasts.api.js';
 import { Message, User } from '../types/index.js';
 import { Avatar } from '../components/ui/Avatar.js';
-import { Send, MessageSquare, Search, CheckCheck, Check, Phone, Video, Lock, ShieldCheck, Users, Plus, Radio } from 'lucide-react';
+import { Send, MessageSquare, Search, CheckCheck, Check, Phone, Video, ShieldCheck, Users, Plus, Radio } from 'lucide-react';
 import { CallModal } from '../components/chat/CallModal.js';
 import { CreateGroupModal } from '../components/chat/CreateGroupModal.js';
 import { CreateBroadcastModal } from '../components/chat/CreateBroadcastModal.js';
@@ -16,7 +16,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { io, Socket } from 'socket.io-client';
 import { API_BASE_URL, getAccessToken } from '../api/client.js';
 import { useTheme } from '../contexts/ThemeContext.js';
-import { encryptMessage, decryptMessage, DecryptedMessageResult } from '../utils/e2ee.js';
+import { decryptMessage, DecryptedMessageResult } from '../utils/e2ee.js';
 
 export const MessagesPage: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -82,14 +82,13 @@ export const MessagesPage: React.FC = () => {
     enabled: !!selectedGroup?.groupId && chatType === 'groups'
   });
 
-  // Send Direct Message (E2EE Encrypted)
+  // Send Direct Message (TLS-Protected)
   const sendDirectMessageMutation = useMutation({
     mutationFn: async () => {
       if (!currentUser || !selectedUser || !messageInput.trim()) {
         throw new Error('Invalid send message state');
       }
-      const encryptedContent = await encryptMessage(currentUser.userId, selectedUser.userId, messageInput.trim());
-      return socialApi.sendMessage(selectedUser.userId, encryptedContent);
+      return socialApi.sendMessage(selectedUser.userId, messageInput.trim());
     },
     onSuccess: (message) => {
       setMessageInput('');
@@ -412,9 +411,6 @@ export const MessagesPage: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <p className="text-xs font-bold text-white truncate flex items-center gap-1.5">
                             {u.displayName}
-                            <span title="End-to-End Encrypted">
-                              <Lock className="w-3 h-3 text-emerald-400" />
-                            </span>
                           </p>
                         </div>
                         <p className="text-[11px] text-slate-400 truncate">@{u.username}</p>
@@ -516,14 +512,14 @@ export const MessagesPage: React.FC = () => {
               </div>
               <h2 className="text-lg font-bold text-white">
                 {chatType === 'direct'
-                  ? 'End-to-End Encrypted Messages'
+                  ? 'Direct Messages'
                   : chatType === 'groups'
                   ? 'Group Conversations'
                   : 'Message Broadcasts'}
               </h2>
               <p className="text-xs text-slate-400">
                 {chatType === 'direct'
-                  ? 'Select a contact from the left panel to start a secure 256-bit AES-GCM conversation.'
+                  ? 'Select a contact from the left panel to start a secure conversation.'
                   : chatType === 'groups'
                   ? 'Select a group from the left panel or click "New Group" to chat with your team.'
                   : 'Send a message to multiple contacts at once. Each recipient gets a private direct message.'}
@@ -544,9 +540,6 @@ export const MessagesPage: React.FC = () => {
                   <div>
                     <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                       {selectedUser.displayName}
-                      <span title="End-to-End Encrypted">
-                        <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                      </span>
                     </h3>
                     <p className="text-[10px] text-slate-400 font-medium">
                       {isTyping ? (
@@ -554,7 +547,7 @@ export const MessagesPage: React.FC = () => {
                           is typing...
                         </span>
                       ) : (
-                        'Encrypted conversation'
+                        'Encrypted in transit'
                       )}
                     </p>
                   </div>

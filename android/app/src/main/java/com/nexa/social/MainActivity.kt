@@ -123,8 +123,9 @@ class MainActivity : AppCompatActivity() {
                     val id = resourceId?.toIntOrNull()
                     if (id != null && id > 0) {
                         val chatIntent = Intent(this, com.nexa.social.ui.ChatActivity::class.java).apply {
-                            putExtra("userId", id)
-                            putExtra("username", secondaryId)
+                            putExtra(com.nexa.social.ui.ChatActivity.EXTRA_CHAT_TYPE, "direct")
+                            putExtra(com.nexa.social.ui.ChatActivity.EXTRA_TARGET_ID, id)
+                            putExtra(com.nexa.social.ui.ChatActivity.EXTRA_TARGET_NAME, secondaryId ?: "Direct Message")
                         }
                         startActivity(chatIntent)
                     } else {

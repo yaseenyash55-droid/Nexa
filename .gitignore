@@ -16,4 +16,11 @@ test-results/
 *.sha256
 uploads/
 artifacts/
-
+*.apk
+*.aab
+*.jks
+*.keystore
+*.pem
+*.p12
+*.sso
+client/public/*.apk

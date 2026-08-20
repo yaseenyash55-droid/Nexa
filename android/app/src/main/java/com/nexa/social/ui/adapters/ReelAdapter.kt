@@ -24,6 +24,11 @@ class ReelAdapter(
         holder.bind(getItem(position))
     }
 
+    override fun onViewRecycled(holder: ReelViewHolder) {
+        super.onViewRecycled(holder)
+        holder.release()
+    }
+
     inner class ReelViewHolder(private val binding: ItemReelBinding) : RecyclerView.ViewHolder(binding.root) {
         private var player: ExoPlayer? = null
 

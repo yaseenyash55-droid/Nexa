@@ -6,17 +6,33 @@ import { env } from '../config/env.js';
 
 const authService = new AuthService();
 
+export function getRefreshTokenCookieOptions() {
+  const isProduction = env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: env.COOKIE_SECURE,
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
+    path: '/',
+    maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
+  };
+}
+
+export function getClearRefreshTokenCookieOptions() {
+  const isProduction = env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: env.COOKIE_SECURE,
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
+    path: '/'
+  };
+}
+
 export class AuthController {
   async register(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await authService.register(req.body);
       
-      res.cookie('nexa_refresh_token', result.refreshToken, {
-        httpOnly: true,
-        secure: env.COOKIE_SECURE,
-        sameSite: 'lax',
-        maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
-      });
+      res.cookie('nexa_refresh_token', result.refreshToken, getRefreshTokenCookieOptions());
 
       return sendSuccess(res, {
         user: result.user,
@@ -32,12 +48,7 @@ export class AuthController {
     try {
       const result = await authService.login(req.body);
 
-      res.cookie('nexa_refresh_token', result.refreshToken, {
-        httpOnly: true,
-        secure: env.COOKIE_SECURE,
-        sameSite: 'lax',
-        maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
-      });
+      res.cookie('nexa_refresh_token', result.refreshToken, getRefreshTokenCookieOptions());
 
       return sendSuccess(res, {
         user: result.user,
@@ -68,12 +79,7 @@ export class AuthController {
 
       const result = await authService.refreshTokens(refreshToken);
 
-      res.cookie('nexa_refresh_token', result.newRefreshToken, {
-        httpOnly: true,
-        secure: env.COOKIE_SECURE,
-        sameSite: 'lax',
-        maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
-      });
+      res.cookie('nexa_refresh_token', result.newRefreshToken, getRefreshTokenCookieOptions());
 
       return sendSuccess(res, {
         accessToken: result.accessToken,
@@ -87,8 +93,10 @@ export class AuthController {
   async logout(req: Request, res: Response, next: NextFunction) {
     try {
       const refreshToken = req.cookies?.nexa_refresh_token || req.body?.refreshToken;
-      await authService.logout(refreshToken);
-      res.clearCookie('nexa_refresh_token');
+      if (refreshToken) {
+        await authService.logout(refreshToken);
+      }
+      res.clearCookie('nexa_refresh_token', getClearRefreshTokenCookieOptions());
       return sendSuccess(res, null, 'Logged out successfully');
     } catch (err) {
       next(err);

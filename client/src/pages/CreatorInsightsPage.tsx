@@ -1,10 +1,8 @@
 import React from 'react';
 import { AppShell } from '../components/layout/AppShell.js';
-import { BarChart3, TrendingUp, Eye, Heart, MessageSquare, Users, Sparkles, ShieldCheck } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext.js';
+import { BarChart3, TrendingUp, Eye, Heart, Users, Sparkles, ShieldCheck } from 'lucide-react';
 
 export const CreatorInsightsPage: React.FC = () => {
-  const { user } = useAuth();
 
   const metrics = [
     { label: 'Total Reach (30 Days)', value: '14,280', change: '+18.4%', icon: <Eye className="w-5 h-5 text-aurora-cyan" /> },

@@ -6,6 +6,10 @@ import {
   MAX_BYTES,
   MiB
 } from '../src/services/media.service.js';
+import {
+  normalizeStorageProvider,
+  validateStorageConfiguration
+} from '../src/config/env.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -65,7 +69,53 @@ describe('Media Service & Storage Engine Suite', () => {
       expect(MAX_BYTES.story).toBe(100 * MiB);
       expect(MAX_BYTES.reel).toBe(500 * MiB);
       expect(MAX_BYTES.video).toBe(500 * MiB);
-      expect(MAX_BYTES.chat).toBe(50000000 > 0 ? 50 * MiB : 0);
+      expect(MAX_BYTES.chat).toBe(50 * MiB);
+    });
+  });
+
+  describe('Storage Configuration & Production Rejection', () => {
+    it('normalizes storage provider aliases', () => {
+      expect(normalizeStorageProvider('s3')).toBe('s3');
+      expect(normalizeStorageProvider('oci_object_storage')).toBe('s3');
+      expect(normalizeStorageProvider('s3_compatible')).toBe('s3');
+      expect(normalizeStorageProvider('local')).toBe('local');
+      expect(normalizeStorageProvider('disk')).toBe('local');
+    });
+
+    it('rejects local disk storage in production mode', () => {
+      expect(() => validateStorageConfiguration('local', true)).toThrow(
+        /Local disk storage provider is not permitted in production/
+      );
+    });
+
+    it('permits local disk storage in development mode', () => {
+      expect(() => validateStorageConfiguration('local', false)).not.toThrow();
+    });
+
+    it('rejects incomplete S3 configuration in production mode', () => {
+      const originalEnv = { ...process.env };
+      delete process.env.S3_ENDPOINT;
+      delete process.env.S3_BUCKET;
+      delete process.env.S3_ACCESS_KEY_ID;
+      delete process.env.S3_SECRET_ACCESS_KEY;
+
+      expect(() => validateStorageConfiguration('s3', true)).toThrow(
+        /Missing required persistent storage configuration/
+      );
+
+      process.env = originalEnv;
+    });
+
+    it('accepts complete S3 configuration in production mode', () => {
+      const originalEnv = { ...process.env };
+      process.env.S3_ENDPOINT = 'https://s3.example.com';
+      process.env.S3_BUCKET = 'nexa-media';
+      process.env.S3_ACCESS_KEY_ID = 'access-key-123';
+      process.env.S3_SECRET_ACCESS_KEY = 'secret-key-456';
+
+      expect(() => validateStorageConfiguration('s3', true)).not.toThrow();
+
+      process.env = originalEnv;
     });
   });
 
@@ -112,6 +162,101 @@ describe('Media Service & Storage Engine Suite', () => {
 
       // Cleanup
       await provider.deleteMedia(asset.storageKey);
+    });
+  });
+
+  describe('S3 Compatible Storage Provider Suite', () => {
+    const testDir = path.resolve(process.cwd(), 'uploads', '.tmp');
+
+    beforeEach(() => {
+      if (!fs.existsSync(testDir)) {
+        fs.mkdirSync(testDir, { recursive: true });
+      }
+    });
+
+    it('streams file to S3 and returns asset metadata without public-read ACL', async () => {
+      const mockSend = vi.fn().mockResolvedValue({});
+      const mockS3Client = { send: mockSend } as any;
+
+      const provider = new S3CompatibleMediaStorageProvider({
+        endpoint: 'https://ax192837.compat.objectstorage.us-ashburn-1.oraclecloud.com',
+        bucket: 'nexa-prod-media',
+        region: 'us-ashburn-1',
+        accessKeyId: 'test-key',
+        secretAccessKey: 'test-secret',
+        cdnBaseUrl: 'https://cdn.nexa.app',
+        s3Client: mockS3Client
+      });
+
+      const tempFile = path.join(testDir, `s3-upload-${Date.now()}.png`);
+      await fs.promises.writeFile(tempFile, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+
+      const asset = await provider.storeMedia(
+        tempFile,
+        'avatar.png',
+        'image/png',
+        42,
+        'avatar'
+      );
+
+      expect(mockSend).toHaveBeenCalledTimes(1);
+      const commandArg = mockSend.mock.calls[0][0];
+      expect(commandArg.input.Bucket).toBe('nexa-prod-media');
+      expect(commandArg.input.Key).toContain('media/avatar/');
+      expect(commandArg.input.Key.endsWith('.png')).toBe(true);
+      expect(commandArg.input.ContentType).toBe('image/png');
+      expect(commandArg.input.ACL).toBeUndefined(); // Must not use public-read automatically
+
+      expect(asset.publicUrl).toBe(`https://cdn.nexa.app/${asset.storageKey}`);
+      expect(asset.userId).toBe(42);
+      expect(asset.mediaType).toBe('image');
+      expect(fs.existsSync(tempFile)).toBe(false); // Staging temp file unlinked
+    });
+
+    it('deletes stored object via authenticated S3 DeleteObjectCommand', async () => {
+      const mockSend = vi.fn().mockResolvedValue({});
+      const mockS3Client = { send: mockSend } as any;
+
+      const provider = new S3CompatibleMediaStorageProvider({
+        endpoint: 'https://s3.example.com',
+        bucket: 'nexa-bucket',
+        accessKeyId: 'key',
+        secretAccessKey: 'secret',
+        s3Client: mockS3Client
+      });
+
+      const success = await provider.deleteMedia('media/photo/12345.jpg');
+      expect(success).toBe(true);
+      expect(mockSend).toHaveBeenCalledTimes(1);
+      const commandArg = mockSend.mock.calls[0][0];
+      expect(commandArg.input.Bucket).toBe('nexa-bucket');
+      expect(commandArg.input.Key).toBe('media/photo/12345.jpg');
+    });
+
+    it('falls back to S3 endpoint URL when CDN_BASE_URL is not set', async () => {
+      const mockSend = vi.fn().mockResolvedValue({});
+      const mockS3Client = { send: mockSend } as any;
+
+      const provider = new S3CompatibleMediaStorageProvider({
+        endpoint: 'https://s3.us-ashburn-1.oraclecloud.com',
+        bucket: 'nexa-direct-bucket',
+        cdnBaseUrl: '',
+        s3Client: mockS3Client
+      });
+
+      const tempFile = path.join(testDir, `s3-direct-${Date.now()}.mp4`);
+      await fs.promises.writeFile(tempFile, Buffer.from([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]));
+
+      const asset = await provider.storeMedia(
+        tempFile,
+        'video.mp4',
+        'video/mp4',
+        7,
+        'reel'
+      );
+
+      expect(asset.publicUrl).toBe(`https://s3.us-ashburn-1.oraclecloud.com/nexa-direct-bucket/${asset.storageKey}`);
+      expect(asset.mediaType).toBe('video');
     });
   });
 });

@@ -3,7 +3,7 @@ import { Post } from '../../types/index.js';
 import { Modal } from '../ui/Modal.js';
 import { Button } from '../ui/Button.js';
 import { Input } from '../ui/Input.js';
-import { Trash2, Edit3, Tag, Users, Copy, Check, Sparkles, MoreVertical } from 'lucide-react';
+import { Trash2, Edit3, Tag, Users, Copy, Check, AlertTriangle } from 'lucide-react';
 
 interface PostOptionsModalProps {
   isOpen: boolean;
@@ -12,6 +12,7 @@ interface PostOptionsModalProps {
   canEdit: boolean;
   onDelete: () => void;
   onSaveEdit: (updatedData: { content: string; tags: string; collaborator: string }) => void;
+  onReport?: () => void;
   isSaving?: boolean;
 }
 
@@ -22,6 +23,7 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
   canEdit,
   onDelete,
   onSaveEdit,
+  onReport,
   isSaving = false
 }) => {
   const [activeTab, setActiveTab] = useState<'menu' | 'edit'>('menu');
@@ -145,6 +147,28 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
               {copied && <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/20 px-2 py-0.5 rounded-full">Copied!</span>}
             </button>
 
+            {onReport && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onReport();
+                }}
+                className="w-full p-3 bg-amber-500/10 hover:bg-amber-600/20 border border-amber-500/30 rounded-xl text-left transition-all flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-500/20 rounded-lg text-amber-400 group-hover:text-white transition-colors">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-amber-400 group-hover:text-white">Report Post</p>
+                    <p className="text-[10px] text-amber-400/80 group-hover:text-white/80">Submit confidential report to moderation team</p>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold text-amber-400 group-hover:text-white">Report</span>
+              </button>
+            )}
+
             {canEdit && (
               <button
                 type="button"
@@ -209,7 +233,7 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
             <Input
               value={collaborator}
               onChange={(e) => setCollaborator(e.target.value)}
-              placeholder="Enter user handle (e.g. leon_yash_8763)"
+              placeholder="Enter user handle"
             />
             <p className="text-[10px] text-slate-500">Collab badge and partner tag will appear on the post</p>
           </div>
@@ -219,13 +243,7 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
             <Button type="button" variant="ghost" size="sm" onClick={() => setActiveTab('menu')}>
               ← Back to Options
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              isLoading={isSaving}
-              onClick={handleSave}
-              rightIcon={<Sparkles className="w-4 h-4" />}
-            >
+            <Button size="sm" onClick={handleSave} isLoading={isSaving}>
               Save Post Changes
             </Button>
           </div>

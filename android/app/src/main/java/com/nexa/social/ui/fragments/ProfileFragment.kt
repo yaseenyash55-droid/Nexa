@@ -18,11 +18,23 @@ import com.nexa.social.ui.viewmodels.ProfileViewModel
 import com.nexa.social.utils.PreferenceManager
 import kotlinx.coroutines.launch
 
+import android.content.Intent
+import com.nexa.social.data.repository.AuthRepository
+import com.nexa.social.data.repository.PostRepository
+import com.nexa.social.ui.CommentsBottomSheetDialogFragment
+import com.nexa.social.ui.EditProfileBottomSheetDialogFragment
+import com.nexa.social.ui.LoginActivity
+import com.nexa.social.ui.adapters.PostAdapter
+import com.nexa.social.utils.TokenManager
+
 class ProfileFragment : Fragment() {
     private var _binding: FragmentProfileBinding? = null
     private val binding get() = _binding!!
     private val viewModel: ProfileViewModel by viewModels()
     private lateinit var prefManager: PreferenceManager
+    private val postRepository = PostRepository()
+    private lateinit var postAdapter: PostAdapter
+    private var isFollowing = false
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentProfileBinding.inflate(inflater, container, false)
@@ -32,11 +44,56 @@ class ProfileFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         prefManager = PreferenceManager(requireContext())
+        setupRecyclerView()
+        setupLogoutButton()
         observeViewModel()
 
         val username = arguments?.getString("username") ?: prefManager.username
         if (!username.isNullOrEmpty()) {
             viewModel.loadProfile(username)
+        }
+    }
+
+    private fun setupRecyclerView() {
+        postAdapter = PostAdapter(
+            onLikeClick = { post ->
+                lifecycleScope.launch {
+                    if (post.isLiked) postRepository.unlikePost(post.postId)
+                    else postRepository.likePost(post.postId)
+                }
+            },
+            onCommentClick = { post ->
+                CommentsBottomSheetDialogFragment.newInstance(post.postId).show(childFragmentManager, "comments")
+            },
+            onBookmarkClick = { post ->
+                lifecycleScope.launch {
+                    if (post.isBookmarked) postRepository.unbookmarkPost(post.postId)
+                    else postRepository.bookmarkPost(post.postId)
+                }
+            }
+        )
+        binding.rvUserPosts.adapter = postAdapter
+    }
+
+    private fun setupLogoutButton() {
+        binding.btnLogout.setOnClickListener {
+            androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle("Account Settings & Logout")
+                .setMessage("Are you sure you want to log out of Nexa Social on this device?")
+                .setPositiveButton("Log Out") { _, _ ->
+                    lifecycleScope.launch {
+                        try {
+                            val tm = TokenManager(requireContext())
+                            AuthRepository(tm).logout()
+                        } catch (_: Exception) {}
+                        val intent = Intent(requireContext(), LoginActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        }
+                        startActivity(intent)
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
     }
 
@@ -62,7 +119,7 @@ class ProfileFragment : Fragment() {
     private fun bindProfile(user: User) {
         binding.tvDisplayName.text = user.displayName
         binding.tvUsername.text = "@${user.username}"
-        binding.tvBio.text = user.bio
+        binding.tvBio.text = user.bio ?: ""
         binding.tvFollowersCount.text = user.followersCount.toString()
         binding.tvFollowingCount.text = user.followingCount.toString()
 
@@ -83,7 +140,33 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        binding.btnEditProfile.visibility = if (user.userId == prefManager.userId) View.VISIBLE else View.GONE
+        val isOwner = user.userId == prefManager.userId || user.username == prefManager.username
+        if (isOwner) {
+            binding.btnEditProfile.visibility = View.VISIBLE
+            binding.btnFollow.visibility = View.GONE
+            binding.btnEditProfile.setOnClickListener {
+                EditProfileBottomSheetDialogFragment.newInstance(user) { updatedUser ->
+                    viewModel.updateProfileLocally(updatedUser)
+                }.show(childFragmentManager, "edit_profile")
+            }
+        } else {
+            binding.btnEditProfile.visibility = View.GONE
+            binding.btnFollow.visibility = View.VISIBLE
+            binding.btnFollow.text = if (isFollowing) "Following" else "Follow"
+            binding.btnFollow.setOnClickListener {
+                isFollowing = !isFollowing
+                binding.btnFollow.text = if (isFollowing) "Following" else "Follow"
+                viewModel.toggleFollow(user, !isFollowing)
+            }
+        }
+
+        // Load posts for user
+        lifecycleScope.launch {
+            postRepository.getFeed().onSuccess { allPosts ->
+                val userPosts = allPosts.filter { it.userId == user.userId || it.author.userId == user.userId }
+                postAdapter.submitList(userPosts)
+            }
+        }
     }
 
     override fun onDestroyView() {

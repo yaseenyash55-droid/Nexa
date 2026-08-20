@@ -13,13 +13,17 @@ import { OracleSecurityRepository } from '../src/repositories/oracle/security.or
 import { OracleGroupRepository } from '../src/repositories/group.repository.js';
 import { OracleBroadcastRepository } from '../src/repositories/broadcast.repository.js';
 import { OracleFcmTokenRepository } from '../src/repositories/oracle/fcm.oracle.repo.js';
+import { OraclePrivacyRepository } from '../src/repositories/oracle/privacy.oracle.repo.js';
 import { checkOracleHealth, initializeOraclePool, closeOraclePool, executeSql } from '../src/db/pool.js';
 import { AuthService } from '../src/services/auth.service.js';
 import { PostService } from '../src/services/post.service.js';
 import { env } from '../src/config/env.js';
 
-describe('Comprehensive Oracle-Backed Integration Suite', () => {
-  let isOracleLive = false;
+const isIntegrationEnabled =
+  process.env.RUN_ORACLE_INTEGRATION_TESTS === 'true' ||
+  process.env.ORACLE_INTEGRATION_TESTS === 'true';
+
+describe.skipIf(!isIntegrationEnabled)('Comprehensive Oracle-Backed Integration Suite', () => {
   let userRepo: OracleUserRepository;
   let postRepo: OraclePostRepository;
   let commentRepo: OracleCommentRepository;
@@ -32,6 +36,7 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   let groupRepo: OracleGroupRepository;
   let broadcastRepo: OracleBroadcastRepository;
   let fcmRepo: OracleFcmTokenRepository;
+  let privacyRepo: OraclePrivacyRepository;
   let authService: AuthService;
   let postService: PostService;
 
@@ -39,16 +44,24 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   const createdUserIds: number[] = [];
 
   beforeAll(async () => {
+    if (!env.DB_USER || !env.DB_PASSWORD || !env.DB_CONNECT_STRING) {
+      throw new Error(
+        '[FATAL TEST ERROR] RUN_ORACLE_INTEGRATION_TESTS is enabled but required database credentials (DB_USER, DB_PASSWORD, DB_CONNECT_STRING) are missing.'
+      );
+    }
+
     try {
       await initializeOraclePool();
       const health = await checkOracleHealth();
-      isOracleLive = health.reachable;
-      if (!isOracleLive) {
-        console.warn('\n[TEST ADVISORY] Real Oracle Database instance is not reachable at ' + env.DB_CONNECT_STRING + '. Skipping live Oracle integration tests.');
+      if (!health.reachable) {
+        throw new Error(
+          `[FATAL TEST ERROR] Oracle integration tests enabled but Oracle Database is unreachable at ${env.DB_CONNECT_STRING}. Details: ${health.details}`
+        );
       }
-    } catch {
-      isOracleLive = false;
-      console.warn('\n[TEST ADVISORY] Real Oracle Database connection failed. Skipping live Oracle integration tests.');
+    } catch (err: any) {
+      throw new Error(
+        `[FATAL TEST ERROR] Oracle connection initialization failed: ${err.message}`
+      );
     }
 
     userRepo = new OracleUserRepository();
@@ -63,14 +76,19 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
     groupRepo = new OracleGroupRepository();
     broadcastRepo = new OracleBroadcastRepository();
     fcmRepo = new OracleFcmTokenRepository();
+    privacyRepo = new OraclePrivacyRepository();
     authService = new AuthService();
     postService = new PostService();
   });
 
   afterAll(async () => {
-    if (isOracleLive && createdUserIds.length > 0) {
+    if (createdUserIds.length > 0) {
       for (const testUserId of createdUserIds) {
-        await executeSql('DELETE FROM USERS WHERE USER_ID = :testUserId', { testUserId });
+        try {
+          await executeSql('DELETE FROM USERS WHERE USER_ID = :testUserId', { testUserId });
+        } catch {
+          // ignore cleanup failures in afterAll
+        }
       }
     }
     await closeOraclePool();
@@ -84,26 +102,22 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
       expect(health.details).not.toContain(env.DB_PASSWORD);
     }
 
-    if (isOracleLive) {
-      const res = await supertest(app).get('/api/health');
-      expect(res.status).toBe(200);
-      expect(res.body.data.status).toBe('ok');
-      expect(res.body.data.mode).toBe('oracle');
-      expect(res.body.data.database.reachable).toBe(true);
-      expect(res.body.data.database.details).toBe('Connected');
-      const bodyStr = JSON.stringify(res.body);
-      if (env.DB_PASSWORD && env.DB_PASSWORD.trim().length > 0) {
-        expect(bodyStr).not.toContain(env.DB_PASSWORD);
-      }
-      if (env.DB_USER && env.DB_USER.trim().length > 0) {
-        expect(bodyStr).not.toContain(env.DB_USER);
-      }
+    const res = await supertest(app).get('/api/health');
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('ok');
+    expect(res.body.data.mode).toBe('oracle');
+    expect(res.body.data.database.reachable).toBe(true);
+    expect(res.body.data.database.details).toBe('Connected');
+    const bodyStr = JSON.stringify(res.body);
+    if (env.DB_PASSWORD && env.DB_PASSWORD.trim().length > 0) {
+      expect(bodyStr).not.toContain(env.DB_PASSWORD);
+    }
+    if (env.DB_USER && env.DB_USER.trim().length > 0) {
+      expect(bodyStr).not.toContain(env.DB_USER);
     }
   });
 
   it('registers users, verifies password hashes, and sanitizes output', async () => {
-    if (!isOracleLive) return;
-
     const uniqueTag = 'user_reg_' + Date.now();
     const regResult = await authService.register({
       username: uniqueTag,
@@ -126,8 +140,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   });
 
   it('handles refresh token rotation and logout revocation', async () => {
-    if (!isOracleLive) return;
-
     const uniqueTag = 'user_tok_' + Date.now();
     const reg = await authService.register({
       username: uniqueTag,
@@ -150,8 +162,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   });
 
   it('enforces password reset tokens with 15-min expiration and single use', async () => {
-    if (!isOracleLive) return;
-
     const uniqueTag = 'user_rst_' + Date.now();
     const reg = await authService.register({
       username: uniqueTag,
@@ -180,8 +190,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   });
 
   it('tracks email verification token state', async () => {
-    if (!isOracleLive) return;
-
     const uniqueTag = 'user_eml_' + Date.now();
     const reg = await authService.register({
       username: uniqueTag,
@@ -199,8 +207,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   });
 
   it('enforces account lockout after 5 consecutive failed logins', async () => {
-    if (!isOracleLive) return;
-
     const uniqueTag = 'user_lck_' + Date.now();
     const reg = await authService.register({
       username: uniqueTag,
@@ -222,8 +228,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   }, 20000);
 
   it('enforces author ownership and prevents IDOR on post updates and deletions', async () => {
-    if (!isOracleLive) return;
-
     const userA = await authService.register({
       username: 'author_a_' + Date.now(),
       email: `author_a_${Date.now()}@test.local`,
@@ -269,8 +273,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   });
 
   it('persists and retrieves comments, likes, and bookmarks', async () => {
-    if (!isOracleLive) return;
-
     const user = await authService.register({
       username: 'user_soc_' + Date.now(),
       email: `user_soc_${Date.now()}@test.local`,
@@ -303,8 +305,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   });
 
   it('persists and manages stories and reels with author ownership', async () => {
-    if (!isOracleLive) return;
-
     const user = await authService.register({
       username: 'user_media_' + Date.now(),
       email: `user_media_${Date.now()}@test.local`,
@@ -339,8 +339,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   });
 
   it('handles direct messages and read receipt tracking in Oracle', async () => {
-    if (!isOracleLive) return;
-
     const sender = await authService.register({
       username: 'msg_sender_' + Date.now(),
       email: `msg_sender_${Date.now()}@test.local`,
@@ -371,8 +369,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   });
 
   it('manages groups, member authorization, and group messages in Oracle', async () => {
-    if (!isOracleLive) return;
-
     const owner = await authService.register({
       username: 'grp_owner_' + Date.now(),
       email: `grp_owner_${Date.now()}@test.local`,
@@ -411,8 +407,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   });
 
   it('manages broadcasts and recipient distribution in Oracle', async () => {
-    if (!isOracleLive) return;
-
     const broadcaster = await authService.register({
       username: 'bc_user_' + Date.now(),
       email: `bc_user_${Date.now()}@test.local`,
@@ -444,8 +438,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   });
 
   it('safely handles SQL-injection shaped input through bind parameters', async () => {
-    if (!isOracleLive) return;
-
     const sqliInput = "' OR 1=1 -- \"; DROP TABLE USERS; --";
     const user = await userRepo.findByUsername(sqliInput);
     expect(user).toBeNull();
@@ -455,8 +447,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   });
 
   it('updates user profile details and verifies search indexing', async () => {
-    if (!isOracleLive) return;
-
     const testRunId = Date.now();
     const uniqueDisplayName = `Searchable User ${testRunId}`;
 
@@ -484,8 +474,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   });
 
   it('creates and manages user notifications with read status', async () => {
-    if (!isOracleLive) return;
-
     const sender = await authService.register({
       username: 'notif_snd_' + Date.now(),
       email: `notif_snd_${Date.now()}@test.local`,
@@ -518,8 +506,6 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
   });
 
   it('registers, upserts idempotently, and revokes FCM notification tokens', async () => {
-    if (!isOracleLive) return;
-
     const testUser = await authService.register({
       username: 'fcm_usr_' + Date.now(),
       email: `fcm_usr_${Date.now()}@test.local`,
@@ -558,5 +544,96 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
     expect(revokedCount).toBe(2);
     tokens = await fcmRepo.getUserTokens(testUser.user.userId);
     expect(tokens.length).toBe(0);
+  });
+
+  it('manages privacy settings, hidden words, blocks, follow requests, reports and moderation in Oracle', async () => {
+    // 1. Create two test users
+    const userA = await authService.register({
+      username: 'priv_a_' + Date.now(),
+      email: `priv_a_${Date.now()}@test.local`,
+      password: 'SecurePassword123!',
+      displayName: 'Privacy User A'
+    });
+    createdUserIds.push(userA.user.userId);
+
+    const userB = await authService.register({
+      username: 'priv_b_' + Date.now(),
+      email: `priv_b_${Date.now()}@test.local`,
+      password: 'SecurePassword123!',
+      displayName: 'Privacy User B'
+    });
+    createdUserIds.push(userB.user.userId);
+
+    // 2. Privacy Settings (get and update)
+    const initialSettings = await privacyRepo.getPrivacySettings(userA.user.userId);
+    expect(initialSettings.userId).toBe(userA.user.userId);
+    expect(initialSettings.isPrivate).toBe(false);
+
+    const updatedSettings = await privacyRepo.updatePrivacySettings(userA.user.userId, {
+      isPrivate: true,
+      whoCanMessage: 'FOLLOWING',
+      hideLikeCounts: true
+    });
+    expect(updatedSettings.isPrivate).toBe(true);
+    expect(updatedSettings.whoCanMessage).toBe('FOLLOWING');
+    expect(updatedSettings.hideLikeCounts).toBe(true);
+
+    // 3. Hidden Words
+    const words = ['crypto_scam', 'free_followers', 'phishing_link'];
+    const savedWords = await privacyRepo.setHiddenWords(userA.user.userId, words);
+    expect(savedWords.sort()).toEqual(words.sort());
+
+    const retrievedWords = await privacyRepo.getHiddenWords(userA.user.userId);
+    expect(retrievedWords.sort()).toEqual(words.sort());
+
+    // 4. User Blocks
+    expect(await privacyRepo.isBlocked(userA.user.userId, userB.user.userId)).toBe(false);
+
+    await privacyRepo.blockUser(userA.user.userId, userB.user.userId);
+    expect(await privacyRepo.isBlocked(userA.user.userId, userB.user.userId)).toBe(true);
+
+    const blockedList = await privacyRepo.getBlockedUsers(userA.user.userId);
+    expect(blockedList.some(b => b.userId === userB.user.userId)).toBe(true);
+
+    await privacyRepo.unblockUser(userA.user.userId, userB.user.userId);
+    expect(await privacyRepo.isBlocked(userA.user.userId, userB.user.userId)).toBe(false);
+
+    // 5. Follow Requests
+    const reqResult = await privacyRepo.createFollowRequest(userB.user.userId, userA.user.userId);
+    expect(reqResult.requestId).toBeGreaterThan(0);
+    expect(reqResult.status).toBe('PENDING');
+
+    const pendingRequests = await privacyRepo.getPendingFollowRequests(userA.user.userId);
+    expect(pendingRequests.some(r => r.requestId === reqResult.requestId)).toBe(true);
+
+    const accepted = await privacyRepo.respondToFollowRequest(userA.user.userId, reqResult.requestId, true);
+    expect(accepted).toBe(true);
+
+    // Check follower relationship formed
+    const isNowFollowing = await userRepo.isFollowing(userB.user.userId, userA.user.userId);
+    expect(isNowFollowing).toBe(true);
+
+    // 6. Reports & Moderation Actions
+    const reportResult = await privacyRepo.createReport({
+      reporterUserId: userB.user.userId,
+      targetType: 'USER',
+      targetId: userA.user.userId,
+      reason: 'Harassment',
+      details: 'Test violation details'
+    });
+    expect(reportResult.reportId).toBeGreaterThan(0);
+
+    const reports = await privacyRepo.getReports({ status: 'PENDING' });
+    expect(reports.some(r => r.reportId === reportResult.reportId)).toBe(true);
+
+    const modAction = await privacyRepo.createModerationAction({
+      reportId: reportResult.reportId,
+      moderatorUserId: userA.user.userId,
+      actionType: 'DISMISS_REPORT',
+      targetType: 'USER',
+      targetId: userA.user.userId,
+      notes: 'Dismissed in automated integration test'
+    });
+    expect(modAction.actionId).toBeGreaterThan(0);
   });
 });

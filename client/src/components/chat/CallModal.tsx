@@ -1,7 +1,7 @@
 import React from 'react';
 import { User } from '../../types/index.js';
 import { Avatar } from '../ui/Avatar.js';
-import { Phone, Video, X, Info } from 'lucide-react';
+import { Phone, Video, X } from 'lucide-react';
 import { Button } from '../ui/Button.js';
 
 interface CallModalProps {

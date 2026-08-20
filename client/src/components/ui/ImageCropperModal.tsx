@@ -121,7 +121,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Crop Profile Picture">
+    <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <div className="space-y-5 select-none">
         {/* Crop Area Container */}
         <div

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { socialApi } from '../../api/social.api.js';
 import { Story } from '../../types/index.js';
 import { Avatar } from '../ui/Avatar.js';
-import { Plus, X, Upload, Sparkles, ChevronLeft, ChevronRight, Eye, Heart, Flame, ThumbsUp, Users } from 'lucide-react';
+import { Plus, X, Upload, Sparkles, ChevronLeft, ChevronRight, Eye, Users } from 'lucide-react';
 import { Modal } from '../ui/Modal.js';
 import { Button } from '../ui/Button.js';
 import { readMediaAsDataUrl } from '../../utils/mediaUpload.js';
@@ -14,7 +14,6 @@ export const StoriesBar: React.FC = () => {
   const queryClient = useQueryClient();
   const [isAddStoryOpen, setIsAddStoryOpen] = useState(false);
   const [mediaUrl, setMediaUrl] = useState('');
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [caption, setCaption] = useState('');
   const [isCloseFriendsOnly, setIsCloseFriendsOnly] = useState(false);
   const [activeStoryGroup, setActiveStoryGroup] = useState<{ username: string; stories: Story[] } | null>(null);
@@ -36,7 +35,6 @@ export const StoriesBar: React.FC = () => {
     },
     onSuccess: () => {
       setMediaUrl('');
-      setMediaFile(null);
       setCaption('');
       setIsCloseFriendsOnly(false);
       setIsAddStoryOpen(false);
@@ -55,7 +53,6 @@ export const StoriesBar: React.FC = () => {
 
     try {
       const dataUrl = await readMediaAsDataUrl(file);
-      setMediaFile(file);
       setMediaUrl(dataUrl);
     } catch (err: any) {
       alert(err.message || 'Failed to load media file');
@@ -153,7 +150,7 @@ export const StoriesBar: React.FC = () => {
             <div className="relative rounded-2xl overflow-hidden max-h-72 border border-brand-500/50">
               <img src={mediaUrl} alt="Story preview" className="w-full h-full object-cover" />
               <button
-                onClick={() => { URL.revokeObjectURL(mediaUrl); setMediaUrl(''); setMediaFile(null); }}
+                onClick={() => { URL.revokeObjectURL(mediaUrl); setMediaUrl(''); }}
                 className="absolute top-2 right-2 p-1.5 bg-slate-900/80 text-white rounded-full hover:bg-rose-600"
               >
                 <X className="w-4 h-4" />

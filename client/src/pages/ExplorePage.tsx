@@ -2,7 +2,7 @@ import React from 'react';
 import { AppShell } from '../components/layout/AppShell.js';
 import { SuggestedUsers } from '../components/search/SuggestedUsers.js';
 import { SearchInput } from '../components/search/SearchInput.js';
-import { Compass, Sparkles } from 'lucide-react';
+import { Compass } from 'lucide-react';
 
 export const ExplorePage: React.FC = () => {
   return (

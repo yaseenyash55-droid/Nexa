@@ -30,4 +30,22 @@ class ProfileViewModel(private val repository: UserRepository = UserRepository()
             }
         }
     }
+
+    fun updateProfileLocally(user: User) {
+        _uiState.value = ProfileUiState.Success(user)
+    }
+
+    fun toggleFollow(user: User, isCurrentlyFollowing: Boolean) {
+        viewModelScope.launch {
+            val res = if (isCurrentlyFollowing) {
+                repository.unfollowUser(user.userId)
+            } else {
+                repository.followUser(user.userId)
+            }
+            res.onSuccess {
+                val newCount = if (isCurrentlyFollowing) maxOf(0, user.followersCount - 1) else user.followersCount + 1
+                _uiState.value = ProfileUiState.Success(user.copy(followersCount = newCount))
+            }
+        }
+    }
 }

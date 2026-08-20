@@ -103,12 +103,15 @@ class AuthRepository(private val tokenManager: TokenManager) {
 
     suspend fun logout(): Result<Unit> {
         return try {
-            val token = tokenManager.accessToken
-            if (!token.isNullOrEmpty()) {
-                try {
-                    NexaApiClient.authApi.logout()
-                } catch (_: Exception) {}
+            val refreshToken = tokenManager.refreshToken
+            val logoutBody = if (!refreshToken.isNullOrEmpty()) {
+                mapOf("refreshToken" to refreshToken)
+            } else {
+                emptyMap()
             }
+            try {
+                NexaApiClient.authApi.logout(logoutBody)
+            } catch (_: Exception) {}
             SocketManager.disconnect()
             tokenManager.clear()
             Result.success(Unit)

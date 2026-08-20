@@ -108,4 +108,43 @@ class PostRepository {
             Result.failure(e)
         }
     }
+
+    suspend fun getComments(postId: Int): Result<List<com.nexa.social.data.models.Comment>> {
+        return try {
+            val response = NexaApiClient.postApi.getComments(postId)
+            if (response.isSuccessful && response.body()?.data != null) {
+                Result.success(response.body()!!.data!!)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Failed to load comments"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun addComment(postId: Int, content: String): Result<com.nexa.social.data.models.Comment> {
+        return try {
+            val response = NexaApiClient.postApi.addComment(postId, com.nexa.social.data.models.CreateCommentRequest(content))
+            if (response.isSuccessful && response.body()?.data != null) {
+                Result.success(response.body()!!.data!!)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Failed to post comment"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteComment(postId: Int, commentId: Int): Result<Unit> {
+        return try {
+            val response = NexaApiClient.postApi.deleteComment(postId, commentId)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Failed to delete comment"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

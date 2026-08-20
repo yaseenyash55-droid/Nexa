@@ -48,6 +48,23 @@ async function startServer() {
         }
       });
 
+      socket.on('message:send', async (data: { receiverId: number; content: string }, callback?: (res: any) => void) => {
+        try {
+          if (data?.receiverId && data?.content) {
+            const msg = await realtimeServer.handleSendMessage(user.userId, data.receiverId, data.content);
+            if (callback) callback({ success: true, data: msg });
+          }
+        } catch (err: any) {
+          if (callback) callback({ success: false, error: err.message });
+        }
+      });
+
+      socket.on('message:read', async (data: { messageId: number }) => {
+        if (data?.messageId) {
+          await realtimeServer.handleMessageRead(data.messageId, user.userId);
+        }
+      });
+
       socket.on('disconnect', () => {
         realtimeServer.removeUserSocket(user.userId, socket.id);
       });

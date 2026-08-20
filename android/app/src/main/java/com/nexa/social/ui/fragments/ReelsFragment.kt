@@ -35,6 +35,15 @@ class ReelsFragment : Fragment() {
             viewModel.toggleLike(reel)
         }
         binding.viewPager.adapter = reelAdapter
+
+        binding.viewPager.registerOnPageChangeCallback(object : androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                super.onPageSelected(position)
+                if (position >= reelAdapter.itemCount - 3 && reelAdapter.itemCount > 0) {
+                    viewModel.loadReels(isLoadMore = true)
+                }
+            }
+        })
     }
 
     private fun observeViewModel() {
@@ -43,13 +52,26 @@ class ReelsFragment : Fragment() {
                 when (state) {
                     is ReelsUiState.Loading -> {
                         binding.progressBar.visibility = View.VISIBLE
+                        binding.tvReelsStatus.visibility = View.GONE
                     }
                     is ReelsUiState.Success -> {
                         binding.progressBar.visibility = View.GONE
+                        binding.tvReelsStatus.visibility = View.GONE
                         reelAdapter.submitList(state.reels)
+                    }
+                    is ReelsUiState.Empty -> {
+                        binding.progressBar.visibility = View.GONE
+                        binding.tvReelsStatus.visibility = View.VISIBLE
+                        binding.tvReelsStatus.text = "No reels available right now. Check back later!"
+                        reelAdapter.submitList(emptyList())
                     }
                     is ReelsUiState.Error -> {
                         binding.progressBar.visibility = View.GONE
+                        binding.tvReelsStatus.visibility = View.VISIBLE
+                        binding.tvReelsStatus.text = "${state.message}\nTap to retry"
+                        binding.tvReelsStatus.setOnClickListener {
+                            viewModel.loadReels(isRefresh = true)
+                        }
                     }
                 }
             }

@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
+import { env } from './config/env.js';
 import authRouter from './routes/auth.routes.js';
 import userRouter from './routes/user.routes.js';
 import postRouter from './routes/post.routes.js';
@@ -29,6 +30,10 @@ const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000'
 ];
+
+if (env.CLIENT_ORIGIN && !ALLOWED_ORIGINS.includes(env.CLIENT_ORIGIN)) {
+  ALLOWED_ORIGINS.push(env.CLIENT_ORIGIN);
+}
 
 app.use(cors({
   origin: ALLOWED_ORIGINS,

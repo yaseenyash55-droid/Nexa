@@ -168,6 +168,36 @@ export interface IFcmTokenRepository {
   getUserTokens(userId: number): Promise<string[]>;
 }
 
+export interface IPrivacyRepository {
+  getPrivacySettings(userId: number): Promise<any>;
+  updatePrivacySettings(userId: number, updates: any): Promise<any>;
+  getHiddenWords(userId: number): Promise<string[]>;
+  setHiddenWords(userId: number, words: string[]): Promise<string[]>;
+  getBlockedUsers(userId: number): Promise<any[]>;
+  blockUser(blockerId: number, blockedId: number): Promise<void>;
+  unblockUser(blockerId: number, blockedId: number): Promise<void>;
+  isBlocked(userA: number, userB: number): Promise<boolean>;
+  getPendingFollowRequests(targetUserId: number): Promise<any[]>;
+  createFollowRequest(requesterId: number, targetId: number): Promise<{ requestId: number; status: string }>;
+  respondToFollowRequest(targetUserId: number, requestId: number, accept: boolean): Promise<boolean>;
+  createReport(report: {
+    reporterUserId: number;
+    targetType: string;
+    targetId: number;
+    reason: string;
+    details?: string;
+  }): Promise<{ reportId: number; status: string }>;
+  getReports(filter?: { status?: string; targetType?: string }): Promise<any[]>;
+  createModerationAction(action: {
+    reportId?: number;
+    moderatorUserId: number;
+    actionType: string;
+    targetType: string;
+    targetId: number;
+    notes?: string;
+  }): Promise<{ actionId: number }>;
+}
+
 export interface IRepositoryManager {
   userRepo: IUserRepository;
   postRepo: IPostRepository;
@@ -179,6 +209,7 @@ export interface IRepositoryManager {
   authRepo: IAuthRepository;
   securityRepo: ISecurityRepository;
   fcmTokenRepo: IFcmTokenRepository;
+  privacyRepo: IPrivacyRepository;
   users: IUserRepository;
   posts: IPostRepository;
   comments: ICommentRepository;
@@ -189,5 +220,6 @@ export interface IRepositoryManager {
   auth: IAuthRepository;
   security: ISecurityRepository;
   fcmTokens: IFcmTokenRepository;
+  privacy: IPrivacyRepository;
 }
 

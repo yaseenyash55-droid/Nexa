@@ -25,15 +25,17 @@ object NexaApiClient {
     private var isInitialized = false
 
     fun init(context: Context) {
-        if (!isInitialized) {
+        if (!isInitialized || tokenManager == null) {
             synchronized(this) {
-                if (!isInitialized) {
+                if (!isInitialized || tokenManager == null) {
                     try {
                         tokenManager = TokenManager(context.applicationContext)
+                        isInitialized = true
                     } catch (_: Exception) {
-                        // Fail closed: tokenManager remains null
+                        // Fail closed: tokenManager remains null, isInitialized remains false to allow recovery
+                        tokenManager = null
+                        isInitialized = false
                     }
-                    isInitialized = true
                 }
             }
         }

@@ -1,46 +1,20 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { AppShell } from '../components/layout/AppShell.js';
 import { useQuery } from '@tanstack/react-query';
 import { postsApi } from '../api/posts.api.js';
 import { PostCard } from '../components/feed/PostCard.js';
 import { PostSkeleton } from '../components/ui/Skeleton.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
-import { Bookmark, FolderPlus, Folder, Sparkles, Plus } from 'lucide-react';
-import { Modal } from '../components/ui/Modal.js';
+import { Bookmark, Folder, Sparkles } from 'lucide-react';
 import { Button } from '../components/ui/Button.js';
-import { Input } from '../components/ui/Input.js';
 
 export const BookmarksPage: React.FC = () => {
-  const [collections, setCollections] = useState([
-    { id: 'all', name: 'All Saved', count: 0 },
-    { id: 'tech', name: 'Tech & Oracle', count: 1 },
-    { id: 'design', name: 'UI/UX Inspiration', count: 1 },
-    { id: 'favs', name: 'Favorites', count: 0 }
-  ]);
-  const [activeCollection, setActiveCollection] = useState('all');
-  const [isAddCollectionOpen, setIsAddCollectionOpen] = useState(false);
-  const [newCollectionName, setNewCollectionName] = useState('');
-
   const { data: bookmarksRes, isLoading } = useQuery({
     queryKey: ['bookmarks'],
     queryFn: () => postsApi.getBookmarks()
   });
 
   const posts = bookmarksRes?.data || [];
-
-  const handleCreateCollection = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newCollectionName.trim()) {
-      const newCol = {
-        id: newCollectionName.toLowerCase().replace(/\s+/g, '-'),
-        name: newCollectionName.trim(),
-        count: 0
-      };
-      setCollections([...collections, newCol]);
-      setNewCollectionName('');
-      setIsAddCollectionOpen(false);
-    }
-  };
 
   return (
     <AppShell>
@@ -52,38 +26,29 @@ export const BookmarksPage: React.FC = () => {
               <Bookmark className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white tracking-tight">Saved Collections</h1>
-              <p className="text-xs text-slate-400">Organize saved posts into custom bookmark collections</p>
+              <h1 className="text-xl font-bold text-white tracking-tight">Saved Bookmarks</h1>
+              <p className="text-xs text-slate-400">All bookmarks saved to your Oracle Database profile repository</p>
             </div>
           </div>
           <Button
             size="sm"
-            onClick={() => setIsAddCollectionOpen(true)}
-            leftIcon={<FolderPlus className="w-4 h-4" />}
+            variant="outline"
+            disabled
+            title="Custom category folders are currently unavailable in this release. All bookmarks are saved in Oracle."
           >
-            New Collection
+            Custom Folders (Unavailable)
           </Button>
         </div>
 
-        {/* Collections Tab Bar */}
-        <div className="flex border-b border-slate-800/80 gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {collections.map((col) => {
-            const isActive = activeCollection === col.id;
-            return (
-              <button
-                key={col.id}
-                onClick={() => setActiveCollection(col.id)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 select-none ${
-                  isActive
-                    ? 'bg-brand-600 text-white shadow-glow-brand'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                }`}
-              >
-                <Folder className="w-3.5 h-3.5" />
-                <span>{col.name}</span>
-              </button>
-            );
-          })}
+        {/* Informational Banner */}
+        <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl flex items-center justify-between text-xs text-slate-300">
+          <div className="flex items-center gap-2">
+            <Folder className="w-4 h-4 text-brand-400" />
+            <span>Active Collection: <strong>All Saved Posts ({posts.length})</strong></span>
+          </div>
+          <span className="aurora-badge text-[11px] px-2.5 py-0.5 rounded-full text-brand-300 border-brand-500/30 flex items-center gap-1">
+            <Sparkles className="w-3 h-3" /> Oracle 23ai Persisted
+          </span>
         </div>
 
         {/* Bookmarked Posts List */}
@@ -92,7 +57,7 @@ export const BookmarksPage: React.FC = () => {
         ) : posts.length === 0 ? (
           <EmptyState
             title="No saved bookmarks"
-            description="Click the bookmark icon on any post to add it to your collections."
+            description="Click the bookmark icon on any post to save it to your Oracle repository."
           />
         ) : (
           <div className="divide-y divide-slate-800/80 border border-slate-800/80 rounded-2xl overflow-hidden">
@@ -102,26 +67,6 @@ export const BookmarksPage: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* New Collection Modal */}
-      <Modal isOpen={isAddCollectionOpen} onClose={() => setIsAddCollectionOpen(false)} title="Create Bookmark Collection">
-        <form onSubmit={handleCreateCollection} className="space-y-4">
-          <Input
-            label="Collection Name"
-            value={newCollectionName}
-            onChange={(e) => setNewCollectionName(e.target.value)}
-            placeholder="e.g. Architecture Insights, Product Design"
-          />
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" size="sm" onClick={() => setIsAddCollectionOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" size="sm" disabled={!newCollectionName.trim()}>
-              Create Collection
-            </Button>
-          </div>
-        </form>
-      </Modal>
     </AppShell>
   );
 };

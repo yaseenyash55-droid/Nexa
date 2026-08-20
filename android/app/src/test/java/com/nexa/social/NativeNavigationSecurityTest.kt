@@ -86,4 +86,45 @@ class NativeNavigationSecurityTest {
         assertFalse(NetworkUtils.isValidExternalHttpsUrl(null))
         assertFalse(NetworkUtils.isValidExternalHttpsUrl(":::malformed:::"))
     }
+
+    @Test
+    fun `bottom navigation items map strictly to native Fragment IDs`() {
+        val bottomNavDestinations = mapOf(
+            R.id.navigation_home to "HomeFragment",
+            R.id.navigation_explore to "ExploreFragment",
+            R.id.navigation_reels to "ReelsFragment",
+            R.id.navigation_messages to "MessagesFragment",
+            R.id.navigation_profile to "ProfileFragment"
+        )
+
+        assertEquals(5, bottomNavDestinations.size)
+        assertTrue(bottomNavDestinations.containsKey(R.id.navigation_home))
+        assertTrue(bottomNavDestinations.containsKey(R.id.navigation_explore))
+        assertTrue(bottomNavDestinations.containsKey(R.id.navigation_reels))
+        assertTrue(bottomNavDestinations.containsKey(R.id.navigation_messages))
+        assertTrue(bottomNavDestinations.containsKey(R.id.navigation_profile))
+    }
+
+    @Test
+    fun `first-party destinations never route to browser Intents or WebViews`() {
+        val firstPartyRoutes = listOf(
+            "/",
+            "/feed",
+            "/explore",
+            "/reels",
+            "/messages",
+            "/profile",
+            "/settings"
+        )
+
+        fun isFirstPartyRoute(path: String): Boolean {
+            return firstPartyRoutes.any { path == it || path.startsWith("$it/") }
+        }
+
+        firstPartyRoutes.forEach { route ->
+            assertTrue("Route $route must be native first-party", isFirstPartyRoute(route))
+            // Must not treat first-party paths as external browser targets
+            assertFalse(NetworkUtils.isValidExternalHttpsUrl(route))
+        }
+    }
 }

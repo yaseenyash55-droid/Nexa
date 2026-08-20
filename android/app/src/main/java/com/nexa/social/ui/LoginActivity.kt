@@ -17,8 +17,8 @@ import kotlinx.coroutines.launch
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
-    private lateinit var authRepository: AuthRepository
-    private lateinit var tokenManager: TokenManager
+    private var authRepository: AuthRepository? = null
+    private var tokenManager: TokenManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,10 +27,18 @@ class LoginActivity : AppCompatActivity() {
 
         NexaApiClient.init(this)
         try {
-            tokenManager = TokenManager(this)
-            authRepository = AuthRepository(tokenManager)
-        } catch (e: Exception) {
-            Toast.makeText(this, "Secure storage initialization failed: ${e.message}", Toast.LENGTH_LONG).show()
+            val tm = TokenManager(this)
+            tokenManager = tm
+            authRepository = AuthRepository(tm)
+        } catch (_: Exception) {
+            Toast.makeText(
+                this,
+                "Secure credential storage is unavailable on this device. Authentication actions are disabled.",
+                Toast.LENGTH_LONG
+            ).show()
+            binding.btnLogin.isEnabled = false
+            binding.tilUsername.isEnabled = false
+            binding.tilPassword.isEnabled = false
         }
 
         binding.btnLogin.setOnClickListener {
@@ -51,6 +59,13 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun performLogin() {
+        val repo = authRepository
+        val tm = tokenManager
+        if (repo == null || tm == null) {
+            Toast.makeText(this, "Secure storage is not available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val username = binding.etUsername.text.toString().trim()
         val password = binding.etPassword.text.toString().trim()
 
@@ -71,10 +86,10 @@ class LoginActivity : AppCompatActivity() {
         setLoading(true)
 
         lifecycleScope.launch {
-            val result = authRepository.login(username, password)
+            val result = repo.login(username, password)
             setLoading(false)
             result.onSuccess { user ->
-                tokenManager.accessToken?.let { token ->
+                tm.accessToken?.let { token ->
                     SocketManager.connect(token)
                 }
                 Toast.makeText(this@LoginActivity, "Welcome back, ${user.displayName}!", Toast.LENGTH_SHORT).show()
@@ -90,9 +105,9 @@ class LoginActivity : AppCompatActivity() {
 
     private fun setLoading(isLoading: Boolean) {
         binding.loginProgressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
-        binding.btnLogin.isEnabled = !isLoading
-        binding.btnGoogleLogin.isEnabled = !isLoading
-        binding.btnGithubLogin.isEnabled = !isLoading
+        binding.btnLogin.isEnabled = !isLoading && authRepository != null
+        binding.btnGoogleLogin.isEnabled = !isLoading && authRepository != null
+        binding.btnGithubLogin.isEnabled = !isLoading && authRepository != null
         binding.etUsername.isEnabled = !isLoading
         binding.etPassword.isEnabled = !isLoading
     }

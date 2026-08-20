@@ -1,4 +1,4 @@
-import oracledb from 'oracledb';
+import oracledb, { Result } from 'oracledb';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 
@@ -7,6 +7,13 @@ oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
 oracledb.autoCommit = false;
 
 let pool: any = null;
+
+export function sanitizeConnectString(rawConnectString: string): string {
+  if (!rawConnectString) return '';
+  return rawConnectString
+    .replace(/:[^:@/]+@/g, ':***@')
+    .replace(/\/\/([^:@/]+):([^:@/]+)@/g, '//$1:***@');
+}
 
 export async function initializeOraclePool(): Promise<void> {
   try {
@@ -29,7 +36,7 @@ export async function initializeOraclePool(): Promise<void> {
     pool = await oracledb.createPool(poolConfig);
     logger.info(
       {
-        connectString: env.DB_CONNECT_STRING.replace(/:[^:@]+@/, ':***@'),
+        connectString: sanitizeConnectString(env.DB_CONNECT_STRING),
         walletConfigured: Boolean(env.WALLET_LOCATION)
       },
       'Oracle Database connection pool initialized successfully'
@@ -59,11 +66,11 @@ export async function getConnection(): Promise<any> {
   return pool.getConnection();
 }
 
-export async function executeSql<T = unknown>(
+export async function executeSql<T = any>(
   sql: string,
   binds: Record<string, any> | any[] = {},
   options: Record<string, any> = {}
-): Promise<any> {
+): Promise<Result<T>> {
   let connection: any = null;
   try {
     connection = await getConnection();

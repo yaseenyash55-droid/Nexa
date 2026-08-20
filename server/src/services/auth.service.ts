@@ -52,9 +52,6 @@ export class AuthService {
 
     const passwordHash = await hashPassword(data.password);
 
-    // Generate tokens before transaction (no DB dependency)
-    const accessTokenPayload = { userId: 0, username: normalizedUsername, email: normalizedEmail };
-
     // Atomic: insert user + refresh token in one transaction
     const result = await withTransaction(async (conn) => {
       // 1. Insert user

@@ -33,7 +33,6 @@ export const MusicAudioEditor: React.FC<MusicAudioEditorProps> = ({ onAudioSelec
   const [selectedTrack, setSelectedTrack] = useState<LicensedTrack | null>(null);
   const [startTime, setStartTime] = useState<number>(0);
   const [volumeMix, setVolumeMix] = useState<number>(80);
-  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     async function fetchCatalog() {

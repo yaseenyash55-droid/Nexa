@@ -64,4 +64,19 @@ interface PostApi {
 
     @DELETE("social/reels/{id}/like")
     suspend fun unlikeReel(@retrofit2.http.Path("id") id: Int): Response<ApiResponse<Map<String, Any>>>
+
+    @GET("posts/{id}/comments")
+    suspend fun getComments(@retrofit2.http.Path("id") id: Int): Response<ApiResponse<List<com.nexa.social.data.models.Comment>>>
+
+    @POST("posts/{id}/comment")
+    suspend fun addComment(
+        @retrofit2.http.Path("id") id: Int,
+        @Body request: com.nexa.social.data.models.CreateCommentRequest
+    ): Response<ApiResponse<com.nexa.social.data.models.Comment>>
+
+    @DELETE("posts/{postId}/comments/{commentId}")
+    suspend fun deleteComment(
+        @retrofit2.http.Path("postId") postId: Int,
+        @retrofit2.http.Path("commentId") commentId: Int
+    ): Response<ApiResponse<Map<String, Any>>>
 }

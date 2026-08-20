@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Image as ImageIcon, Sparkles, X, Upload, CheckCircle2, AlertCircle, HelpCircle, Film, Loader2 } from 'lucide-react';
+import { Sparkles, X, Upload, CheckCircle2, AlertCircle, HelpCircle, Film, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.js';
 import { Avatar } from '../ui/Avatar.js';
 import { Button } from '../ui/Button.js';
