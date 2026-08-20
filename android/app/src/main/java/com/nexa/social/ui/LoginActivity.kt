@@ -45,13 +45,9 @@ class LoginActivity : AppCompatActivity() {
             startActivity(Intent(this, ForgotPasswordActivity::class.java))
         }
 
-        binding.btnGoogleLogin.setOnClickListener {
-            Toast.makeText(this, "Google Sign-In will be implemented with Credential Manager soon", Toast.LENGTH_SHORT).show()
-        }
-
-        binding.btnGithubLogin.setOnClickListener {
-            Toast.makeText(this, "GitHub Sign-In not supported natively yet", Toast.LENGTH_SHORT).show()
-        }
+        // Hide OAuth buttons until server-side Credential Manager OAuth is configured
+        binding.btnGoogleLogin.visibility = View.GONE
+        binding.btnGithubLogin.visibility = View.GONE
     }
 
     private fun performLogin() {

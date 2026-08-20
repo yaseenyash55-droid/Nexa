@@ -20,6 +20,8 @@ services:
         sync: false
       - key: DB_CONNECT_STRING
         sync: false
+      - key: TNS_ADMIN
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET

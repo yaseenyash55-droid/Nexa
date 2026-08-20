@@ -8,7 +8,7 @@ function saveBase64PostImageToDisk(base64Data: string, userId: number): string {
   if (!base64Data || !base64Data.startsWith('data:image/')) {
     return base64Data;
   }
-  const matches = base64Data.match(/^data:image\/([a-zA-Z0-9\+\/]+);base64,(.+)$/);
+  const matches = base64Data.match(/^data:image\/([a-zA-Z0-9+/]+);base64,(.+)$/);
   if (!matches) return base64Data;
 
   const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
@@ -30,7 +30,7 @@ function saveBase64VideoToDisk(base64Data: string, userId: number): string {
   if (!base64Data || !base64Data.startsWith('data:video/')) {
     return base64Data;
   }
-  const matches = base64Data.match(/^data:video\/([a-zA-Z0-9\+\/-]+);base64,(.+)$/);
+  const matches = base64Data.match(/^data:video\/([a-zA-Z0-9+/-]+);base64,(.+)$/);
   if (!matches) return base64Data;
 
   let ext = 'mp4';

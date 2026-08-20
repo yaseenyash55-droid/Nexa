@@ -16,11 +16,16 @@
     "typecheck": "npm run typecheck --workspace=server && npm run typecheck --workspace=client",
     "lint": "npm run lint --workspace=server && npm run lint --workspace=client",
     "test": "npm run test --workspace=server && npm run test --workspace=client",
+    "test:unit": "npm run test:unit --workspace=server && npm run test --workspace=client",
+    "test:integration": "npm run test:integration --workspace=server",
     "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.45.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
     "concurrently": "^8.2.2",
+    "eslint": "^8.57.1",
     "prettier": "^3.3.2",
     "typescript": "^5.4.5"
   },

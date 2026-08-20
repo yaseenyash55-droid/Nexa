@@ -13,6 +13,7 @@ export interface User {
   followersCount?: number;
   followingCount?: number;
   isFollowing?: boolean;
+  role?: 'ADMIN' | 'MODERATOR' | 'USER';
 }
 
 export interface Post {

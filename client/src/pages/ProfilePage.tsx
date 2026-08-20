@@ -206,14 +206,13 @@ export const ProfilePage: React.FC = () => {
                           <Play className="w-2.5 h-2.5 fill-current" /> Reel
                         </span>
                         {currentUser &&
-                          (currentUser.userId === reel.userId || [100, 101, 102].includes(currentUser.userId)) && (
+                          (currentUser.userId === reel.userId || currentUser.role === 'ADMIN' || currentUser.role === 'MODERATOR') && (
                             <button
                               type="button"
                               onClick={() => {
-                                if (confirm('Delete this reel from Oracle database?')) {
+                                if (window.confirm('Delete this reel from Oracle database?')) {
                                   socialApi.deleteReel(reel.reelId).then(() => {
                                     queryClient.invalidateQueries({ queryKey: ['reels'] });
-                                    alert('✔ Reel deleted successfully!');
                                   });
                                 }
                               }}

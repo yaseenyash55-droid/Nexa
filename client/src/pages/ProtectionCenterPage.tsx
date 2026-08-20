@@ -1,92 +1,160 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppShell } from '../components/layout/AppShell.js';
 import { useAuth } from '../contexts/AuthContext.js';
 import { 
   ShieldCheck, 
   KeyRound, 
   Smartphone, 
-  EyeOff, 
   UserX, 
   Filter, 
   Moon, 
   AlertTriangle, 
   Check, 
-  RefreshCw, 
   Lock, 
-  Copy, 
-  BellRing,
-  Sparkles
+  Sparkles,
+  Info
 } from 'lucide-react';
 import { Button } from '../components/ui/Button.js';
 import { Input } from '../components/ui/Input.js';
+import { api } from '../api/client.js';
+
+interface SessionItem {
+  sessionId?: string;
+  id?: string | number;
+  device?: string;
+  ipAddress?: string;
+  location?: string;
+  lastActiveAt?: string;
+  createdAt?: string;
+  current?: boolean;
+}
 
 export const ProtectionCenterPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'security' | 'privacy' | 'moderation' | 'wellbeing'>('security');
 
-  // 2FA state
-  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
-  const [secretKey, setSecretKey] = useState('NEXA-7X9K-3P2M-8W4Q');
-  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
-  const [isGeneratingCodes, setIsGeneratingCodes] = useState(false);
-  const [copiedCodes, setCopiedCodes] = useState(false);
+  // Security Status & Sessions from backend
+  const [securityStatus, setSecurityStatus] = useState<{ emailVerified: boolean; mfaEnabled: boolean } | null>(null);
+  const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const [isSessionsLoading, setIsSessionsLoading] = useState(false);
+  const [sessionActionMsg, setSessionActionMsg] = useState<string | null>(null);
 
-  // Active Sessions
-  const [activeSessions, setActiveSessions] = useState([
-    { id: 1, device: 'Chrome on Windows 11', location: 'San Francisco, US', lastActive: 'Active now', current: true },
-    { id: 2, device: 'Nexa iOS App on iPhone 15', location: 'Tokyo, JP', lastActive: '2 hours ago', current: false }
-  ]);
+  // Privacy Settings from backend
+  const [privacySettings, setPrivacySettings] = useState({
+    isPrivate: false,
+    whoCanMessage: 'EVERYONE',
+    whoCanComment: 'EVERYONE',
+    activityStatusVisible: true,
+    readReceiptsEnabled: true,
+    hideLikeCounts: false
+  });
+  const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
+  const [privacySuccessMsg, setPrivacySuccessMsg] = useState<string | null>(null);
 
-  // Privacy & Follow Requests
-  const [isPrivateAccount, setIsPrivateAccount] = useState(false);
-  const [followRequests, setFollowRequests] = useState([
-    { id: 101, username: 'dev_marcus', displayName: 'Marcus Vance', time: '10m ago' }
-  ]);
-
-  // Moderation: Blocked Users & Hidden Words
-  const [blockedUsers, setBlockedUsers] = useState([
-    { id: 201, username: 'spambot_99', displayName: 'Spam Bot 99' }
-  ]);
+  // Moderation: Hidden Words from backend
+  const [hiddenWords, setHiddenWords] = useState<string[]>([]);
   const [newKeyword, setNewKeyword] = useState('');
-  const [hiddenWords, setHiddenWords] = useState(['crypto_spam', 'buy_followers', 'scam_link']);
+  const [isSavingWords, setIsSavingWords] = useState(false);
 
-  // Wellbeing
+  // Wellbeing local settings
   const [quietMode, setQuietMode] = useState(false);
   const [takeBreakMinutes, setTakeBreakMinutes] = useState(30);
 
-  const handleGenerateRecoveryCodes = () => {
-    setIsGeneratingCodes(true);
-    setTimeout(() => {
-      const codes = Array.from({ length: 8 }, () => Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
-      setRecoveryCodes(codes);
-      setIsGeneratingCodes(false);
-      setCopiedCodes(false);
-    }, 400);
-  };
+  // Load real security status and sessions on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function loadSecurityData() {
+      setIsSessionsLoading(true);
+      try {
+        const [statusRes, sessionsRes, privacyRes, wordsRes] = await Promise.allSettled([
+          api.get('/security/status'),
+          api.get('/security/sessions'),
+          api.get('/privacy/settings'),
+          api.get('/privacy/hidden-words')
+        ]);
 
-  const handleRevokeSession = (sessionId: number) => {
-    setActiveSessions(prev => prev.filter(s => s.id !== sessionId));
-  };
+        if (isMounted) {
+          if (statusRes.status === 'fulfilled') {
+            setSecurityStatus(statusRes.value.data?.data || null);
+          }
+          if (sessionsRes.status === 'fulfilled') {
+            const rawSessions = sessionsRes.value.data?.data || [];
+            setSessions(rawSessions);
+          }
+          if (privacyRes.status === 'fulfilled') {
+            setPrivacySettings(prev => ({ ...prev, ...(privacyRes.value.data?.data || {}) }));
+          }
+          if (wordsRes.status === 'fulfilled') {
+            setHiddenWords(wordsRes.value.data?.data || []);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load protection data:', err);
+      } finally {
+        if (isMounted) setIsSessionsLoading(false);
+      }
+    }
+    loadSecurityData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
-  const handleUnblockUser = (userId: number) => {
-    setBlockedUsers(prev => prev.filter(u => u.id !== userId));
-  };
-
-  const handleAddHiddenWord = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newKeyword.trim() && !hiddenWords.includes(newKeyword.trim().toLowerCase())) {
-      setHiddenWords([...hiddenWords, newKeyword.trim().toLowerCase()]);
-      setNewKeyword('');
+  const handleRevokeSession = async (sessionId: string | number) => {
+    try {
+      setSessionActionMsg(null);
+      await api.delete(`/security/sessions/${sessionId}`);
+      setSessions(prev => prev.filter(s => (s.sessionId || s.id) !== sessionId));
+      setSessionActionMsg('Session revoked successfully.');
+    } catch (err: any) {
+      setSessionActionMsg(err.response?.data?.error?.message || 'Failed to revoke session.');
     }
   };
 
-  const handleRemoveHiddenWord = (word: string) => {
-    setHiddenWords(prev => prev.filter(w => w !== word));
+  const handleSavePrivacy = async () => {
+    try {
+      setIsSavingPrivacy(true);
+      setPrivacySuccessMsg(null);
+      await api.put('/privacy/settings', privacySettings);
+      setPrivacySuccessMsg('Privacy preferences saved successfully.');
+    } catch (err) {
+      console.error('Failed to save privacy settings:', err);
+    } finally {
+      setIsSavingPrivacy(false);
+    }
+  };
+
+  const handleAddHiddenWord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const word = newKeyword.trim().toLowerCase();
+    if (!word || hiddenWords.includes(word)) return;
+
+    const nextWords = [...hiddenWords, word];
+    setHiddenWords(nextWords);
+    setNewKeyword('');
+    try {
+      setIsSavingWords(true);
+      await api.put('/privacy/hidden-words', { words: nextWords });
+    } catch (err) {
+      console.error('Failed to update hidden words:', err);
+    } finally {
+      setIsSavingWords(false);
+    }
+  };
+
+  const handleRemoveHiddenWord = async (wordToRemove: string) => {
+    const nextWords = hiddenWords.filter(w => w !== wordToRemove);
+    setHiddenWords(nextWords);
+    try {
+      await api.put('/privacy/hidden-words', { words: nextWords });
+    } catch (err) {
+      console.error('Failed to remove hidden word:', err);
+    }
   };
 
   const tabs = [
     { id: 'security', label: '2FA & Devices', icon: <ShieldCheck className="w-4 h-4" /> },
-    { id: 'privacy', label: 'Privacy & Requests', icon: <Lock className="w-4 h-4" /> },
+    { id: 'privacy', label: 'Privacy & Permissions', icon: <Lock className="w-4 h-4" /> },
     { id: 'moderation', label: 'Safety & Hidden Words', icon: <Filter className="w-4 h-4" /> },
     { id: 'wellbeing', label: 'Quiet Mode & Health', icon: <Moon className="w-4 h-4" /> }
   ];
@@ -98,22 +166,23 @@ export const ProtectionCenterPage: React.FC = () => {
         <div className="aurora-glass rounded-2xl p-5 border border-brand-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-gradient-to-tr from-brand-600 to-aurora-cyan rounded-xl text-white shadow-glow-brand">
+              <div className="p-2 bg-gradient-to-tr from-brand-600 to-indigo-500 rounded-xl text-white shadow-lg shadow-brand-600/30">
                 <ShieldCheck className="w-6 h-6" />
               </div>
-              <h1 className="text-xl font-bold text-white tracking-tight">Nexa Protection Center</h1>
+              <h1 className="text-xl font-bold text-white tracking-tight">Protection Hub</h1>
             </div>
             <p className="text-xs text-slate-300">
-              Manage multi-factor authentication, active devices, privacy, content safety filters, and quiet mode wellbeing.
+              Account security, device sessions, privacy preferences, and content filtering.
             </p>
           </div>
-          <span className="aurora-badge text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" /> Protection Active
+          <span className="aurora-badge text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 text-brand-300 border-brand-500/40">
+            <Sparkles className="w-3.5 h-3.5 text-brand-400" />
+            Oracle 23ai Security Active
           </span>
         </div>
 
-        {/* Tab Navigation Bar */}
-        <div className="flex border-b border-slate-800/80 gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {/* Tab Navigation */}
+        <div className="flex border-b border-slate-800 gap-2 overflow-x-auto pb-1 scrollbar-none">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -133,237 +202,244 @@ export const ProtectionCenterPage: React.FC = () => {
           })}
         </div>
 
-        {/* TAB 1: 2FA & Devices */}
+        {/* Tab: Security & Devices */}
         {activeTab === 'security' && (
           <div className="space-y-6">
-            {/* 2FA Toggle & Key */}
-            <div className="aurora-glass rounded-2xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <KeyRound className="w-5 h-5 text-brand-400" /> Two-Factor Authentication (2FA)
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Require an authenticator app (TOTP) security code on every new sign in.
-                  </p>
+            {/* 2FA Status Notice */}
+            <div className="aurora-glass rounded-2xl p-5 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="w-5 h-5 text-brand-400" />
+                  <div>
+                    <h2 className="text-sm font-bold text-white">Two-Factor Authentication (2FA)</h2>
+                    <p className="text-[11px] text-slate-400">TOTP Authenticator app verification</p>
+                  </div>
                 </div>
-                <button
-                  onClick={() => setIs2FAEnabled(!is2FAEnabled)}
-                  className={`w-12 h-6 rounded-full transition-colors p-1 relative ${
-                    is2FAEnabled ? 'bg-brand-600' : 'bg-slate-700'
-                  }`}
-                >
-                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${is2FAEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
-                </button>
+                <span className={`text-[11px] px-2.5 py-1 rounded-full font-semibold ${
+                  securityStatus?.mfaEnabled ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {securityStatus?.mfaEnabled ? 'Enabled' : 'Not Configured'}
+                </span>
               </div>
 
-              {is2FAEnabled && (
-                <div className="p-4 bg-slate-900/80 rounded-xl border border-brand-500/30 space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">TOTP Authenticator Secret Key:</span>
-                    <code className="text-brand-300 font-mono bg-black/40 px-2 py-1 rounded border border-brand-500/20">{secretKey}</code>
-                  </div>
+              <div className="p-3.5 bg-slate-900/60 border border-slate-800 rounded-xl flex items-start gap-2.5 text-xs text-slate-300">
+                <Info className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
+                <span>
+                  Two-Factor Authentication requires a verified server-side TOTP service and encryption key. Server-side MFA is currently unconfigured in this production release.
+                </span>
+              </div>
+            </div>
 
-                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-semibold text-slate-200">Backup Recovery Codes</p>
-                      <p className="text-[11px] text-slate-400">Use one-time codes if you lose access to your authenticator app</p>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={handleGenerateRecoveryCodes} isLoading={isGeneratingCodes}>
-                      Generate Codes
-                    </Button>
+            {/* Active Sessions */}
+            <div className="aurora-glass rounded-2xl p-5 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-5 h-5 text-aurora-cyan" />
+                  <div>
+                    <h2 className="text-sm font-bold text-white">Active Device Sessions</h2>
+                    <p className="text-[11px] text-slate-400">Authenticated refresh tokens recorded in Oracle Database</p>
                   </div>
+                </div>
+              </div>
 
-                  {recoveryCodes.length > 0 && (
-                    <div className="p-3 bg-black/40 rounded-xl border border-slate-800 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-semibold text-slate-300">8 One-Time Backup Codes:</span>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(recoveryCodes.join('\n'));
-                            setCopiedCodes(true);
-                          }}
-                          className="text-xs text-brand-400 hover:underline flex items-center gap-1"
-                        >
-                          <Copy className="w-3.5 h-3.5" /> {copiedCodes ? 'Copied!' : 'Copy All'}
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono text-cyan-300">
-                        {recoveryCodes.map((code, idx) => (
-                          <div key={idx} className="p-1.5 bg-slate-900 rounded text-center border border-slate-800">{code}</div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+              {sessionActionMsg && (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400">
+                  {sessionActionMsg}
                 </div>
               )}
-            </div>
 
-            {/* Active Devices & Sessions */}
-            <div className="aurora-glass rounded-2xl p-5 space-y-4">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-aurora-cyan" /> Active Sessions & Devices
-              </h3>
-              <p className="text-xs text-slate-400">
-                Logged in devices with active refresh sessions. Revoke any session you do not recognize.
-              </p>
-
-              <div className="space-y-3">
-                {activeSessions.map((session) => (
-                  <div key={session.id} className="p-3.5 bg-slate-900/60 rounded-xl border border-slate-800/80 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-white flex items-center gap-2">
-                        {session.device} {session.current && <span className="text-[10px] bg-brand-500/20 text-brand-400 px-2 py-0.5 rounded-full border border-brand-500/30">Current Device</span>}
-                      </p>
-                      <p className="text-[11px] text-slate-400">{session.location} • {session.lastActive}</p>
-                    </div>
-                    {!session.current && (
-                      <Button size="sm" variant="danger" onClick={() => handleRevokeSession(session.id)}>
-                        Revoke
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: Privacy & Requests */}
-        {activeTab === 'privacy' && (
-          <div className="space-y-6">
-            <div className="aurora-glass rounded-2xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Lock className="w-5 h-5 text-aurora-pink" /> Private Account Mode
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    When enabled, only users you approve as followers can see your profile posts and stories.
-                  </p>
+              {isSessionsLoading ? (
+                <p className="text-xs text-slate-400 py-4 text-center">Loading active sessions from database...</p>
+              ) : sessions.length === 0 ? (
+                <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 text-center text-xs text-slate-400">
+                  Current browser session active. No auxiliary refresh tokens recorded.
                 </div>
-                <button
-                  onClick={() => setIsPrivateAccount(!isPrivateAccount)}
-                  className={`w-12 h-6 rounded-full transition-colors p-1 relative ${
-                    isPrivateAccount ? 'bg-brand-600' : 'bg-slate-700'
-                  }`}
-                >
-                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${isPrivateAccount ? 'translate-x-6' : 'translate-x-0'}`} />
-                </button>
-              </div>
-            </div>
-
-            {/* Pending Follow Requests Queue */}
-            <div className="aurora-glass rounded-2xl p-5 space-y-4">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <UserX className="w-5 h-5 text-brand-400" /> Pending Follow Requests ({followRequests.length})
-              </h3>
-
-              {followRequests.length === 0 ? (
-                <p className="text-xs text-slate-500">No pending follow requests.</p>
               ) : (
-                <div className="space-y-3">
-                  {followRequests.map((req) => (
-                    <div key={req.id} className="p-3.5 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-bold text-white">{req.displayName}</p>
-                        <p className="text-[11px] text-slate-400">@{req.username} • {req.time}</p>
+                <div className="space-y-2.5">
+                  {sessions.map((session, idx) => {
+                    const sid = session.sessionId || session.id || idx;
+                    return (
+                      <div
+                        key={String(sid)}
+                        className="flex items-center justify-between p-3.5 bg-slate-900/80 rounded-xl border border-slate-800 text-xs"
+                      >
+                        <div>
+                          <p className="font-semibold text-slate-200 flex items-center gap-2">
+                            {session.device || 'Active Session'}
+                            {session.current && (
+                              <span className="text-[10px] bg-brand-500/20 text-brand-300 px-2 py-0.5 rounded-full font-bold">
+                                Current
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {session.ipAddress ? `IP: ${session.ipAddress} • ` : ''}
+                            {session.createdAt ? `Started: ${new Date(session.createdAt).toLocaleDateString()}` : 'Active'}
+                          </p>
+                        </div>
+
+                        {!session.current && (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => handleRevokeSession(sid)}
+                          >
+                            Revoke
+                          </Button>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" onClick={() => setFollowRequests(prev => prev.filter(r => r.id !== req.id))}>
-                          Approve
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setFollowRequests(prev => prev.filter(r => r.id !== req.id))}>
-                          Decline
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* TAB 3: Safety & Hidden Words */}
-        {activeTab === 'moderation' && (
-          <div className="space-y-6">
-            {/* Hidden Words Comment Filter */}
-            <div className="aurora-glass rounded-2xl p-5 space-y-4">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Filter className="w-5 h-5 text-aurora-cyan" /> Hidden Words & Comment Filter
-              </h3>
-              <p className="text-xs text-slate-400">
-                Comments or replies containing these custom keywords or offensive phrases will be automatically hidden.
-              </p>
+        {/* Tab: Privacy & Permissions */}
+        {activeTab === 'privacy' && (
+          <div className="aurora-glass rounded-2xl p-5 border border-slate-800 space-y-4 text-xs">
+            <h2 className="text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+              <Lock className="w-4 h-4 text-brand-400" /> Privacy Controls
+            </h2>
 
-              <form onSubmit={handleAddHiddenWord} className="flex gap-2">
-                <Input
-                  value={newKeyword}
-                  onChange={(e) => setNewKeyword(e.target.value)}
-                  placeholder="Enter keyword or phrase to block..."
-                  className="flex-1"
-                />
-                <Button type="submit" size="sm">Add Rule</Button>
-              </form>
+            {privacySuccessMsg && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 flex items-center gap-2">
+                <Check className="w-4 h-4" /> {privacySuccessMsg}
+              </div>
+            )}
 
-              <div className="flex flex-wrap gap-2 pt-2">
-                {hiddenWords.map((word) => (
-                  <span key={word} className="px-3 py-1 bg-slate-800 text-slate-200 border border-slate-700 rounded-full text-xs font-medium flex items-center gap-1.5">
-                    {word}
-                    <button type="button" onClick={() => handleRemoveHiddenWord(word)} className="text-slate-400 hover:text-rose-400 font-bold">×</button>
-                  </span>
-                ))}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
+                <div>
+                  <p className="font-semibold text-slate-100">Private Account</p>
+                  <p className="text-[11px] text-slate-400">Only approved followers can view your full posts</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPrivacySettings(prev => ({ ...prev, isPrivate: !prev.isPrivate }))}
+                  className={`w-12 h-6 rounded-full transition-colors p-1 relative ${privacySettings.isPrivate ? 'bg-brand-600' : 'bg-slate-700'}`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${privacySettings.isPrivate ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
+                <div>
+                  <p className="font-semibold text-slate-100">Show Activity Status</p>
+                  <p className="text-[11px] text-slate-400">Allow accounts you follow to see when you were last active</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPrivacySettings(prev => ({ ...prev, activityStatusVisible: !prev.activityStatusVisible }))}
+                  className={`w-12 h-6 rounded-full transition-colors p-1 relative ${privacySettings.activityStatusVisible ? 'bg-brand-600' : 'bg-slate-700'}`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${privacySettings.activityStatusVisible ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
+                <div>
+                  <p className="font-semibold text-slate-100">Read Receipts</p>
+                  <p className="text-[11px] text-slate-400">Allow others to see when you have read their direct messages</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPrivacySettings(prev => ({ ...prev, readReceiptsEnabled: !prev.readReceiptsEnabled }))}
+                  className={`w-12 h-6 rounded-full transition-colors p-1 relative ${privacySettings.readReceiptsEnabled ? 'bg-brand-600' : 'bg-slate-700'}`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${privacySettings.readReceiptsEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
               </div>
             </div>
 
-            {/* Blocked Users */}
-            <div className="aurora-glass rounded-2xl p-5 space-y-4">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <UserX className="w-5 h-5 text-rose-400" /> Blocked Accounts ({blockedUsers.length})
-              </h3>
-              <div className="space-y-2">
-                {blockedUsers.map((u) => (
-                  <div key={u.id} className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-white">{u.displayName}</p>
-                      <p className="text-[11px] text-slate-400">@{u.username}</p>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => handleUnblockUser(u.id)}>
-                      Unblock
-                    </Button>
-                  </div>
-                ))}
-              </div>
+            <div className="pt-2 flex justify-end">
+              <Button size="sm" onClick={handleSavePrivacy} isLoading={isSavingPrivacy}>
+                Save Privacy Settings
+              </Button>
             </div>
           </div>
         )}
 
-        {/* TAB 4: Quiet Mode & Wellbeing */}
-        {activeTab === 'wellbeing' && (
-          <div className="aurora-glass rounded-2xl p-5 space-y-5">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Moon className="w-5 h-5 text-indigo-400" /> Quiet Mode & Digital Wellbeing
-            </h3>
-            <p className="text-xs text-slate-400">
-              Pause all push notifications during your focus or sleep schedule.
-            </p>
+        {/* Tab: Moderation & Hidden Words */}
+        {activeTab === 'moderation' && (
+          <div className="aurora-glass rounded-2xl p-5 border border-slate-800 space-y-5 text-xs">
+            <div className="border-b border-slate-800 pb-3">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <Filter className="w-4 h-4 text-rose-400" /> Hidden Words & Comment Filters
+              </h2>
+              <p className="text-[11px] text-slate-400">Comments containing these keywords will be automatically filtered from your posts</p>
+            </div>
 
-            <div className="flex items-center justify-between p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
-              <div>
-                <p className="text-xs font-bold text-white flex items-center gap-2">
-                  <BellRing className="w-4 h-4 text-brand-400" /> Quiet Hours Schedule
-                </p>
-                <p className="text-[11px] text-slate-400">Mutes push alerts every day between 10:00 PM and 7:00 AM</p>
+            <form onSubmit={handleAddHiddenWord} className="flex gap-2">
+              <Input
+                id="protection-hidden-word"
+                placeholder="Enter keyword or phrase to block..."
+                value={newKeyword}
+                onChange={(e) => setNewKeyword(e.target.value)}
+              />
+              <Button type="submit" size="sm" isLoading={isSavingWords}>
+                Add Word
+              </Button>
+            </form>
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              {hiddenWords.map((word) => (
+                <span
+                  key={word}
+                  className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 flex items-center gap-2 text-xs"
+                >
+                  <span>{word}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveHiddenWord(word)}
+                    className="text-slate-400 hover:text-rose-400 transition-colors"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tab: Wellbeing */}
+        {activeTab === 'wellbeing' && (
+          <div className="aurora-glass rounded-2xl p-5 border border-slate-800 space-y-4 text-xs">
+            <h2 className="text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+              <Moon className="w-4 h-4 text-indigo-400" /> Digital Wellbeing & Quiet Mode
+            </h2>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
+                <div>
+                  <p className="font-semibold text-slate-100">Quiet Mode</p>
+                  <p className="text-[11px] text-slate-400">Pause notification alerts and sounds during focused hours</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setQuietMode(!quietMode)}
+                  className={`w-12 h-6 rounded-full transition-colors p-1 relative ${quietMode ? 'bg-brand-600' : 'bg-slate-700'}`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${quietMode ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
               </div>
-              <button
-                onClick={() => setQuietMode(!quietMode)}
-                className={`w-12 h-6 rounded-full transition-colors p-1 relative ${
-                  quietMode ? 'bg-brand-600' : 'bg-slate-700'
-                }`}
-              >
-                <div className={`w-4 h-4 bg-white rounded-full transition-transform ${quietMode ? 'translate-x-6' : 'translate-x-0'}`} />
-              </button>
+
+              <div className="p-3.5 bg-slate-900/60 rounded-xl border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-slate-100">Break Reminder Interval</p>
+                  <span className="text-brand-400 font-bold">{takeBreakMinutes} mins</span>
+                </div>
+                <input
+                  type="range"
+                  min="15"
+                  max="120"
+                  step="15"
+                  value={takeBreakMinutes}
+                  onChange={(e) => setTakeBreakMinutes(Number(e.target.value))}
+                  className="w-full accent-brand-500"
+                />
+              </div>
             </div>
           </div>
         )}

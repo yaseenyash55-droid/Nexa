@@ -61,14 +61,12 @@ class RegisterActivity : AppCompatActivity() {
             val result = authRepository.register(request)
             setLoading(false)
 
-            result.onSuccess { user ->
-                tokenManager.accessToken?.let { token ->
-                    SocketManager.connect(token)
-                }
+            result.onSuccess {
                 Toast.makeText(this@RegisterActivity, "Account created! Please verify your email.", Toast.LENGTH_LONG).show()
 
-                val intent = Intent(this@RegisterActivity, MainActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                val intent = Intent(this@RegisterActivity, VerifyEmailActivity::class.java).apply {
+                    putExtra("email", email)
+                }
                 startActivity(intent)
                 finish()
             }.onFailure { exception ->

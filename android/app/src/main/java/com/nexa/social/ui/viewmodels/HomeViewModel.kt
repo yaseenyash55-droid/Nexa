@@ -20,17 +20,81 @@ class HomeViewModel(private val repository: PostRepository = PostRepository()) :
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    private var currentPosts: MutableList<Post> = mutableListOf()
+
     init {
         loadFeed()
     }
 
-    fun loadFeed() {
+    fun loadFeed(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = HomeUiState.Loading
+            if (!isRefresh && currentPosts.isEmpty()) {
+                _uiState.value = HomeUiState.Loading
+            }
             repository.getFeed().onSuccess { posts ->
-                _uiState.value = HomeUiState.Success(posts)
+                currentPosts = posts.toMutableList()
+                _uiState.value = HomeUiState.Success(currentPosts.toList())
             }.onFailure { exception ->
-                _uiState.value = HomeUiState.Error(exception.message ?: "Unknown error")
+                if (currentPosts.isEmpty()) {
+                    _uiState.value = HomeUiState.Error(exception.message ?: "Failed to load feed")
+                }
+            }
+        }
+    }
+
+    fun toggleLike(post: Post) {
+        val isCurrentlyLiked = post.isLiked == true
+        val newLiked = !isCurrentlyLiked
+        val newCount = if (newLiked) post.likesCount + 1 else maxOf(0, post.likesCount - 1)
+
+        // Optimistic UI update
+        val index = currentPosts.indexOfFirst { it.postId == post.postId }
+        if (index != -1) {
+            val updatedPost = post.copy(isLiked = newLiked, likesCount = newCount)
+            currentPosts[index] = updatedPost
+            _uiState.value = HomeUiState.Success(currentPosts.toList())
+        }
+
+        viewModelScope.launch {
+            val result = if (newLiked) {
+                repository.likePost(post.postId)
+            } else {
+                repository.unlikePost(post.postId)
+            }
+
+            result.onFailure {
+                // Rollback on failure
+                if (index != -1) {
+                    currentPosts[index] = post
+                    _uiState.value = HomeUiState.Success(currentPosts.toList())
+                }
+            }
+        }
+    }
+
+    fun toggleBookmark(post: Post) {
+        val isCurrentlyBookmarked = post.isBookmarked == true
+        val newBookmarked = !isCurrentlyBookmarked
+
+        val index = currentPosts.indexOfFirst { it.postId == post.postId }
+        if (index != -1) {
+            val updatedPost = post.copy(isBookmarked = newBookmarked)
+            currentPosts[index] = updatedPost
+            _uiState.value = HomeUiState.Success(currentPosts.toList())
+        }
+
+        viewModelScope.launch {
+            val result = if (newBookmarked) {
+                repository.bookmarkPost(post.postId)
+            } else {
+                repository.unbookmarkPost(post.postId)
+            }
+
+            result.onFailure {
+                if (index != -1) {
+                    currentPosts[index] = post
+                    _uiState.value = HomeUiState.Success(currentPosts.toList())
+                }
             }
         }
     }

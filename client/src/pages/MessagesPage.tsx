@@ -14,7 +14,7 @@ import { CreateBroadcastModal } from '../components/chat/CreateBroadcastModal.js
 import { useAuth } from '../contexts/AuthContext.js';
 import { formatDistanceToNow } from 'date-fns';
 import { io, Socket } from 'socket.io-client';
-import { getAccessToken } from '../api/client.js';
+import { API_BASE_URL, getAccessToken } from '../api/client.js';
 import { useTheme } from '../contexts/ThemeContext.js';
 import { encryptMessage, decryptMessage, DecryptedMessageResult } from '../utils/e2ee.js';
 
@@ -151,7 +151,12 @@ export const MessagesPage: React.FC = () => {
     const token = getAccessToken();
     if (!token) return;
 
-    const socket = io({ auth: { token }, withCredentials: true });
+    const socketHost = API_BASE_URL.replace(/\/api$/, '');
+    const socket = io(socketHost, {
+      auth: { token },
+      withCredentials: true,
+      transports: ['websocket', 'polling']
+    });
     socketRef.current = socket;
 
     socket.on('message:created', (message: Message) => {
@@ -578,9 +583,9 @@ export const MessagesPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-emerald-500/10 border-b border-emerald-500/20 px-4 py-1.5 flex items-center justify-center gap-2 text-[11px] text-emerald-300 font-medium">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Messages are end-to-end encrypted with 256-bit AES-GCM</span>
+              <div className="bg-brand-500/10 border-b border-brand-500/20 px-4 py-1.5 flex items-center justify-center gap-2 text-[11px] text-brand-300 font-medium">
+                <ShieldCheck className="w-3.5 h-3.5 text-brand-400" />
+                <span>Direct messages encrypted in-transit via TLS</span>
               </div>
 
               {/* Direct Messages Stream */}
@@ -610,11 +615,6 @@ export const MessagesPage: React.FC = () => {
                         >
                           <p className="leading-relaxed whitespace-pre-line">{decryptedInfo.text}</p>
                           <div className={`flex items-center justify-end gap-1.5 text-[9px] ${isSelf ? 'text-brand-200' : 'text-slate-400'}`}>
-                            {decryptedInfo.isEncrypted && (
-                              <span title="End-to-End Encrypted">
-                                <Lock className="w-2.5 h-2.5 text-emerald-400" />
-                              </span>
-                            )}
                             <span>{formatDistanceToNow(new Date(m.createdAt), { addSuffix: true })}</span>
                             {isSelf && (
                               <span title={m.isRead ? 'Read' : 'Sent'}>
@@ -657,16 +657,15 @@ export const MessagesPage: React.FC = () => {
                   type="text"
                   value={messageInput}
                   onChange={handleInputChange}
-                  placeholder={`Message @${selectedUser.username}... (Encrypted)`}
-                  className="flex-1 bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                  placeholder={`Message @${selectedUser.username}...`}
+                  className="flex-1 bg-slate-900 border border-slate-800 focus:border-brand-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
                 />
                 <button
                   type="submit"
                   disabled={!messageInput.trim() || sendDirectMessageMutation.isPending}
-                  className="p-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl shadow-glow-brand transition-all flex items-center justify-center gap-1"
-                  title="Send Encrypted Message"
+                  className="p-2.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white rounded-xl shadow-glow-brand transition-all flex items-center justify-center"
+                  title="Send Message"
                 >
-                  <Lock className="w-3.5 h-3.5" />
                   <Send className="w-4 h-4" />
                 </button>
               </form>

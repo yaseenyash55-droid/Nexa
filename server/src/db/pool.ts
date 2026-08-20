@@ -10,15 +10,30 @@ let pool: any = null;
 
 export async function initializeOraclePool(): Promise<void> {
   try {
-    pool = await oracledb.createPool({
+    const poolConfig: any = {
       user: env.DB_USER,
       password: env.DB_PASSWORD,
       connectString: env.DB_CONNECT_STRING,
       poolMin: env.DB_POOL_MIN,
       poolMax: env.DB_POOL_MAX,
       poolIncrement: env.DB_POOL_INCREMENT
-    });
-    logger.info({ connectString: env.DB_CONNECT_STRING }, 'Oracle Database connection pool initialized successfully');
+    };
+
+    if (env.WALLET_LOCATION) {
+      poolConfig.walletLocation = env.WALLET_LOCATION;
+      if (env.WALLET_PASSWORD) {
+        poolConfig.walletPassword = env.WALLET_PASSWORD;
+      }
+    }
+
+    pool = await oracledb.createPool(poolConfig);
+    logger.info(
+      {
+        connectString: env.DB_CONNECT_STRING.replace(/:[^:@]+@/, ':***@'),
+        walletConfigured: Boolean(env.WALLET_LOCATION)
+      },
+      'Oracle Database connection pool initialized successfully'
+    );
   } catch (err) {
     logger.error({ err }, 'Failed to initialize Oracle Database connection pool');
     throw err;
@@ -44,7 +59,11 @@ export async function getConnection(): Promise<any> {
   return pool.getConnection();
 }
 
-export async function executeSql<T = unknown>(sql: string, binds: Record<string, any> | any[] = {}, options: Record<string, any> = {}): Promise<any> {
+export async function executeSql<T = unknown>(
+  sql: string,
+  binds: Record<string, any> | any[] = {},
+  options: Record<string, any> = {}
+): Promise<any> {
   let connection: any = null;
   try {
     connection = await getConnection();
@@ -100,25 +119,25 @@ export async function checkOracleHealth(): Promise<{
   details: string;
 }> {
   if (!pool) {
-    return { reachable: false, details: 'Oracle Pool not initialized' };
+    return { reachable: false, details: 'Database unreachable' };
   }
   let conn: any = null;
   try {
     conn = await pool.getConnection();
     const res = await conn.execute('SELECT 1 AS ALIVE FROM DUAL');
     if (res.rows && res.rows.length > 0) {
-      return { reachable: true, details: 'Connected to Oracle DB' };
+      return { reachable: true, details: 'Connected' };
     }
-    return { reachable: false, details: 'Ping check returned empty result' };
+    return { reachable: false, details: 'Database unreachable' };
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    return { reachable: false, details: `Oracle DB error: ${errorMsg}` };
+    logger.error({ err }, 'Oracle DB health ping failure');
+    return { reachable: false, details: 'Database unreachable' };
   } finally {
     if (conn) {
       try {
         await conn.close();
       } catch {
-        // ignore
+        // ignore close error
       }
     }
   }

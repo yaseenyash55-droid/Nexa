@@ -17,6 +17,7 @@ export function sanitizeInputString(input: string): string {
     // Strip HTML tags for unformatted text
     .replace(/<[^>]*>/g, '')
     // Strip null characters and dangerous control characters
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
     .trim();
 }

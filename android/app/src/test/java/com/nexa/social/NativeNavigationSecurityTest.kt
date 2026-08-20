@@ -1,7 +1,10 @@
 package com.nexa.social
 
 import com.nexa.social.data.models.NotificationDestination
+import com.nexa.social.utils.NetworkUtils
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NativeNavigationSecurityTest {
@@ -57,5 +60,30 @@ class NativeNavigationSecurityTest {
         assertEquals(false, isValid(NotificationDestination.REEL, "999999999999999999")) // Oversized
         assertEquals(false, isValid(NotificationDestination.PROFILE, ""))
         assertEquals(false, isValid(NotificationDestination.PROFILE, "   "))
+    }
+
+    @Test
+    fun `isValidExternalHttpsUrl strictly accepts valid HTTPS URLs and rejects hostile schemes`() {
+        // Valid HTTPS URLs
+        assertTrue(NetworkUtils.isValidExternalHttpsUrl("https://example.com"))
+        assertTrue(NetworkUtils.isValidExternalHttpsUrl("https://docs.oracle.com/en/database/"))
+
+        // Reject non-HTTPS schemes
+        assertFalse(NetworkUtils.isValidExternalHttpsUrl("http://insecure-site.com"))
+        assertFalse(NetworkUtils.isValidExternalHttpsUrl("file:///sdcard/malware.apk"))
+        assertFalse(NetworkUtils.isValidExternalHttpsUrl("content://media/external/images"))
+        assertFalse(NetworkUtils.isValidExternalHttpsUrl("javascript:alert(document.cookie)"))
+        assertFalse(NetworkUtils.isValidExternalHttpsUrl("data:text/html,<script>alert(1)</script>"))
+        assertFalse(NetworkUtils.isValidExternalHttpsUrl("intent:#Intent;action=android.intent.action.VIEW;end"))
+
+        // Reject user-info and credential leak URLs
+        assertFalse(NetworkUtils.isValidExternalHttpsUrl("https://admin:secret@example.com/dashboard"))
+        assertFalse(NetworkUtils.isValidExternalHttpsUrl("https://example.com/auth?token=eyJhbGciOi..."))
+        assertFalse(NetworkUtils.isValidExternalHttpsUrl("https://example.com/profile?jwt=secret123"))
+
+        // Reject empty or malformed URLs
+        assertFalse(NetworkUtils.isValidExternalHttpsUrl(""))
+        assertFalse(NetworkUtils.isValidExternalHttpsUrl(null))
+        assertFalse(NetworkUtils.isValidExternalHttpsUrl(":::malformed:::"))
     }
 }

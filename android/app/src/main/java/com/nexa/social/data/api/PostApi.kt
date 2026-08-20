@@ -52,4 +52,16 @@ interface PostApi {
 
     @DELETE("posts/{id}/bookmark")
     suspend fun unbookmarkPost(@retrofit2.http.Path("id") id: Int): Response<ApiResponse<Map<String, Any>>>
+
+    @GET("social/reels")
+    suspend fun getReels(
+        @Query("limit") limit: Int = 20,
+        @Query("offset") offset: Int = 0
+    ): Response<ApiResponse<List<com.nexa.social.data.models.Reel>>>
+
+    @POST("social/reels/{id}/like")
+    suspend fun likeReel(@retrofit2.http.Path("id") id: Int): Response<ApiResponse<Map<String, Any>>>
+
+    @DELETE("social/reels/{id}/like")
+    suspend fun unlikeReel(@retrofit2.http.Path("id") id: Int): Response<ApiResponse<Map<String, Any>>>
 }

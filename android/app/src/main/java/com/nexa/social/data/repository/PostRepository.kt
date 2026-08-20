@@ -69,4 +69,43 @@ class PostRepository {
             Result.failure(e)
         }
     }
+
+    suspend fun getReels(limit: Int = 20, offset: Int = 0): Result<List<com.nexa.social.data.models.Reel>> {
+        return try {
+            val response = NexaApiClient.postApi.getReels(limit = limit, offset = offset)
+            if (response.isSuccessful && response.body()?.data != null) {
+                Result.success(response.body()!!.data!!)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Failed to fetch reels"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun likeReel(reelId: Int): Result<Unit> {
+        return try {
+            val response = NexaApiClient.postApi.likeReel(reelId)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Failed to like reel"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun unlikeReel(reelId: Int): Result<Unit> {
+        return try {
+            val response = NexaApiClient.postApi.unlikeReel(reelId)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Failed to unlike reel"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

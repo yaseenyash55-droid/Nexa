@@ -144,27 +144,27 @@ export const UserManualPage: React.FC = () => {
       ]
     },
     {
-      id: 'direct-messages-e2ee',
-      title: '5. Direct Messages & 256-bit AES-GCM Encryption',
+      id: 'direct-messages-tls',
+      title: '5. Direct Messages & Real-Time Sync',
       category: 'Messaging',
       icon: MessageSquare,
-      color: 'text-emerald-400',
-      bg: 'bg-emerald-500/10 border-emerald-500/20',
-      summary: 'Send 1-on-1 direct messages encrypted in your browser before transmission.',
+      color: 'text-brand-400',
+      bg: 'bg-brand-500/10 border-brand-500/20',
+      summary: 'Send 1-on-1 direct messages secured with transport-level encryption and real-time Socket.IO sync.',
       targetRoute: '/messages',
       actionLabel: 'Open Direct Messages',
       steps: [
         {
-          title: 'Step 1: Client-Side Web Crypto API',
-          desc: 'Direct messages use native `window.crypto.subtle` in the browser or `javax.crypto.Cipher` on Android.'
+          title: 'Step 1: Authenticated REST & WebSocket',
+          desc: 'Direct messages are transmitted over secure TLS connections directly to the Oracle-backed API gateway.'
         },
         {
-          title: 'Step 2: Key Derivation (PBKDF2)',
-          desc: 'A 256-bit AES-GCM key is derived locally using PBKDF2 with HMAC-SHA-256 (100,000 iterations) from sorted conversation user IDs.'
+          title: 'Step 2: Real-Time Event Dispatch',
+          desc: 'Socket.IO delivers new messages instantly to online recipients with read receipts and delivery status.'
         },
         {
-          title: 'Step 3: Zero Plaintext Database Storage',
-          desc: 'Messages are stored in Oracle SQL as `E2EE::<iv_hex>::<ciphertext_hex>`. Server administrators cannot read private chat content.'
+          title: 'Step 3: Oracle SQL Persistence',
+          desc: 'Conversations are durably persisted in the Oracle MESSAGES repository with sender and recipient indexing.'
         },
         {
           title: 'Step 4: Real-Time Typing Indicators',

@@ -27,11 +27,15 @@ import com.nexa.social.utils.TokenManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+import androidx.activity.viewModels
+import com.nexa.social.ui.viewmodels.HomeViewModel
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var prefManager: PreferenceManager
     private lateinit var networkMonitor: NetworkMonitor
+    private val homeViewModel: HomeViewModel by viewModels()
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -45,9 +49,7 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
-            // After creating a post, we might want to refresh the home feed
-            // This will depend on how the HomeFragment is implemented.
-            // For now, it's just a placeholder.
+            homeViewModel.loadFeed(isRefresh = true)
         }
     }
 

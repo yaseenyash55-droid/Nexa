@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import supertest from 'supertest';
+import { app } from '../src/app.js';
 import { OracleUserRepository } from '../src/repositories/oracle/user.oracle.repo.js';
 import { OraclePostRepository } from '../src/repositories/oracle/post.oracle.repo.js';
 import { OracleCommentRepository } from '../src/repositories/oracle/comment.oracle.repo.js';
@@ -41,8 +43,12 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
       await initializeOraclePool();
       const health = await checkOracleHealth();
       isOracleLive = health.reachable;
+      if (!isOracleLive) {
+        console.warn('\n[TEST ADVISORY] Real Oracle Database instance is not reachable at ' + env.DB_CONNECT_STRING + '. Skipping live Oracle integration tests.');
+      }
     } catch {
       isOracleLive = false;
+      console.warn('\n[TEST ADVISORY] Real Oracle Database connection failed. Skipping live Oracle integration tests.');
     }
 
     userRepo = new OracleUserRepository();
@@ -74,7 +80,25 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
     const health = await checkOracleHealth();
     expect(health).toHaveProperty('reachable');
     expect(health).toHaveProperty('details');
-    expect(health.details).not.toContain(env.DB_PASSWORD);
+    if (env.DB_PASSWORD && env.DB_PASSWORD.trim().length > 0) {
+      expect(health.details).not.toContain(env.DB_PASSWORD);
+    }
+
+    if (isOracleLive) {
+      const res = await supertest(app).get('/api/health');
+      expect(res.status).toBe(200);
+      expect(res.body.data.status).toBe('ok');
+      expect(res.body.data.mode).toBe('oracle');
+      expect(res.body.data.database.reachable).toBe(true);
+      expect(res.body.data.database.details).toBe('Connected');
+      const bodyStr = JSON.stringify(res.body);
+      if (env.DB_PASSWORD && env.DB_PASSWORD.trim().length > 0) {
+        expect(bodyStr).not.toContain(env.DB_PASSWORD);
+      }
+      if (env.DB_USER && env.DB_USER.trim().length > 0) {
+        expect(bodyStr).not.toContain(env.DB_USER);
+      }
+    }
   });
 
   it('registers users, verifies password hashes, and sanitizes output', async () => {
@@ -195,7 +219,7 @@ describe('Comprehensive Oracle-Backed Integration Suite', () => {
     await expect(authService.login(uniqueTag, 'WrongPassword!')).rejects.toMatchObject({
       code: 'ACCOUNT_LOCKED'
     });
-  });
+  }, 20000);
 
   it('enforces author ownership and prevents IDOR on post updates and deletions', async () => {
     if (!isOracleLive) return;

@@ -5,16 +5,16 @@ dotenv.config();
 const nodeEnv = process.env.NODE_ENV || 'development';
 const isProduction = nodeEnv === 'production';
 
-function getRequiredEnv(keys: string[], label: string): string {
+export function getRequiredEnv(keys: string[], label: string, enforceRequired = isProduction): string {
   for (const key of keys) {
     const value = process.env[key];
 
-    if (value) {
-      return value;
+    if (value && value.trim().length > 0) {
+      return value.trim();
     }
   }
 
-  if (isProduction) {
+  if (enforceRequired) {
     throw new Error(
       `[FATAL CONFIGURATION ERROR] Missing required environment variable: ${label}`
     );
@@ -23,7 +23,7 @@ function getRequiredEnv(keys: string[], label: string): string {
   return '';
 }
 
-function getPositiveInteger(key: string, fallback: number): number {
+export function getPositiveInteger(key: string, fallback: number): number {
   const rawValue = process.env[key];
 
   if (!rawValue) {
@@ -39,6 +39,34 @@ function getPositiveInteger(key: string, fallback: number): number {
   }
 
   return value;
+}
+
+export function validateProductionConnectString(connectString: string, enforceProd = isProduction): void {
+  if (!enforceProd) {
+    return;
+  }
+
+  if (!connectString || connectString.trim().length === 0) {
+    throw new Error(
+      '[FATAL CONFIGURATION ERROR] Missing required environment variable: DB_CONNECT_STRING'
+    );
+  }
+
+  const normalized = connectString.toLowerCase().trim();
+  const loopbackPatterns = [
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0',
+    '::1',
+  ];
+
+  for (const pattern of loopbackPatterns) {
+    if (normalized.includes(pattern)) {
+      throw new Error(
+        `[FATAL CONFIGURATION ERROR] Production DB_CONNECT_STRING targets local loopback (${pattern}). A secure, remotely reachable Oracle instance (e.g. TCPS with TLS or Cloud ADB) is required.`
+      );
+    }
+  }
 }
 
 const jwtAccessSecret = getRequiredEnv(
@@ -66,6 +94,12 @@ const databaseConnectString = getRequiredEnv(
   'DB_CONNECT_STRING'
 );
 
+const walletLocation = process.env.TNS_ADMIN || process.env.ORACLE_WALLET_LOCATION || process.env.WALLET_LOCATION || '';
+const walletPassword = process.env.WALLET_PASSWORD || '';
+
+// Validate connect string against localhost in production mode
+validateProductionConnectString(databaseConnectString, isProduction);
+
 export const env = {
   NODE_ENV: nodeEnv,
   PORT: getPositiveInteger('PORT', 4000),
@@ -83,6 +117,10 @@ export const env = {
   ORACLE_DB_USER: databaseUser,
   ORACLE_DB_PASSWORD: databasePassword,
   ORACLE_DB_CONNECTION_STRING: databaseConnectString,
+
+  TNS_ADMIN: walletLocation,
+  WALLET_LOCATION: walletLocation,
+  WALLET_PASSWORD: walletPassword,
 
   DB_POOL_MIN: getPositiveInteger('DB_POOL_MIN', 1),
   DB_POOL_MAX: getPositiveInteger('DB_POOL_MAX', 5),

@@ -43,7 +43,6 @@ export const ReelsPage: React.FC = () => {
       setVideoDuration(null);
       setIsAddReelOpen(false);
       queryClient.invalidateQueries({ queryKey: ['reels'] });
-      alert('✔ Video published successfully!');
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Failed to publish video';
@@ -325,10 +324,12 @@ const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => voi
 
         <button
           onClick={() => {
-            navigator.clipboard.writeText(window.location.href);
-            alert('Reel link copied!');
+            if (navigator.clipboard) {
+              navigator.clipboard.writeText(window.location.href);
+            }
           }}
           className="flex flex-col items-center gap-1 text-white group"
+          title="Copy Reel link"
         >
           <div className="p-3 bg-black/50 backdrop-blur-md rounded-full text-white group-hover:scale-110 transition-transform">
             <Share2 className="w-6 h-6" />

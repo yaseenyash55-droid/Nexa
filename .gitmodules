@@ -1,0 +1,3 @@
+[submodule "client/nexa"]
+	path = client/nexa
+	url = https://github.com/yaseenyash55-droid/nexa-6gwh1g.git

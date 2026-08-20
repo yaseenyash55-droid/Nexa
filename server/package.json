@@ -10,7 +10,9 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:unit": "vitest run --exclude tests/oracle.integration.test.ts",
+    "test:integration": "vitest run tests/oracle.integration.test.ts"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

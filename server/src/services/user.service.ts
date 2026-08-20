@@ -8,7 +8,7 @@ function saveBase64ImageToDisk(base64Data: string, prefix: string, userId: numbe
   if (!base64Data || !base64Data.startsWith('data:image/')) {
     return base64Data;
   }
-  const matches = base64Data.match(/^data:image\/([a-zA-Z0-9\+\/]+);base64,(.+)$/);
+  const matches = base64Data.match(/^data:image\/([a-zA-Z0-9+/]+);base64,(.+)$/);
   if (!matches) return base64Data;
 
   const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];

@@ -87,6 +87,20 @@ class AuthRepository(private val tokenManager: TokenManager) {
         }
     }
 
+    suspend fun resendVerification(email: String): Result<String> {
+        return try {
+            val response = NexaApiClient.authApi.resendVerification(mapOf("email" to email))
+            if (response.isSuccessful) {
+                Result.success(response.body()?.message ?: "Verification email sent")
+            } else {
+                val errorMsg = response.body()?.error?.message ?: "Failed to resend verification email"
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun logout(): Result<Unit> {
         return try {
             val token = tokenManager.accessToken

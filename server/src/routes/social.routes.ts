@@ -22,7 +22,7 @@ function saveBase64StoryImageToDisk(base64Data: string, userId: number): string 
   if (!base64Data || !base64Data.startsWith('data:image/')) {
     return base64Data;
   }
-  const matches = base64Data.match(/^data:image\/([a-zA-Z0-9\+\/]+);base64,(.+)$/);
+  const matches = base64Data.match(/^data:image\/([a-zA-Z0-9+/]+);base64,(.+)$/);
   if (!matches) return base64Data;
 
   const mimeType = `image/${matches[1]}`;
@@ -47,7 +47,8 @@ function saveBase64StoryImageToDisk(base64Data: string, userId: number): string 
 
 socialRouter.post('/stories', requireAuth, aiAndMediaRateLimiter, async (req: any, res, next) => {
   try {
-    let { mediaUrl, caption } = req.body;
+    const { caption } = req.body;
+    let { mediaUrl } = req.body;
     if (!mediaUrl) {
       return sendError(res, 'INVALID_INPUT', 'Media URL or image data is required', 400);
     }
@@ -97,7 +98,7 @@ function saveBase64ReelToDisk(base64Data: string, userId: number): string {
   if (!base64Data || !base64Data.startsWith('data:video/')) {
     return base64Data;
   }
-  const matches = base64Data.match(/^data:video\/([a-zA-Z0-9\+\/-]+);base64,(.+)$/);
+  const matches = base64Data.match(/^data:video\/([a-zA-Z0-9+/-]+);base64,(.+)$/);
   if (!matches) return base64Data;
 
   let ext = 'mp4';
@@ -129,7 +130,8 @@ function saveBase64ReelToDisk(base64Data: string, userId: number): string {
 
 socialRouter.post('/reels', requireAuth, aiAndMediaRateLimiter, async (req: any, res, next) => {
   try {
-    let { videoUrl, caption } = req.body;
+    const { caption } = req.body;
+    let { videoUrl } = req.body;
     if (!videoUrl) {
       return sendError(res, 'INVALID_INPUT', 'Video URL or file is required', 400);
     }

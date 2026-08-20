@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -33,7 +32,7 @@ class ReelsFragment : Fragment() {
 
     private fun setupViewPager() {
         reelAdapter = ReelAdapter { reel ->
-            Toast.makeText(context, "Liked reel ${reel.reelId}", Toast.LENGTH_SHORT).show()
+            viewModel.toggleLike(reel)
         }
         binding.viewPager.adapter = reelAdapter
     }
@@ -51,11 +50,15 @@ class ReelsFragment : Fragment() {
                     }
                     is ReelsUiState.Error -> {
                         binding.progressBar.visibility = View.GONE
-                        Toast.makeText(context, state.message, Toast.LENGTH_SHORT).show()
                     }
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.loadReels(isRefresh = true)
     }
 
     override fun onDestroyView() {

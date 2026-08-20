@@ -51,9 +51,23 @@ class VerifyEmailActivity : AppCompatActivity() {
             }
         }
 
+        val email = intent.getStringExtra("email")
+
         binding.tvResend.setOnClickListener {
-            // Implementation for resend verification
-            Toast.makeText(this, "Resend verification not implemented yet", Toast.LENGTH_SHORT).show()
+            if (!email.isNullOrBlank()) {
+                setLoading(true)
+                lifecycleScope.launch {
+                    val result = authRepository.resendVerification(email)
+                    setLoading(false)
+                    result.onSuccess { msg ->
+                        Toast.makeText(this@VerifyEmailActivity, msg, Toast.LENGTH_SHORT).show()
+                    }.onFailure { err ->
+                        Toast.makeText(this@VerifyEmailActivity, err.message ?: "Resend failed", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } else {
+                Toast.makeText(this, "Please enter your email or register to receive a code", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

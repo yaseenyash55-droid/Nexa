@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -36,12 +35,19 @@ class MessagesFragment : Fragment() {
 
     private fun setupRecyclerView() {
         conversationAdapter = ConversationAdapter { conversation ->
-            val intent = Intent(context, ChatActivity::class.java).apply {
-                putExtra("userId", conversation.otherUserId)
-                putExtra("username", conversation.username)
-                putExtra("displayName", conversation.displayName)
+            if (conversation.otherUserId > 0) {
+                val intent = Intent(context, ChatActivity::class.java).apply {
+                    putExtra(ChatActivity.EXTRA_TARGET_ID, conversation.otherUserId)
+                    val targetName = if (conversation.displayName.isNotBlank()) conversation.displayName else conversation.username
+                    putExtra(ChatActivity.EXTRA_TARGET_NAME, targetName)
+                    putExtra(ChatActivity.EXTRA_CHAT_TYPE, "direct")
+                    // Backward-compatible extras
+                    putExtra("userId", conversation.otherUserId)
+                    putExtra("username", conversation.username)
+                    putExtra("displayName", conversation.displayName)
+                }
+                startActivity(intent)
             }
-            startActivity(intent)
         }
         binding.rvConversations.adapter = conversationAdapter
     }
@@ -50,6 +56,11 @@ class MessagesFragment : Fragment() {
         binding.swipeRefresh.setOnRefreshListener {
             viewModel.loadConversations()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.loadConversations()
     }
 
     private fun observeViewModel() {

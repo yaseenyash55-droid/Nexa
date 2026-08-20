@@ -48,8 +48,17 @@ class ChatActivity : AppCompatActivity() {
         prefManager = PreferenceManager(this)
 
         chatType = intent.getStringExtra(EXTRA_CHAT_TYPE) ?: "direct"
-        targetId = intent.getIntExtra(EXTRA_TARGET_ID, 0)
-        targetName = intent.getStringExtra(EXTRA_TARGET_NAME) ?: "Chat"
+        targetId = intent.getIntExtra(EXTRA_TARGET_ID, intent.getIntExtra("userId", 0))
+        targetName = intent.getStringExtra(EXTRA_TARGET_NAME)
+            ?: intent.getStringExtra("displayName")
+            ?: intent.getStringExtra("username")
+            ?: "Chat"
+
+        if (targetId <= 0) {
+            Toast.makeText(this, "Invalid chat recipient", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
 
         setupToolbar()
         setupRecyclerView()

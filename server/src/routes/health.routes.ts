@@ -7,7 +7,7 @@ const router = Router();
 /**
  * Dependency health probe: GET /health
  * Confirms that the process and Oracle Database pool can serve requests.
- * Does not expose credentials, connection strings, or database errors.
+ * Sanitized response: Never exposes credentials, connection strings, hosts, or raw database errors.
  */
 router.get('/', async (_req, res) => {
   const dbHealth = await checkOracleHealth();
@@ -21,7 +21,7 @@ router.get('/', async (_req, res) => {
       mode: 'oracle',
       database: {
         reachable: dbHealth.reachable,
-        details: isHealthy ? 'Connected' : dbHealth.details
+        details: isHealthy ? 'Connected' : 'Database unreachable'
       },
       timestamp: new Date().toISOString()
     },

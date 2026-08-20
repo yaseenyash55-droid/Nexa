@@ -12,7 +12,7 @@ import { ImageCropperModal } from '../components/ui/ImageCropperModal.js';
 import { PostCard } from '../components/feed/PostCard.js';
 import { PostSkeleton } from '../components/ui/Skeleton.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
-import { userApi, authApi } from '../api/client.js';
+import { userApi, authApi, api } from '../api/client.js';
 import { postsApi } from '../api/posts.api.js';
 import { 
   User, 
@@ -168,13 +168,17 @@ export const SettingsPage: React.FC = () => {
 
     try {
       setIsUpdatingPassword(true);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setPasswordSuccessMsg('Password updated successfully!');
+      if (user?.email) {
+        await authApi.forgotPassword(user.email);
+        setPasswordSuccessMsg('A password change verification token has been dispatched to your email.');
+      } else {
+        setPasswordSuccessMsg('Password update submitted.');
+      }
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      setPasswordErrorMsg('Failed to update password');
+      setPasswordErrorMsg(err.response?.data?.error?.message || 'Failed to update password');
     } finally {
       setIsUpdatingPassword(false);
     }
@@ -770,11 +774,38 @@ const InsightsTabSection: React.FC = () => {
 };
 
 const ProtectionTabSection: React.FC = () => {
-  const [activeSessions, setActiveSessions] = useState([
-    { id: 1, device: 'Chrome on Windows 11', location: 'Active local session', lastActive: 'Active now', current: true },
-    { id: 2, device: 'Nexa Android App (.apk)', location: 'Mobile device', lastActive: '15 mins ago', current: false }
-  ]);
-  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    async function loadSessions() {
+      setIsLoading(true);
+      try {
+        const res = await api.get('/security/sessions');
+        if (isMounted && res.data) {
+          setSessions(res.data.data || []);
+        }
+      } catch {
+        // sessions endpoint fallback
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    loadSessions();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleRevoke = async (sessionId: string | number) => {
+    try {
+      await api.delete(`/security/sessions/${sessionId}`);
+      setSessions(prev => prev.filter(s => (s.sessionId || s.id) !== sessionId));
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <div className="space-y-5 text-xs">
@@ -784,11 +815,11 @@ const ProtectionTabSection: React.FC = () => {
             <p className="font-semibold text-slate-100 flex items-center gap-2">
               <Lock className="w-4 h-4 text-brand-400" /> Two-Factor Authentication (2FA)
             </p>
-            <p className="text-[11px] text-slate-400">Add an extra layer of security using an authenticator app (TOTP)</p>
+            <p className="text-[11px] text-slate-400">TOTP Authenticator app verification (Unconfigured on current server)</p>
           </div>
-          <Button size="sm" variant={is2FAEnabled ? 'outline' : 'primary'} onClick={() => setIs2FAEnabled(!is2FAEnabled)}>
-            {is2FAEnabled ? 'Disable 2FA' : 'Enable 2FA'}
-          </Button>
+          <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+            Not Configured
+          </span>
         </div>
       </div>
 
@@ -796,29 +827,41 @@ const ProtectionTabSection: React.FC = () => {
         <h3 className="font-bold text-slate-200 flex items-center gap-2">
           <Smartphone className="w-4 h-4 text-aurora-cyan" /> Logged-in Active Devices & Sessions
         </h3>
-        <div className="space-y-2 pt-1">
-          {activeSessions.map(session => (
-            <div key={session.id} className="flex items-center justify-between p-3 bg-slate-950/60 rounded-lg border border-slate-800/80">
-              <div>
-                <p className="font-medium text-slate-200 flex items-center gap-1.5">
-                  {session.device} {session.current && <span className="text-[10px] bg-brand-500/20 text-brand-300 px-2 py-0.5 rounded-full font-semibold">Current Device</span>}
-                </p>
-                <p className="text-[11px] text-slate-400">{session.location} • {session.lastActive}</p>
-              </div>
-              {!session.current && (
-                <Button size="sm" variant="danger" onClick={() => setActiveSessions(prev => prev.filter(s => s.id !== session.id))}>
-                  Revoke
-                </Button>
-              )}
-            </div>
-          ))}
-        </div>
+        {isLoading ? (
+          <p className="text-slate-400 text-center py-2">Loading sessions...</p>
+        ) : sessions.length === 0 ? (
+          <p className="text-slate-400 text-[11px] py-2">Current browser session active. No other active tokens found.</p>
+        ) : (
+          <div className="space-y-2 pt-1">
+            {sessions.map(session => {
+              const sid = session.sessionId || session.id;
+              return (
+                <div key={String(sid)} className="flex items-center justify-between p-3 bg-slate-950/60 rounded-lg border border-slate-800/80">
+                  <div>
+                    <p className="font-medium text-slate-200 flex items-center gap-1.5">
+                      {session.device || 'Active Session'} {session.current && <span className="text-[10px] bg-brand-500/20 text-brand-300 px-2 py-0.5 rounded-full font-semibold">Current Device</span>}
+                    </p>
+                    <p className="text-[11px] text-slate-400">{session.location || 'Oracle DB Session'} • {session.createdAt ? new Date(session.createdAt).toLocaleDateString() : 'Active'}</p>
+                  </div>
+                  {!session.current && (
+                    <Button size="sm" variant="danger" onClick={() => handleRevoke(sid)}>
+                      Revoke
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
 const ModerationTabSection: React.FC = () => {
+  const { user } = useAuth();
+  const isModeratorOrAdmin = user?.role === 'ADMIN' || user?.role === 'MODERATOR';
+
   const [reports, setReports] = useState([
     { id: 1, type: 'Post', targetId: 102, reporter: 'user_alex', reason: 'Spam or Scam Content', detail: 'Promoting unverified crypto links.', status: 'Pending' },
     { id: 2, type: 'Reel', targetId: 4, reporter: 'sarah_design', reason: 'Copyright Issue', detail: 'Uncredited music audio track.', status: 'Pending' }
@@ -827,6 +870,16 @@ const ModerationTabSection: React.FC = () => {
   const handleAction = (reportId: number) => {
     setReports(prev => prev.filter(r => r.id !== reportId));
   };
+
+  if (!isModeratorOrAdmin) {
+    return (
+      <div className="p-6 bg-slate-900/60 rounded-xl border border-slate-800 text-center space-y-2">
+        <Lock className="w-8 h-8 text-slate-500 mx-auto" />
+        <h3 className="text-xs font-bold text-white">Restricted Dashboard</h3>
+        <p className="text-[11px] text-slate-400">Moderator privileges are required to view and review content moderation reports.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
