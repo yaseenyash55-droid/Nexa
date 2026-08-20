@@ -48,7 +48,6 @@ jobs:
     name: Oracle Integration Suite (Optional)
     runs-on: ubuntu-latest
     needs: backend-and-web
-    if: "${{ secrets.TEST_ORACLE_CONNECT_STRING != '' }}"
 
     steps:
       - name: Checkout Repository
@@ -66,6 +65,7 @@ jobs:
         run: npm ci
 
       - name: Execute Live Oracle Integration Tests
+        if: secrets.TEST_ORACLE_CONNECT_STRING != ''
         run: npm run test:integration --workspace=server
         env:
           NODE_ENV: test
