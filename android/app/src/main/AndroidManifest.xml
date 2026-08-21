@@ -73,6 +73,12 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- Native Email OTP Login Activity -->
+        <activity
+            android:name=".ui.OtpVerificationActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Native Register Screen Activity -->
         <activity
             android:name=".ui.RegisterActivity"

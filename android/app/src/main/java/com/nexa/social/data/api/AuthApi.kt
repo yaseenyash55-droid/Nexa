@@ -5,11 +5,13 @@ import com.nexa.social.data.models.FcmTokenRequest
 import com.nexa.social.data.models.ForgotPasswordRequest
 import com.nexa.social.data.models.LoginRequest
 import com.nexa.social.data.models.LoginResponse
+import com.nexa.social.data.models.LoginResultResponse
 import com.nexa.social.data.models.RefreshTokenRequest
 import com.nexa.social.data.models.RefreshTokenResponse
 import com.nexa.social.data.models.RegisterRequest
 import com.nexa.social.data.models.ResetPasswordRequest
 import com.nexa.social.data.models.VerifyEmailRequest
+import com.nexa.social.data.models.VerifyLoginOtpRequest
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -20,7 +22,10 @@ interface AuthApi {
     suspend fun register(@Body request: RegisterRequest): Response<ApiResponse<LoginResponse>>
 
     @POST("auth/login")
-    suspend fun login(@Body request: LoginRequest): Response<ApiResponse<LoginResponse>>
+    suspend fun login(@Body request: LoginRequest): Response<ApiResponse<LoginResultResponse>>
+
+    @POST("auth/login/verify-otp")
+    suspend fun verifyLoginOtp(@Body request: VerifyLoginOtpRequest): Response<ApiResponse<LoginResponse>>
 
     @POST("auth/refresh")
     suspend fun refresh(@Body request: RefreshTokenRequest): Response<ApiResponse<RefreshTokenResponse>>

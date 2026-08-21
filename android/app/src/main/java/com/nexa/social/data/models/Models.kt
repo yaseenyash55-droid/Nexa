@@ -62,6 +62,21 @@ data class LoginResponse(
     @SerializedName("refreshToken") val refreshToken: String?
 )
 
+data class LoginResultResponse(
+    @SerializedName("mfaRequired") val mfaRequired: Boolean = false,
+    @SerializedName("challengeId") val challengeId: String? = null,
+    @SerializedName("expiresAt") val expiresAt: String? = null,
+    @SerializedName("maskedEmail") val maskedEmail: String? = null,
+    @SerializedName("user") val user: User? = null,
+    @SerializedName("accessToken") val accessToken: String? = null,
+    @SerializedName("refreshToken") val refreshToken: String? = null
+)
+
+data class VerifyLoginOtpRequest(
+    @SerializedName("challengeId") val challengeId: String,
+    @SerializedName("code") val code: String
+)
+
 data class RefreshTokenRequest(
     @SerializedName("refreshToken") val refreshToken: String
 )
