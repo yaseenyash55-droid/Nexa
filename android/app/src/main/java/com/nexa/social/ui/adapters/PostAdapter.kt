@@ -1,5 +1,10 @@
 package com.nexa.social.ui.adapters
 
+import android.content.Intent
+import android.graphics.Color
+import android.view.GestureDetector
+import android.view.MotionEvent
+
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -60,10 +65,43 @@ class PostAdapter(
             }
 
             // Like status
-            binding.btnLike.setImageResource(if (post.isLiked == true) R.drawable.ic_heart else R.drawable.ic_heart) // Need active heart icon
+            binding.btnLike.setImageResource(R.drawable.ic_heart)
+            binding.btnLike.setColorFilter(if (post.isLiked) Color.parseColor("#10B981") else Color.WHITE)
             binding.btnLike.setOnClickListener { onLikeClick(post) }
             binding.btnComment.setOnClickListener { onCommentClick(post) }
             binding.btnBookmark.setOnClickListener { onBookmarkClick(post) }
+            binding.btnShare.setOnClickListener {
+                val shareText = buildString {
+                    if (!post.content.isNullOrBlank()) append(post.content)
+                    if (!post.imageUrl.isNullOrBlank()) {
+                        if (isNotEmpty()) append("\n")
+                        append(post.imageUrl)
+                    }
+                }
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, shareText)
+                }
+                binding.root.context.startActivity(Intent.createChooser(intent, "Share NEXA post"))
+            }
+
+            val gestures = GestureDetector(binding.root.context,
+                object : GestureDetector.SimpleOnGestureListener() {
+                    override fun onDown(e: MotionEvent): Boolean = true
+                    override fun onDoubleTap(e: MotionEvent): Boolean {
+                        if (!post.isLiked) onLikeClick(post)
+                        binding.btnLike.setColorFilter(Color.parseColor("#10B981"))
+                        binding.btnLike.animate().scaleX(1.45f).scaleY(1.45f).setDuration(120).withEndAction {
+                            binding.btnLike.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
+                        }.start()
+                        return true
+                    }
+                })
+            binding.ivPostImage.setOnTouchListener { view, event ->
+                val handled = gestures.onTouchEvent(event)
+                if (event.action == MotionEvent.ACTION_UP && !handled) view.performClick()
+                handled
+            }
         }
     }
 

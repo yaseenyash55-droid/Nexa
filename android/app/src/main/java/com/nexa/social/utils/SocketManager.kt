@@ -23,6 +23,7 @@ object SocketManager {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private var messageListener: ((Message) -> Unit)? = null
+    private var messageReadListener: ((messageId: Int, readAt: String?) -> Unit)? = null
     private var groupMessageListener: ((GroupMessage) -> Unit)? = null
     private var typingStartListener: ((userId: Int, username: String?) -> Unit)? = null
     private var typingStopListener: ((userId: Int) -> Unit)? = null
@@ -86,6 +87,18 @@ object SocketManager {
                 }
             }
 
+            socket?.on("message:read") { args ->
+                if (args.isNotEmpty()) {
+                    try {
+                        val json = if (args[0] is JSONObject) args[0] as JSONObject else JSONObject(args[0].toString())
+                        val messageId = json.optInt("messageId")
+                        val readAt = json.optString("readAt").takeIf { it.isNotBlank() }
+                        mainHandler.post { messageReadListener?.invoke(messageId, readAt) }
+                    } catch (e: Exception) {
+                        if (BuildConfig.DEBUG) Log.e(TAG, "Error parsing message:read event", e)
+                    }
+                }
+            }
             socket?.on("group:message:created") { args ->
                 if (args.isNotEmpty()) {
                     val jsonStr = args[0].toString()
@@ -163,6 +176,14 @@ object SocketManager {
 
     fun unregisterMessageListener() {
         messageListener = null
+    }
+
+    fun registerMessageReadListener(listener: (messageId: Int, readAt: String?) -> Unit) {
+        messageReadListener = listener
+    }
+
+    fun unregisterMessageReadListener() {
+        messageReadListener = null
     }
 
     fun registerGroupMessageListener(listener: (GroupMessage) -> Unit) {

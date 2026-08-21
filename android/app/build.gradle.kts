@@ -51,6 +51,8 @@ android {
         debug {
             isDebuggable = true
             isMinifyEnabled = false
+            buildConfigField("String", "API_BASE_URL", "\"http://127.0.0.1:4000/api/\"")
+            buildConfigField("String", "SOCKET_SERVER_URL", "\"http://127.0.0.1:4000\"")
         }
         release {
             isDebuggable = false

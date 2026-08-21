@@ -18,7 +18,7 @@
     <item
         android:id="@+id/navigation_reels"
         android:icon="@drawable/ic_reels"
-        android:title="Reels" />
+        android:title="Bytes" />
 
     <item
         android:id="@+id/navigation_profile"

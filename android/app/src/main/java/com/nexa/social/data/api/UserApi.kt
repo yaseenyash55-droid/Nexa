@@ -1,15 +1,27 @@
 package com.nexa.social.data.api
 
 import com.nexa.social.data.models.ApiResponse
+import com.nexa.social.data.models.MediaUploadResponse
 import com.nexa.social.data.models.User
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
+import retrofit2.http.Part
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface UserApi {
+    @Multipart
+    @POST("media/upload")
+    suspend fun uploadProfileImage(
+        @Part file: MultipartBody.Part,
+        @Part("kind") kind: RequestBody
+    ): Response<ApiResponse<MediaUploadResponse>>
+
     @GET("users/suggestions")
     suspend fun getSuggestions(
         @Query("limit") limit: Int = 20

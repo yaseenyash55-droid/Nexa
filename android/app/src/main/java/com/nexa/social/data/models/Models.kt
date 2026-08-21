@@ -184,7 +184,8 @@ data class DisplayMessage(
     val senderName: String?,
     val content: String,
     val isSelf: Boolean,
-    val timestamp: String?
+    val timestamp: String?,
+    val isRead: Boolean = false
 )
 
 data class Comment(

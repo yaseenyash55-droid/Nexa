@@ -24,3 +24,5 @@ artifacts/
 *.p12
 *.sso
 client/public/*.apk
+.nexa-backups/
+*.nexa-backup

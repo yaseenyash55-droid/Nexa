@@ -25,6 +25,14 @@ class MessagesAdapter(
         notifyItemInserted(messages.size - 1)
     }
 
+    fun markMessageRead(messageId: Int) {
+        val index = messages.indexOfFirst { it.id == messageId }
+        if (index >= 0 && messages[index].isSelf) {
+            messages[index] = messages[index].copy(isRead = true)
+            notifyItemChanged(index)
+        }
+    }
+
     override fun getItemViewType(position: Int): Int {
         return if (messages[position].isSelf) TYPE_SENT else TYPE_RECEIVED
     }
@@ -56,7 +64,8 @@ class MessagesAdapter(
 
         fun bind(msg: DisplayMessage) {
             tvContent.text = msg.content
-            tvTime.text = formatTimestamp(msg.timestamp) ?: "Sent"
+            val time = formatTimestamp(msg.timestamp) ?: "Sent"
+            tvTime.text = if (msg.isRead) "$time â€¢ Read" else time
         }
     }
 

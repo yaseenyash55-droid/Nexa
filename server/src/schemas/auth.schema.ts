@@ -23,6 +23,11 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required')
 });
 
+export const verifyLoginOtpSchema = z.object({
+  challengeId: z.string().length(64),
+  code: z.string().regex(/^\d{6}$/, 'Enter the six-digit verification code')
+});
+
 export const forgotPasswordSchema = z.object({
   email: z.string().email('Please enter a valid email address')
 });

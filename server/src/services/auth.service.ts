@@ -7,8 +7,10 @@ import { env } from '../config/env.js';
 import { getEmailProvider } from '../utils/email.js';
 import { auditLogSecurityEvent } from '../utils/securityAuditLogger.js';
 import { withTransaction } from '../db/pool.js';
+import { EmailOtpService } from './email-otp.service.js';
 
 export class AuthService {
+  private readonly emailOtpService = new EmailOtpService();
   private get userRepo() {
     return getRepositoryManager().userRepo;
   }
@@ -88,7 +90,7 @@ export class AuthService {
     };
   }
 
-  async login(loginId: any, password?: string): Promise<{ user: User; tokens: AuthTokens; accessToken: string; refreshToken: string }> {
+  async login(loginId: any, password?: string): Promise<any> {
     const credentials = typeof loginId === 'object' && loginId !== null
       ? loginId
       : { emailOrUsername: loginId, password };
@@ -192,6 +194,9 @@ export class AuthService {
       username: user.username
     });
 
+    const securitySettings = await this.securityRepo.getSecuritySettings(user.userId);
+    if (securitySettings?.mfaEnabled) return this.emailOtpService.begin(user);
+
     const accessToken = signAccessToken({ userId: user.userId, username: user.username, email: user.email });
     const refreshToken = signRefreshToken({ userId: user.userId, username: user.username, email: user.email });
 
@@ -202,6 +207,10 @@ export class AuthService {
     const sanitizedUser = this.sanitizeUser(user);
 
     return { user: sanitizedUser, tokens: { accessToken, refreshToken }, accessToken, refreshToken };
+  }
+
+  async verifyLoginOtp(challengeId: string, code: string) {
+    return this.emailOtpService.complete(challengeId, code);
   }
 
   async refreshTokens(refreshToken?: string, authHeaderToken?: string): Promise<AuthTokens & { accessToken: string; newRefreshToken: string }> {
@@ -335,8 +344,15 @@ export class AuthService {
   }
 
   async sendEmailVerification(userId: number, email?: string): Promise<{ message: string }> {
-    const user = await this.userRepo.findById(userId);
-    const recipientEmail = email || user?.email;
+    const normalizedEmail = email?.trim().toLowerCase();
+
+    const user = userId > 0
+      ? await this.userRepo.findById(userId)
+      : normalizedEmail
+        ? await this.userRepo.findByEmail(normalizedEmail)
+        : null;
+
+    const recipientEmail = normalizedEmail || user?.email;
     if (!recipientEmail || !user) {
       throw { statusCode: 404, code: 'USER_NOT_FOUND', message: 'User for verification not found' };
     }
@@ -346,7 +362,7 @@ export class AuthService {
     const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours TTL
     const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
 
-    await this.authRepo.saveEmailVerificationToken(userId, tokenHash, expiresAt);
+    await this.authRepo.saveEmailVerificationToken(user.userId, tokenHash, expiresAt);
 
     const emailProvider = getEmailProvider();
     await emailProvider.sendEmail({

@@ -47,6 +47,7 @@ export class AuthController {
   async login(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await authService.login(req.body);
+      if (result.mfaRequired) return sendSuccess(res, result, 'Verification code sent');
 
       res.cookie('nexa_refresh_token', result.refreshToken, getRefreshTokenCookieOptions());
 
@@ -58,6 +59,14 @@ export class AuthController {
     } catch (err) {
       next(err);
     }
+  }
+
+  async verifyLoginOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.verifyLoginOtp(req.body.challengeId, req.body.code);
+      res.cookie('nexa_refresh_token', result.refreshToken, getRefreshTokenCookieOptions());
+      return sendSuccess(res, { user: result.user, accessToken: result.accessToken, refreshToken: result.refreshToken }, 'Login verification successful');
+    } catch (err) { next(err); }
   }
 
   async refresh(req: Request, res: Response, next: NextFunction) {

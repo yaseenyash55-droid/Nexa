@@ -71,6 +71,7 @@ class ChatActivity : AppCompatActivity() {
         super.onDestroy()
         SocketManager.removeTypingListeners()
         SocketManager.unregisterMessageListener()
+        SocketManager.unregisterMessageReadListener()
         SocketManager.unregisterGroupMessageListener()
         stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
     }
@@ -92,6 +93,9 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun setupRealtimeMessageListeners() {
+        SocketManager.registerMessageReadListener { messageId, _ ->
+            adapter.markMessageRead(messageId)
+        }
         if (chatType == "direct") {
             SocketManager.registerMessageListener { message ->
                 if (message.senderId == targetId) {

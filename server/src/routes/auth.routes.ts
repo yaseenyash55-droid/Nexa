@@ -9,7 +9,8 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   verifyEmailSchema,
-  resendVerificationSchema
+  resendVerificationSchema,
+  verifyLoginOtpSchema
 } from '../schemas/auth.schema.js';
 
 const router = Router();
@@ -17,6 +18,7 @@ const controller = new AuthController();
 
 router.post('/register', accountCreationRateLimiter, validate(registerSchema), (req, res, next) => controller.register(req, res, next));
 router.post('/login', loginRateLimiter, validate(loginSchema), (req, res, next) => controller.login(req, res, next));
+router.post('/login/verify-otp', authRateLimiter, validate(verifyLoginOtpSchema), (req, res, next) => controller.verifyLoginOtp(req, res, next));
 router.post('/refresh', authRateLimiter, (req, res, next) => controller.refresh(req, res, next));
 router.post('/logout', (req, res, next) => controller.logout(req, res, next));
 router.get('/me', requireAuth, (req, res, next) => controller.me(req, res, next));

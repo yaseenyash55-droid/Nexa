@@ -62,7 +62,7 @@ class ReelsFragment : Fragment() {
                     is ReelsUiState.Empty -> {
                         binding.progressBar.visibility = View.GONE
                         binding.tvReelsStatus.visibility = View.VISIBLE
-                        binding.tvReelsStatus.text = "No reels available right now. Check back later!"
+                        binding.tvReelsStatus.text = "No Bytes available right now. Check back later!"
                         reelAdapter.submitList(emptyList())
                     }
                     is ReelsUiState.Error -> {

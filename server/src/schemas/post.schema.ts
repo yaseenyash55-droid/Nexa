@@ -1,9 +1,22 @@
 import { z } from 'zod';
 
+const storedImageUrlSchema = z.string().refine(
+  value =>
+    value === '' ||
+    /^https?:\/\/\S+$/i.test(value) ||
+    /^\/uploads\/[A-Za-z0-9._-]+$/.test(value),
+  'Invalid image URL format'
+);
+
 export const createPostSchema = z.object({
-  content: z.string().max(2000, 'Content cannot exceed 2000 characters').optional(),
-  imageUrl: z.string().url('Invalid image URL format').or(z.literal('')).optional()
-}).refine(data => (data.content && data.content.trim().length > 0) || (data.imageUrl && data.imageUrl.trim().length > 0), {
-  message: 'Post must contain either text content or an image URL',
-  path: ['content']
-});
+  content: z.string().max(2200, 'Content cannot exceed 2200 characters').optional(),
+  imageUrl: storedImageUrlSchema.optional()
+}).refine(
+  data =>
+    Boolean(data.content?.trim()) ||
+    Boolean(data.imageUrl?.trim()),
+  {
+    message: 'Post must contain either text content or an image URL',
+    path: ['content']
+  }
+);
