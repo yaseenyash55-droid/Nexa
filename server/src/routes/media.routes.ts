@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import { Router } from 'express';
 import multer from 'multer';
 import { executeSql } from '../db/pool.js';
+import { executePostgresSql } from '../db/postgres.pool.js';
+import { env } from '../config/env.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import {
@@ -104,24 +106,42 @@ mediaRouter.post(
         kind
       );
 
-      // Record metadata and storage key in Oracle database
+      // Record metadata and storage key in database
       const authReq = req as AuthenticatedRequest;
       try {
-        await executeSql(
-          `INSERT INTO MEDIA_ASSETS
-             (ASSET_ID, USER_ID, STORAGE_KEY, ORIGINAL_NAME, MIME_TYPE, SIZE_BYTES, MEDIA_KIND)
-           VALUES
-             (:assetId, :userId, :storageKey, :originalName, :mimeType, :sizeBytes, :mediaKind)`,
-          {
-            assetId: asset.assetId,
-            userId: authReq.user!.userId,
-            storageKey: asset.storageKey,
-            originalName: path.basename(uploaded.originalname).slice(0, 255),
-            mimeType: uploaded.mimetype,
-            sizeBytes: asset.sizeBytes,
-            mediaKind: kind.toUpperCase()
-          }
-        );
+        if (env.DATABASE_PROVIDER === 'postgres') {
+          await executePostgresSql(
+            `INSERT INTO media_assets
+               (asset_id, user_id, storage_key, original_name, mime_type, size_bytes, media_kind)
+             VALUES
+               ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              asset.assetId,
+              authReq.user!.userId,
+              asset.storageKey,
+              path.basename(uploaded.originalname).slice(0, 255),
+              uploaded.mimetype,
+              asset.sizeBytes,
+              kind.toUpperCase()
+            ]
+          );
+        } else {
+          await executeSql(
+            `INSERT INTO MEDIA_ASSETS
+               (ASSET_ID, USER_ID, STORAGE_KEY, ORIGINAL_NAME, MIME_TYPE, SIZE_BYTES, MEDIA_KIND)
+             VALUES
+               (:assetId, :userId, :storageKey, :originalName, :mimeType, :sizeBytes, :mediaKind)`,
+            {
+              assetId: asset.assetId,
+              userId: authReq.user!.userId,
+              storageKey: asset.storageKey,
+              originalName: path.basename(uploaded.originalname).slice(0, 255),
+              mimeType: uploaded.mimetype,
+              sizeBytes: asset.sizeBytes,
+              mediaKind: kind.toUpperCase()
+            }
+          );
+        }
       } catch (dbError) {
         // Rollback stored object on DB insert failure
         await storageProvider.deleteMedia(asset.storageKey).catch(() => undefined);

@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { executeSql } from '../db/pool.js';
+import { executePostgresSql } from '../db/postgres.pool.js';
 import { getRepositoryManager } from '../repositories/index.js';
 import { signAccessToken, signRefreshToken } from '../utils/jwt.js';
 import { hashToken } from '../utils/hash.js';
@@ -8,12 +9,12 @@ import { env } from '../config/env.js';
 import { AuthTokens, User } from '../types/index.js';
 
 type ChallengeRow = {
-  CHALLENGE_ID: string;
-  USER_ID: number;
-  OTP_HASH: string;
-  EXPIRES_AT: Date;
-  ATTEMPTS: number;
-  CONSUMED_AT: Date | null;
+  challengeId: string;
+  userId: number;
+  otpHash: string;
+  expiresAt: Date;
+  attempts: number;
+  consumedAt: Date | null;
 };
 
 export class EmailOtpService {
@@ -39,13 +40,32 @@ export class EmailOtpService {
     const challengeId = crypto.randomBytes(32).toString('hex');
     const code = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await executeSql(`UPDATE LOGIN_OTP_CHALLENGES SET CONSUMED_AT = SYSTIMESTAMP
-      WHERE USER_ID = :userId AND CONSUMED_AT IS NULL`, { userId: user.userId });
-    await executeSql(`INSERT INTO LOGIN_OTP_CHALLENGES
-      (CHALLENGE_ID, USER_ID, OTP_HASH, EXPIRES_AT, ATTEMPTS)
-      VALUES (:challengeId, :userId, :otpHash, :expiresAt, 0)`, {
-      challengeId, userId: user.userId, otpHash: this.otpHash(challengeId, code), expiresAt
-    });
+    const hash = this.otpHash(challengeId, code);
+
+    if (env.DATABASE_PROVIDER === 'postgres') {
+      await executePostgresSql(
+        `UPDATE login_otp_challenges SET consumed_at = CURRENT_TIMESTAMP
+         WHERE user_id = $1 AND consumed_at IS NULL`,
+        [user.userId]
+      );
+      await executePostgresSql(
+        `INSERT INTO login_otp_challenges (challenge_id, user_id, otp_hash, expires_at, attempts)
+         VALUES ($1, $2, $3, $4, 0)`,
+        [challengeId, user.userId, hash, expiresAt]
+      );
+    } else {
+      await executeSql(
+        `UPDATE LOGIN_OTP_CHALLENGES SET CONSUMED_AT = SYSTIMESTAMP
+         WHERE USER_ID = :userId AND CONSUMED_AT IS NULL`,
+        { userId: user.userId }
+      );
+      await executeSql(
+        `INSERT INTO LOGIN_OTP_CHALLENGES (CHALLENGE_ID, USER_ID, OTP_HASH, EXPIRES_AT, ATTEMPTS)
+         VALUES (:challengeId, :userId, :otpHash, :expiresAt, 0)`,
+        { challengeId, userId: user.userId, otpHash: hash, expiresAt }
+      );
+    }
+
     await getEmailProvider().sendEmail({
       to: user.email,
       subject: 'Your NEXA login verification code',
@@ -56,23 +76,98 @@ export class EmailOtpService {
   }
 
   async complete(challengeId: string, code: string) {
-    const result = await executeSql<ChallengeRow>(`SELECT CHALLENGE_ID, USER_ID, OTP_HASH,
-      EXPIRES_AT, ATTEMPTS, CONSUMED_AT FROM LOGIN_OTP_CHALLENGES
-      WHERE CHALLENGE_ID = :challengeId`, { challengeId });
-    const row = result.rows?.[0];
-    if (!row || row.CONSUMED_AT) throw { statusCode: 400, code: 'INVALID_OTP_CHALLENGE', message: 'Verification request is invalid or already used' };
-    if (new Date(row.EXPIRES_AT).getTime() <= Date.now()) throw { statusCode: 400, code: 'OTP_EXPIRED', message: 'Verification code expired. Sign in again.' };
-    if (row.ATTEMPTS >= 5) throw { statusCode: 429, code: 'OTP_ATTEMPTS_EXCEEDED', message: 'Too many incorrect codes. Sign in again.' };
-    const expected = Buffer.from(row.OTP_HASH, 'hex');
+    let row: ChallengeRow | null = null;
+
+    if (env.DATABASE_PROVIDER === 'postgres') {
+      const result = await executePostgresSql<{
+        challenge_id: string;
+        user_id: number | string;
+        otp_hash: string;
+        expires_at: Date | string;
+        attempts: number;
+        consumed_at?: Date | string | null;
+      }>(
+        `SELECT challenge_id, user_id, otp_hash, expires_at, attempts, consumed_at
+         FROM login_otp_challenges
+         WHERE challenge_id = $1`,
+        [challengeId]
+      );
+      const r = result.rows?.[0];
+      if (r) {
+        row = {
+          challengeId: r.challenge_id,
+          userId: Number(r.user_id),
+          otpHash: r.otp_hash,
+          expiresAt: new Date(r.expires_at),
+          attempts: Number(r.attempts),
+          consumedAt: r.consumed_at ? new Date(r.consumed_at) : null
+        };
+      }
+    } else {
+      const result = await executeSql<{
+        CHALLENGE_ID: string;
+        USER_ID: number;
+        OTP_HASH: string;
+        EXPIRES_AT: Date;
+        ATTEMPTS: number;
+        CONSUMED_AT: Date | null;
+      }>(
+        `SELECT CHALLENGE_ID, USER_ID, OTP_HASH, EXPIRES_AT, ATTEMPTS, CONSUMED_AT
+         FROM LOGIN_OTP_CHALLENGES
+         WHERE CHALLENGE_ID = :challengeId`,
+        { challengeId }
+      );
+      const r = result.rows?.[0];
+      if (r) {
+        row = {
+          challengeId: r.CHALLENGE_ID,
+          userId: Number(r.USER_ID),
+          otpHash: r.OTP_HASH,
+          expiresAt: new Date(r.EXPIRES_AT),
+          attempts: Number(r.ATTEMPTS),
+          consumedAt: r.CONSUMED_AT ? new Date(r.CONSUMED_AT) : null
+        };
+      }
+    }
+
+    if (!row || row.consumedAt) throw { statusCode: 400, code: 'INVALID_OTP_CHALLENGE', message: 'Verification request is invalid or already used' };
+    if (new Date(row.expiresAt).getTime() <= Date.now()) throw { statusCode: 400, code: 'OTP_EXPIRED', message: 'Verification code expired. Sign in again.' };
+    if (row.attempts >= 5) throw { statusCode: 429, code: 'OTP_ATTEMPTS_EXCEEDED', message: 'Too many incorrect codes. Sign in again.' };
+
+    const expected = Buffer.from(row.otpHash, 'hex');
     const supplied = Buffer.from(this.otpHash(challengeId, code), 'hex');
     if (expected.length !== supplied.length || !crypto.timingSafeEqual(expected, supplied)) {
-      await executeSql(`UPDATE LOGIN_OTP_CHALLENGES SET ATTEMPTS = ATTEMPTS + 1
-        WHERE CHALLENGE_ID = :challengeId AND CONSUMED_AT IS NULL`, { challengeId });
+      if (env.DATABASE_PROVIDER === 'postgres') {
+        await executePostgresSql(
+          `UPDATE login_otp_challenges SET attempts = attempts + 1
+           WHERE challenge_id = $1 AND consumed_at IS NULL`,
+          [challengeId]
+        );
+      } else {
+        await executeSql(
+          `UPDATE LOGIN_OTP_CHALLENGES SET ATTEMPTS = ATTEMPTS + 1
+           WHERE CHALLENGE_ID = :challengeId AND CONSUMED_AT IS NULL`,
+          { challengeId }
+        );
+      }
       throw { statusCode: 401, code: 'INVALID_OTP', message: 'Verification code is incorrect' };
     }
-    await executeSql(`UPDATE LOGIN_OTP_CHALLENGES SET CONSUMED_AT = SYSTIMESTAMP
-      WHERE CHALLENGE_ID = :challengeId AND CONSUMED_AT IS NULL`, { challengeId });
-    const user = await this.userRepo.findById(row.USER_ID);
+
+    if (env.DATABASE_PROVIDER === 'postgres') {
+      await executePostgresSql(
+        `UPDATE login_otp_challenges SET consumed_at = CURRENT_TIMESTAMP
+         WHERE challenge_id = $1 AND consumed_at IS NULL`,
+        [challengeId]
+      );
+    } else {
+      await executeSql(
+        `UPDATE LOGIN_OTP_CHALLENGES SET CONSUMED_AT = SYSTIMESTAMP
+         WHERE CHALLENGE_ID = :challengeId AND CONSUMED_AT IS NULL`,
+        { challengeId }
+      );
+    }
+
+    const user = await this.userRepo.findById(row.userId);
     if (!user) throw { statusCode: 404, code: 'USER_NOT_FOUND', message: 'User no longer exists' };
     const payload = { userId: user.userId, username: user.username, email: user.email };
     const accessToken = signAccessToken(payload);

@@ -1,30 +1,30 @@
 services:
   - type: web
-    name: nexa-backend
-    env: node
-    plan: free
-    region: singapore
-    buildCommand: npm install && npm run build
-    startCommand: npm start
-    autoDeploy: true
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 10000
-      - key: CLIENT_ORIGIN
-        value: https://nexa-social-app.surge.sh
-      - key: DB_USER
-        sync: false
-      - key: DB_PASSWORD
-        sync: false
-      - key: DB_CONNECT_STRING
-        sync: false
-      - key: TNS_ADMIN
-        sync: false
-      - key: JWT_SECRET
-        generateValue: true
-      - key: JWT_REFRESH_SECRET
-        generateValue: true
-      - key: COOKIE_SECURE
-        value: true
+  name: nexa-backend
+  env: node
+  plan: free
+  region: singapore
+  buildCommand: npm install && npm run build
+  startCommand: npm start
+  autoDeploy: true
+  envVars:
+    - key: NODE_ENV
+      value: production
+    - key: PORT
+      value: 10000
+    - key: CLIENT_ORIGIN
+      value: https://nexa-social-app.surge.sh
+    - key: DATABASE_PROVIDER
+      value: postgres
+    - key: DATABASE_URL
+      sync: false
+    - key: PG_POOL_MIN
+      value: 1
+    - key: PG_POOL_MAX
+      value: 10
+    - key: JWT_SECRET
+      generateValue: true
+    - key: JWT_REFRESH_SECRET
+      generateValue: true
+    - key: COOKIE_SECURE
+      value: true

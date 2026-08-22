@@ -79,14 +79,37 @@ const jwtRefreshSecret = getRequiredEnv(
   'JWT_REFRESH_SECRET'
 );
 
+const rawDatabaseProvider = (
+  process.env.DATABASE_PROVIDER ||
+  (process.env.DATABASE_URL ? 'postgres' : 'oracle')
+).toLowerCase().trim();
+
+export const databaseProvider: 'postgres' | 'oracle' =
+  rawDatabaseProvider === 'postgres' || rawDatabaseProvider === 'postgresql' || rawDatabaseProvider === 'pg'
+    ? 'postgres'
+    : 'oracle';
+
+const isPostgres = databaseProvider === 'postgres';
+const isOracle = databaseProvider === 'oracle';
+
+const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL || '';
+
+if (isProduction && isPostgres && !databaseUrl) {
+  throw new Error(
+    '[FATAL CONFIGURATION ERROR] Missing required environment variable: DATABASE_URL for PostgreSQL provider in production'
+  );
+}
+
 const databaseUser = getRequiredEnv(
   ['DB_USER', 'ORACLE_DB_USER', 'ORACLE_USER'],
-  'DB_USER'
+  'DB_USER',
+  isProduction && isOracle
 );
 
 const databasePassword = getRequiredEnv(
   ['DB_PASSWORD', 'ORACLE_DB_PASSWORD', 'ORACLE_PASSWORD'],
-  'DB_PASSWORD'
+  'DB_PASSWORD',
+  isProduction && isOracle
 );
 
 const databaseConnectString = getRequiredEnv(
@@ -96,7 +119,8 @@ const databaseConnectString = getRequiredEnv(
     'ORACLE_DB_CONNECTION_STRING',
     'ORACLE_DB_CONNECT_STRING'
   ],
-  'DB_CONNECT_STRING'
+  'DB_CONNECT_STRING',
+  isProduction && isOracle
 );
 
 const walletLocation =
@@ -107,8 +131,10 @@ const walletLocation =
   '';
 const walletPassword = process.env.WALLET_PASSWORD || '';
 
-// Validate connect string against localhost in production mode
-validateProductionConnectString(databaseConnectString, isProduction);
+// Validate connect string against localhost in production mode if Oracle is active
+if (isOracle) {
+  validateProductionConnectString(databaseConnectString, isProduction);
+}
 
 const rawStorageProvider = (
   process.env.STORAGE_PROVIDER ||
@@ -198,6 +224,12 @@ export const env = {
   JWT_ACCESS_SECRET: jwtAccessSecret,
   JWT_REFRESH_SECRET: jwtRefreshSecret,
 
+  DATABASE_PROVIDER: databaseProvider,
+  DATABASE_URL: databaseUrl,
+  PG_POOL_MIN: getPositiveInteger('PG_POOL_MIN', 1),
+  PG_POOL_MAX: getPositiveInteger('PG_POOL_MAX', 10),
+  PG_SSL: process.env.PG_SSL === 'false' ? false : (isProduction || databaseUrl.includes('sslmode') || databaseUrl.includes('supabase') || databaseUrl.includes('neon') || databaseUrl.includes('render')),
+
   DB_USER: databaseUser,
   DB_PASSWORD: databasePassword,
   DB_CONNECT_STRING: databaseConnectString,
@@ -234,6 +266,6 @@ export const env = {
   S3_SECRET_ACCESS_KEY: s3SecretAccessKey,
   CDN_BASE_URL: cdnBaseUrl,
 
-  DATA_SOURCE: 'oracle' as const,
+  DATA_SOURCE: databaseProvider,
   USE_MOCK_DATA: false
 };

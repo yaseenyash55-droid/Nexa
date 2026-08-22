@@ -6,7 +6,7 @@ import { AuthTokens, User } from '../types/index.js';
 import { env } from '../config/env.js';
 import { getEmailProvider } from '../utils/email.js';
 import { auditLogSecurityEvent } from '../utils/securityAuditLogger.js';
-import { withTransaction } from '../db/pool.js';
+import { withDatabaseTransaction as withTransaction } from '../db/index.js';
 import { EmailOtpService } from './email-otp.service.js';
 
 export class AuthService {

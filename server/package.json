@@ -12,7 +12,10 @@
     "lint": "eslint src --ext .ts --max-warnings=0",
     "test": "vitest run --exclude tests/oracle.integration.test.ts",
     "test:unit": "vitest run --exclude tests/oracle.integration.test.ts",
-    "test:integration": "vitest run tests/oracle.integration.test.ts"
+    "test:integration": "vitest run tests/oracle.integration.test.ts",
+    "db:migrate:postgres": "tsx scripts/run_postgres_migrations.ts",
+    "db:test:postgres": "tsx scripts/test_postgres_connection.ts",
+    "verify:prod": "tsx scripts/verify_production_workflow.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1114.0",
@@ -24,6 +27,7 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/multer": "^1.4.12",
     "@types/node": "^20.14.9",
+    "@types/pg": "^8.23.1",
     "@types/supertest": "^6.0.2",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
@@ -36,6 +40,7 @@
     "multer": "^2.2.0",
     "nodemailer": "^9.0.5",
     "oracledb": "^6.5.0",
+    "pg": "^8.23.0",
     "pino": "^9.2.0",
     "pino-pretty": "^11.2.1",
     "socket.io": "^4.8.3",

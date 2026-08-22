@@ -1,21 +1,32 @@
 import { app } from './app.js';
 import { env } from './config/env.js';
-import { initializeOraclePool, closeOraclePool } from './db/pool.js';
+import { initializeDatabasePool, closeDatabasePool } from './db/index.js';
 import { logger } from './utils/logger.js';
 import { Server } from 'socket.io';
 import { realtimeServer } from './socket.js';
 
 async function startServer() {
   try {
-    await initializeOraclePool();
+    await initializeDatabasePool();
 
     const server = app.listen(env.PORT, () => {
-      logger.info(`Nexa Server listening on port ${env.PORT} with Oracle Database`);
+      logger.info(
+        `Nexa Server listening on port ${env.PORT} with ${env.DATABASE_PROVIDER.toUpperCase()} Database`
+      );
     });
+
+    const allowedOrigins = [
+      'https://nexa-social-app.surge.sh',
+      'http://localhost:5173',
+      'http://localhost:3000'
+    ];
+    if (env.CLIENT_ORIGIN && !allowedOrigins.includes(env.CLIENT_ORIGIN)) {
+      allowedOrigins.push(env.CLIENT_ORIGIN);
+    }
 
     const io = new Server(server, {
       cors: {
-        origin: env.CLIENT_ORIGIN,
+        origin: allowedOrigins,
         methods: ['GET', 'POST'],
         credentials: true
       }
@@ -75,7 +86,7 @@ async function startServer() {
     const shutdown = async (signal: string) => {
       logger.info(`Received ${signal}. Shutting down gracefully...`);
       server.close(async () => {
-        await closeOraclePool();
+        await closeDatabasePool();
         process.exit(0);
       });
     };

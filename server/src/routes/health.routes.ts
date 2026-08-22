@@ -1,16 +1,17 @@
 import { Router } from 'express';
-import { checkOracleHealth } from '../db/pool.js';
+import { checkDatabaseHealth } from '../db/index.js';
+import { env } from '../config/env.js';
 import { sendSuccess } from '../utils/response.js';
 
 const router = Router();
 
 /**
  * Dependency health probe: GET /health
- * Confirms that the process and Oracle Database pool can serve requests.
+ * Confirms that the process and active Database pool (PostgreSQL or Oracle) can serve requests.
  * Sanitized response: Never exposes credentials, connection strings, hosts, or raw database errors.
  */
 router.get('/', async (_req, res) => {
-  const dbHealth = await checkOracleHealth();
+  const dbHealth = await checkDatabaseHealth();
   const isHealthy = dbHealth.reachable;
   const statusCode = isHealthy ? 200 : 503;
 
@@ -18,8 +19,9 @@ router.get('/', async (_req, res) => {
     res,
     {
       status: isHealthy ? 'ok' : 'degraded',
-      mode: 'oracle',
+      mode: dbHealth.provider,
       database: {
+        provider: dbHealth.provider,
         reachable: dbHealth.reachable,
         status: isHealthy ? 'connected' : 'unreachable',
         details: isHealthy ? 'Connected' : 'Database unreachable'
@@ -34,12 +36,12 @@ router.get('/', async (_req, res) => {
 
 /**
  * Readiness Probe: GET /ready
- * Validates dependencies (Oracle DB connection pool, data source mode).
+ * Validates dependencies (Database connection pool, data source mode).
  * Returns HTTP 200 if ready to serve traffic, HTTP 503 if unready/degraded.
  * Omits connection strings, keys, or stack traces from payload.
  */
 router.get('/ready', async (_req, res) => {
-  const dbHealth = await checkOracleHealth();
+  const dbHealth = await checkDatabaseHealth();
   const isReady = dbHealth.reachable;
   const statusCode = isReady ? 200 : 503;
 
@@ -47,8 +49,9 @@ router.get('/ready', async (_req, res) => {
     res,
     {
       status: isReady ? 'ready' : 'unready',
-      mode: 'oracle',
+      mode: dbHealth.provider,
       database: {
+        provider: dbHealth.provider,
         reachable: isReady,
         status: isReady ? 'connected' : 'unreachable',
         details: isReady ? 'Connected' : 'Database unreachable'
