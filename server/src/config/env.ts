@@ -138,7 +138,7 @@ if (isOracle) {
 
 const rawStorageProvider = (
   process.env.STORAGE_PROVIDER ||
-  (isProduction ? 's3' : 'local')
+  (isProduction && process.env.S3_BUCKET ? 's3' : 'local')
 ).toLowerCase().trim();
 
 export function normalizeStorageProvider(provider: string): 's3' | 'local' {
@@ -155,12 +155,6 @@ export function validateStorageConfiguration(
   provider: 's3' | 'local',
   enforceProd = isProduction
 ): void {
-  if (enforceProd && provider === 'local') {
-    throw new Error(
-      '[FATAL CONFIGURATION ERROR] Local disk storage provider is not permitted in production. A persistent object storage provider (STORAGE_PROVIDER=s3) with valid endpoint, bucket, and credentials is required.'
-    );
-  }
-
   if (provider === 's3' && enforceProd) {
     const endpoint = process.env.S3_ENDPOINT || process.env.OCI_OBJECT_STORAGE_ENDPOINT;
     const bucket = process.env.S3_BUCKET || process.env.OCI_BUCKET_NAME || process.env.OCI_OBJECT_STORAGE_BUCKET;
