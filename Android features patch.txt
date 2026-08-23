@@ -1,0 +1,2507 @@
+From a8fc28f3effacaefe96a71c8fcb77479eb62e564 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 23 Aug 2026 10:25:51 +0200
+Subject: [PATCH 2/2] feat(android): add Bytes publishing profile grids and
+ settings
+
+---
+ android/app/src/main/AndroidManifest.xml      |  17 ++
+ .../main/java/com/nexa/social/MainActivity.kt |  18 ++-
+ .../java/com/nexa/social/NexaApiClient.kt     |   2 +
+ .../java/com/nexa/social/data/api/PostApi.kt  |  19 ++-
+ .../com/nexa/social/data/api/SecurityApi.kt   |  22 +++
+ .../com/nexa/social/data/models/Models.kt     |  14 +-
+ .../social/data/repository/PostRepository.kt  |  13 ++
+ .../com/nexa/social/ui/CreatePostActivity.kt  | 100 +-----------
+ .../com/nexa/social/ui/CreateReelActivity.kt  | 124 ++++++++++++++
+ .../EditProfileBottomSheetDialogFragment.kt   | 113 ++++++-------
+ .../com/nexa/social/ui/SettingsActivity.kt    | 151 ++++++++++++++++++
+ .../com/nexa/social/ui/UserListActivity.kt    |  60 +++++++
+ .../com/nexa/social/ui/UserProfileActivity.kt |  34 ++++
+ .../nexa/social/ui/adapters/CommentAdapter.kt |   6 +-
+ .../social/ui/adapters/ConversationAdapter.kt |   6 +-
+ .../nexa/social/ui/adapters/PostAdapter.kt    |  17 +-
+ .../social/ui/adapters/ProfileGridAdapter.kt  |  46 ++++++
+ .../nexa/social/ui/adapters/ReelAdapter.kt    |   8 +-
+ .../nexa/social/ui/adapters/UserAdapter.kt    |   6 +-
+ .../nexa/social/ui/fragments/HomeFragment.kt  |   6 +
+ .../social/ui/fragments/ProfileFragment.kt    |  95 ++++++-----
+ .../nexa/social/ui/fragments/ReelsFragment.kt |  12 +-
+ .../social/ui/viewmodels/ProfileViewModel.kt  |   4 +-
+ .../nexa/social/utils/MediaFilePreparer.kt    | 108 +++++++++++++
+ .../com/nexa/social/utils/MediaUrlResolver.kt |  18 +++
+ .../app/src/main/res/drawable/ic_settings.xml |  10 ++
+ .../main/res/layout/activity_create_reel.xml  | 132 +++++++++++++++
+ .../src/main/res/layout/activity_settings.xml | 111 +++++++++++++
+ .../main/res/layout/activity_user_list.xml    |  50 ++++++
+ .../main/res/layout/activity_user_profile.xml |  28 ++++
+ .../main/res/layout/dialog_edit_profile.xml   |  33 +++-
+ .../src/main/res/layout/fragment_profile.xml  |  88 ++++++----
+ .../src/main/res/layout/item_profile_grid.xml |  27 ++++
+ .../app/src/main/res/values-night/colors.xml  |  10 ++
+ android/app/src/main/res/values/colors.xml    |  14 +-
+ .../java/com/nexa/social/ApiContractTest.kt   |  37 +++++
+ .../com/nexa/social/MediaValidatorTest.kt     |  10 ++
+ client/src/api/posts.api.ts                   |   7 +
+ client/src/pages/ProfilePage.tsx              |   4 +-
+ server/src/controllers/post.controller.ts     |  15 ++
+ server/src/routes/post.routes.ts              |   1 +
+ server/src/routes/security.routes.ts          |  40 ++++-
+ 42 files changed, 1361 insertions(+), 275 deletions(-)
+ create mode 100644 android/app/src/main/java/com/nexa/social/data/api/SecurityApi.kt
+ create mode 100644 android/app/src/main/java/com/nexa/social/ui/CreateReelActivity.kt
+ create mode 100644 android/app/src/main/java/com/nexa/social/ui/SettingsActivity.kt
+ create mode 100644 android/app/src/main/java/com/nexa/social/ui/UserListActivity.kt
+ create mode 100644 android/app/src/main/java/com/nexa/social/ui/UserProfileActivity.kt
+ create mode 100644 android/app/src/main/java/com/nexa/social/ui/adapters/ProfileGridAdapter.kt
+ create mode 100644 android/app/src/main/java/com/nexa/social/utils/MediaFilePreparer.kt
+ create mode 100644 android/app/src/main/java/com/nexa/social/utils/MediaUrlResolver.kt
+ create mode 100644 android/app/src/main/res/drawable/ic_settings.xml
+ create mode 100644 android/app/src/main/res/layout/activity_create_reel.xml
+ create mode 100644 android/app/src/main/res/layout/activity_settings.xml
+ create mode 100644 android/app/src/main/res/layout/activity_user_list.xml
+ create mode 100644 android/app/src/main/res/layout/activity_user_profile.xml
+ create mode 100644 android/app/src/main/res/layout/item_profile_grid.xml
+ create mode 100644 android/app/src/main/res/values-night/colors.xml
+
+diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
+index a1f9def..4fd8c5f 100644
+--- a/android/app/src/main/AndroidManifest.xml
++++ b/android/app/src/main/AndroidManifest.xml
+@@ -103,6 +103,23 @@
+             android:exported="false"
+             android:windowSoftInputMode="adjustResize" />
+ 
++        <activity
++            android:name=".ui.CreateReelActivity"
++            android:exported="false"
++            android:windowSoftInputMode="adjustResize" />
++
++        <activity
++            android:name=".ui.SettingsActivity"
++            android:exported="false" />
++
++        <activity
++            android:name=".ui.UserProfileActivity"
++            android:exported="false" />
++
++        <activity
++            android:name=".ui.UserListActivity"
++            android:exported="false" />
++
+         <!-- Native Conversations Screen Activity -->
+         <activity
+             android:name=".ui.ConversationsActivity"
+diff --git a/android/app/src/main/java/com/nexa/social/MainActivity.kt b/android/app/src/main/java/com/nexa/social/MainActivity.kt
+index c7bbe7b..06ebf54 100644
+--- a/android/app/src/main/java/com/nexa/social/MainActivity.kt
++++ b/android/app/src/main/java/com/nexa/social/MainActivity.kt
+@@ -18,6 +18,7 @@ import com.nexa.social.data.models.FcmTokenRequest
+ import com.nexa.social.data.models.NotificationDestination
+ import com.nexa.social.databinding.ActivityMainBinding
+ import com.nexa.social.ui.CreatePostActivity
++import com.nexa.social.ui.CreateReelActivity
+ import com.nexa.social.ui.LoginActivity
+ import com.nexa.social.utils.NetworkMonitor
+ import com.nexa.social.utils.NotificationHelper
+@@ -45,7 +46,7 @@ class MainActivity : AppCompatActivity() {
+         }
+     }
+ 
+-    private val createPostLauncher = registerForActivityResult(
++    private val createContentLauncher = registerForActivityResult(
+         ActivityResultContracts.StartActivityForResult()
+     ) { result ->
+         if (result.resultCode == RESULT_OK) {
+@@ -83,15 +84,26 @@ class MainActivity : AppCompatActivity() {
+             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
+         val navController = navHostFragment.navController
+         binding.bottomNavigation.setupWithNavController(navController)
++        navController.addOnDestinationChangedListener { _, destination, _ ->
++            val creatingByte = destination.id == R.id.navigation_reels
++            binding.fabCreatePost.contentDescription = if (creatingByte) "Create Byte" else "Create post"
++        }
+     }
+ 
+     private fun setupFab() {
+         binding.fabCreatePost.setOnClickListener {
+             if (!prefManager.isLoggedIn) {
+-                Toast.makeText(this, "Please log in to publish a post", Toast.LENGTH_SHORT).show()
++                Toast.makeText(this, "Please log in to publish", Toast.LENGTH_SHORT).show()
+                 startActivity(Intent(this, LoginActivity::class.java))
+             } else {
+-                createPostLauncher.launch(Intent(this, CreatePostActivity::class.java))
++                val navHost = supportFragmentManager
++                    .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
++                val target = if (navHost.navController.currentDestination?.id == R.id.navigation_reels) {
++                    CreateReelActivity::class.java
++                } else {
++                    CreatePostActivity::class.java
++                }
++                createContentLauncher.launch(Intent(this, target))
+             }
+         }
+     }
+diff --git a/android/app/src/main/java/com/nexa/social/NexaApiClient.kt b/android/app/src/main/java/com/nexa/social/NexaApiClient.kt
+index c08d6b6..a2aeb05 100644
+--- a/android/app/src/main/java/com/nexa/social/NexaApiClient.kt
++++ b/android/app/src/main/java/com/nexa/social/NexaApiClient.kt
+@@ -6,6 +6,7 @@ import com.nexa.social.data.api.AuthInterceptor
+ import com.nexa.social.data.api.GroupApi
+ import com.nexa.social.data.api.MessageApi
+ import com.nexa.social.data.api.PostApi
++import com.nexa.social.data.api.SecurityApi
+ import com.nexa.social.data.api.TokenAuthenticator
+ import com.nexa.social.data.api.UserApi
+ import com.nexa.social.utils.TokenManager
+@@ -86,4 +87,5 @@ object NexaApiClient {
+     val messageApi: MessageApi by lazy { retrofit.create(MessageApi::class.java) }
+     val groupApi: GroupApi by lazy { retrofit.create(GroupApi::class.java) }
+     val userApi: UserApi by lazy { retrofit.create(UserApi::class.java) }
++    val securityApi: SecurityApi by lazy { retrofit.create(SecurityApi::class.java) }
+ }
+diff --git a/android/app/src/main/java/com/nexa/social/data/api/PostApi.kt b/android/app/src/main/java/com/nexa/social/data/api/PostApi.kt
+index c66033f..66a5c52 100644
+--- a/android/app/src/main/java/com/nexa/social/data/api/PostApi.kt
++++ b/android/app/src/main/java/com/nexa/social/data/api/PostApi.kt
+@@ -2,6 +2,7 @@ package com.nexa.social.data.api
+ 
+ import com.nexa.social.data.models.ApiResponse
+ import com.nexa.social.data.models.CreatePostRequest
++import com.nexa.social.data.models.CreateReelRequest
+ import com.nexa.social.data.models.MediaUploadResponse
+ import com.nexa.social.data.models.Post
+ import okhttp3.MultipartBody
+@@ -29,6 +30,13 @@ interface PostApi {
+         @Query("offset") offset: Int = 0
+     ): Response<ApiResponse<List<Post>>>
+ 
++    @GET("posts/user/{userId}")
++    suspend fun getUserPosts(
++        @retrofit2.http.Path("userId") userId: Int,
++        @Query("limit") limit: Int = 50,
++        @Query("cursor") cursor: Int? = null
++    ): Response<ApiResponse<List<Post>>>
++
+     @Multipart
+     @POST("media/upload")
+     suspend fun uploadMedia(
+@@ -53,16 +61,21 @@ interface PostApi {
+     @DELETE("posts/{id}/bookmark")
+     suspend fun unbookmarkPost(@retrofit2.http.Path("id") id: Int): Response<ApiResponse<Map<String, Any>>>
+ 
+-    @GET("social/reels")
++    @GET("reels")
+     suspend fun getReels(
+         @Query("limit") limit: Int = 20,
+         @Query("offset") offset: Int = 0
+     ): Response<ApiResponse<List<com.nexa.social.data.models.Reel>>>
+ 
+-    @POST("social/reels/{id}/like")
++    @POST("reels")
++    suspend fun createReel(
++        @Body request: CreateReelRequest
++    ): Response<ApiResponse<com.nexa.social.data.models.Reel>>
++
++    @POST("reels/{id}/like")
+     suspend fun likeReel(@retrofit2.http.Path("id") id: Int): Response<ApiResponse<Map<String, Any>>>
+ 
+-    @DELETE("social/reels/{id}/like")
++    @DELETE("reels/{id}/like")
+     suspend fun unlikeReel(@retrofit2.http.Path("id") id: Int): Response<ApiResponse<Map<String, Any>>>
+ 
+     @GET("posts/{id}/comments")
+diff --git a/android/app/src/main/java/com/nexa/social/data/api/SecurityApi.kt b/android/app/src/main/java/com/nexa/social/data/api/SecurityApi.kt
+new file mode 100644
+index 0000000..afdacdc
+--- /dev/null
++++ b/android/app/src/main/java/com/nexa/social/data/api/SecurityApi.kt
+@@ -0,0 +1,22 @@
++package com.nexa.social.data.api
++
++import com.nexa.social.data.models.ApiResponse
++import com.nexa.social.data.models.SecurityStatus
++import retrofit2.Response
++import retrofit2.http.DELETE
++import retrofit2.http.GET
++import retrofit2.http.POST
++
++interface SecurityApi {
++    @GET("security/status")
++    suspend fun getStatus(): Response<ApiResponse<SecurityStatus>>
++
++    @POST("security/mfa/email")
++    suspend fun enableEmailMfa(): Response<ApiResponse<SecurityStatus>>
++
++    @DELETE("security/mfa")
++    suspend fun disableMfa(): Response<ApiResponse<SecurityStatus>>
++
++    @DELETE("security/sessions/all")
++    suspend fun logoutAllDevices(): Response<ApiResponse<Map<String, Boolean>>>
++}
+diff --git a/android/app/src/main/java/com/nexa/social/data/models/Models.kt b/android/app/src/main/java/com/nexa/social/data/models/Models.kt
+index 700bd6c..502d626 100644
+--- a/android/app/src/main/java/com/nexa/social/data/models/Models.kt
++++ b/android/app/src/main/java/com/nexa/social/data/models/Models.kt
+@@ -25,7 +25,8 @@ data class User(
+     @SerializedName("location") val location: String? = null,
+     @SerializedName("websiteUrl") val websiteUrl: String? = null,
+     @SerializedName("followersCount") val followersCount: Int = 0,
+-    @SerializedName("followingCount") val followingCount: Int = 0
++    @SerializedName("followingCount") val followingCount: Int = 0,
++    @SerializedName("isFollowing") val isFollowing: Boolean = false
+ )
+ 
+ data class LoginRequest(
+@@ -187,6 +188,17 @@ data class CreatePostRequest(
+     @SerializedName("imageUrl") val imageUrl: String? = null
+ )
+ 
++data class CreateReelRequest(
++    @SerializedName("videoUrl") val videoUrl: String,
++    @SerializedName("caption") val caption: String? = null
++)
++
++data class SecurityStatus(
++    @SerializedName("emailVerified") val emailVerified: Boolean = false,
++    @SerializedName("mfaEnabled") val mfaEnabled: Boolean = false,
++    @SerializedName("lastProtectionCheckAt") val lastProtectionCheckAt: String? = null
++)
++
+ data class FcmTokenRequest(
+     @SerializedName("fcmToken") val fcmToken: String,
+     @SerializedName("platform") val platform: String = "android",
+diff --git a/android/app/src/main/java/com/nexa/social/data/repository/PostRepository.kt b/android/app/src/main/java/com/nexa/social/data/repository/PostRepository.kt
+index 111221f..1b385b1 100644
+--- a/android/app/src/main/java/com/nexa/social/data/repository/PostRepository.kt
++++ b/android/app/src/main/java/com/nexa/social/data/repository/PostRepository.kt
+@@ -83,6 +83,19 @@ class PostRepository {
+         }
+     }
+ 
++    suspend fun getUserPosts(userId: Int, limit: Int = 50): Result<List<Post>> {
++        return try {
++            val response = NexaApiClient.postApi.getUserPosts(userId = userId, limit = limit)
++            if (response.isSuccessful && response.body()?.data != null) {
++                Result.success(response.body()!!.data!!)
++            } else {
++                Result.failure(Exception(response.body()?.error?.message ?: response.body()?.message ?: "Failed to load profile posts"))
++            }
++        } catch (e: Exception) {
++            Result.failure(e)
++        }
++    }
++
+     suspend fun likeReel(reelId: Int): Result<Unit> {
+         return try {
+             val response = NexaApiClient.postApi.likeReel(reelId)
+diff --git a/android/app/src/main/java/com/nexa/social/ui/CreatePostActivity.kt b/android/app/src/main/java/com/nexa/social/ui/CreatePostActivity.kt
+index 758a7cb..5da6a76 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/CreatePostActivity.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/CreatePostActivity.kt
+@@ -15,18 +15,15 @@ import androidx.lifecycle.lifecycleScope
+ import com.nexa.social.NexaApiClient
+ import com.nexa.social.data.models.CreatePostRequest
+ import com.nexa.social.databinding.ActivityCreatePostBinding
++import com.nexa.social.utils.MediaFilePreparer
+ import com.nexa.social.utils.PreferenceManager
+-import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.launch
+-import kotlinx.coroutines.withContext
+ import okhttp3.MediaType.Companion.toMediaTypeOrNull
+ import okhttp3.MultipartBody
+ import okhttp3.RequestBody
+ import okhttp3.RequestBody.Companion.asRequestBody
+ import okhttp3.RequestBody.Companion.toRequestBody
+ import java.io.File
+-import java.io.FileOutputStream
+-import java.io.InputStream
+ 
+ class CreatePostActivity : AppCompatActivity() {
+ 
+@@ -174,12 +171,12 @@ class CreatePostActivity : AppCompatActivity() {
+ 
+                 // 1. Process and upload media file if selected
+                 if (selectedImageUri != null) {
+-                    val mediaInfo = prepareAndValidateMedia(selectedImageUri!!)
+-                    if (mediaInfo == null) {
+-                        setLoading(false)
+-                        Toast.makeText(this@CreatePostActivity, "Invalid image file (must be JPEG, PNG, or WebP under 10 MB)", Toast.LENGTH_LONG).show()
+-                        return@launch
+-                    }
++                    val mediaInfo = MediaFilePreparer.prepare(
++                        context = this@CreatePostActivity,
++                        uri = selectedImageUri!!,
++                        kind = MediaFilePreparer.Kind.IMAGE,
++                        maxBytes = 20L * 1024L * 1024L
++                    ).getOrElse { throw it }
+ 
+                     tempProcessingFile = mediaInfo.file
+ 
+@@ -227,89 +224,6 @@ class CreatePostActivity : AppCompatActivity() {
+         }
+     }
+ 
+-    private data class ValidatedMedia(val file: File, val mimeType: String)
+-
+-    private suspend fun prepareAndValidateMedia(uri: Uri): ValidatedMedia? = withContext(Dispatchers.IO) {
+-        return@withContext try {
+-            val inputStream: InputStream = contentResolver.openInputStream(uri) ?: return@withContext null
+-
+-            // Read magic bytes for MIME signature verification
+-            val headerBytes = ByteArray(12)
+-            val bytesRead = inputStream.read(headerBytes)
+-            if (bytesRead < 4) {
+-                inputStream.close()
+-                return@withContext null
+-            }
+-
+-            val mimeType = detectImageMimeType(headerBytes) ?: run {
+-                inputStream.close()
+-                return@withContext null
+-            }
+-
+-            val ext = when (mimeType) {
+-                "image/jpeg" -> ".jpg"
+-                "image/png" -> ".png"
+-                "image/webp" -> ".webp"
+-                else -> ".jpg"
+-            }
+-
+-            val tempFile = File.createTempFile("upload_stage_", ext, cacheDir)
+-            val outputStream = FileOutputStream(tempFile)
+-            outputStream.write(headerBytes, 0, bytesRead)
+-            inputStream.copyTo(outputStream)
+-            inputStream.close()
+-            outputStream.flush()
+-            outputStream.close()
+-
+-            // Verify size limit: Max 10 MB (10 * 1024 * 1024 bytes)
+-            if (tempFile.length() > 10 * 1024 * 1024) {
+-                tempFile.delete()
+-                return@withContext null
+-            }
+-
+-            ValidatedMedia(tempFile, mimeType)
+-        } catch (_: Exception) {
+-            null
+-        }
+-    }
+-
+-    private fun detectImageMimeType(header: ByteArray): String? {
+-        // JPEG: FF D8 FF
+-        if (header.size >= 3 &&
+-            header[0] == 0xFF.toByte() &&
+-            header[1] == 0xD8.toByte() &&
+-            header[2] == 0xFF.toByte()
+-        ) {
+-            return "image/jpeg"
+-        }
+-
+-        // PNG: 89 50 4E 47
+-        if (header.size >= 4 &&
+-            header[0] == 0x89.toByte() &&
+-            header[1] == 0x50.toByte() &&
+-            header[2] == 0x4E.toByte() &&
+-            header[3] == 0x47.toByte()
+-        ) {
+-            return "image/png"
+-        }
+-
+-        // WebP: RIFF ... WEBP (header 0..3 == "RIFF", header 8..11 == "WEBP")
+-        if (header.size >= 12 &&
+-            header[0] == 'R'.code.toByte() &&
+-            header[1] == 'I'.code.toByte() &&
+-            header[2] == 'F'.code.toByte() &&
+-            header[3] == 'F'.code.toByte() &&
+-            header[8] == 'W'.code.toByte() &&
+-            header[9] == 'E'.code.toByte() &&
+-            header[10] == 'B'.code.toByte() &&
+-            header[11] == 'P'.code.toByte()
+-        ) {
+-            return "image/webp"
+-        }
+-
+-        return null
+-    }
+-
+     private fun setLoading(isLoading: Boolean) {
+         binding.postProgressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
+         binding.btnPost.isEnabled = !isLoading
+diff --git a/android/app/src/main/java/com/nexa/social/ui/CreateReelActivity.kt b/android/app/src/main/java/com/nexa/social/ui/CreateReelActivity.kt
+new file mode 100644
+index 0000000..b9908d2
+--- /dev/null
++++ b/android/app/src/main/java/com/nexa/social/ui/CreateReelActivity.kt
+@@ -0,0 +1,124 @@
++package com.nexa.social.ui
++
++import android.net.Uri
++import android.os.Bundle
++import android.view.View
++import android.widget.Toast
++import androidx.activity.result.PickVisualMediaRequest
++import androidx.activity.result.contract.ActivityResultContracts
++import androidx.appcompat.app.AppCompatActivity
++import androidx.lifecycle.lifecycleScope
++import androidx.media3.common.MediaItem
++import androidx.media3.exoplayer.ExoPlayer
++import com.nexa.social.NexaApiClient
++import com.nexa.social.data.models.CreateReelRequest
++import com.nexa.social.databinding.ActivityCreateReelBinding
++import com.nexa.social.utils.MediaFilePreparer
++import kotlinx.coroutines.launch
++import okhttp3.MediaType.Companion.toMediaTypeOrNull
++import okhttp3.MultipartBody
++import okhttp3.RequestBody.Companion.asRequestBody
++import okhttp3.RequestBody.Companion.toRequestBody
++
++class CreateReelActivity : AppCompatActivity() {
++    private lateinit var binding: ActivityCreateReelBinding
++    private var selectedVideoUri: Uri? = null
++    private var previewPlayer: ExoPlayer? = null
++
++    private val videoPicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
++        if (uri != null) {
++            selectedVideoUri = uri
++            showPreview(uri)
++        }
++    }
++
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++        binding = ActivityCreateReelBinding.inflate(layoutInflater)
++        setContentView(binding.root)
++
++        binding.btnClose.setOnClickListener { finish() }
++        binding.btnChooseVideo.setOnClickListener {
++            videoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
++        }
++        binding.btnPublish.setOnClickListener { publishByte() }
++    }
++
++    private fun showPreview(uri: Uri) {
++        previewPlayer?.release()
++        previewPlayer = ExoPlayer.Builder(this).build().apply {
++            setMediaItem(MediaItem.fromUri(uri))
++            prepare()
++            playWhenReady = true
++            repeatMode = ExoPlayer.REPEAT_MODE_ONE
++        }
++        binding.playerPreview.player = previewPlayer
++        binding.playerPreview.visibility = View.VISIBLE
++        binding.tvVideoHelp.visibility = View.GONE
++    }
++
++    private fun publishByte() {
++        val uri = selectedVideoUri
++        if (uri == null) {
++            Toast.makeText(this, "Choose a video first", Toast.LENGTH_SHORT).show()
++            return
++        }
++
++        setLoading(true)
++        lifecycleScope.launch {
++            var prepared: MediaFilePreparer.PreparedMedia? = null
++            try {
++                prepared = MediaFilePreparer.prepare(
++                    context = this@CreateReelActivity,
++                    uri = uri,
++                    kind = MediaFilePreparer.Kind.VIDEO,
++                    maxBytes = 500L * 1024L * 1024L,
++                    maxDurationMs = 60_000L
++                ).getOrElse { throw it }
++
++                val fileBody = prepared.file.asRequestBody(prepared.mimeType.toMediaTypeOrNull())
++                val filePart = MultipartBody.Part.createFormData("file", prepared.file.name, fileBody)
++                val kindPart = "reel".toRequestBody("text/plain".toMediaTypeOrNull())
++                val upload = NexaApiClient.postApi.uploadMedia(filePart, kindPart)
++                val publicUrl = upload.body()?.data?.publicUrl
++                if (!upload.isSuccessful || publicUrl.isNullOrBlank()) {
++                    throw IllegalStateException(upload.body()?.error?.message ?: "Video upload failed (${upload.code()})")
++                }
++
++                val caption = binding.etCaption.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
++                val create = NexaApiClient.postApi.createReel(CreateReelRequest(publicUrl, caption))
++                if (!create.isSuccessful || create.body()?.data == null) {
++                    throw IllegalStateException(create.body()?.error?.message ?: "Byte publishing failed (${create.code()})")
++                }
++
++                Toast.makeText(this@CreateReelActivity, "Byte published successfully", Toast.LENGTH_SHORT).show()
++                setResult(RESULT_OK)
++                finish()
++            } catch (error: Exception) {
++                Toast.makeText(this@CreateReelActivity, error.message ?: "Unable to publish Byte", Toast.LENGTH_LONG).show()
++            } finally {
++                prepared?.file?.delete()
++                setLoading(false)
++            }
++        }
++    }
++
++    private fun setLoading(loading: Boolean) {
++        binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
++        binding.btnPublish.isEnabled = !loading
++        binding.btnChooseVideo.isEnabled = !loading
++        binding.btnClose.isEnabled = !loading
++    }
++
++    override fun onStop() {
++        super.onStop()
++        previewPlayer?.pause()
++    }
++
++    override fun onDestroy() {
++        binding.playerPreview.player = null
++        previewPlayer?.release()
++        previewPlayer = null
++        super.onDestroy()
++    }
++}
+diff --git a/android/app/src/main/java/com/nexa/social/ui/EditProfileBottomSheetDialogFragment.kt b/android/app/src/main/java/com/nexa/social/ui/EditProfileBottomSheetDialogFragment.kt
+index 0514e09..7dc762e 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/EditProfileBottomSheetDialogFragment.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/EditProfileBottomSheetDialogFragment.kt
+@@ -16,12 +16,13 @@ import com.nexa.social.data.models.UpdateProfileRequest
+ import com.nexa.social.data.models.User
+ import com.nexa.social.data.repository.UserRepository
+ import com.nexa.social.databinding.DialogEditProfileBinding
++import com.nexa.social.utils.MediaFilePreparer
++import com.nexa.social.utils.MediaUrlResolver
+ import kotlinx.coroutines.launch
+ import okhttp3.MediaType.Companion.toMediaTypeOrNull
+ import okhttp3.MultipartBody
+ import okhttp3.RequestBody.Companion.asRequestBody
+ import okhttp3.RequestBody.Companion.toRequestBody
+-import java.io.File
+ 
+ class EditProfileBottomSheetDialogFragment : BottomSheetDialogFragment() {
+ 
+@@ -44,6 +45,7 @@ class EditProfileBottomSheetDialogFragment : BottomSheetDialogFragment() {
+     private var onProfileUpdatedCallback: ((User) -> Unit)? = null
+ 
+     private var selectedProfileImageUri: Uri? = null
++    private var selectedCoverImageUri: Uri? = null
+ 
+     private val profileImagePicker = registerForActivityResult(
+         ActivityResultContracts.PickVisualMedia()
+@@ -56,6 +58,15 @@ class EditProfileBottomSheetDialogFragment : BottomSheetDialogFragment() {
+         }
+     }
+ 
++    private val coverImagePicker = registerForActivityResult(
++        ActivityResultContracts.PickVisualMedia()
++    ) { uri ->
++        if (uri != null) {
++            selectedCoverImageUri = uri
++            binding.ivCoverPreview.load(uri)
++        }
++    }
++
+     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+         _binding = DialogEditProfileBinding.inflate(inflater, container, false)
+         return binding.root
+@@ -74,15 +85,23 @@ class EditProfileBottomSheetDialogFragment : BottomSheetDialogFragment() {
+                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+             )
+         }
++        binding.btnChooseCoverImage.setOnClickListener {
++            coverImagePicker.launch(
++                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
++            )
++        }
+     }
+ 
+     private fun populateFields() {
+         currentUser?.let { user ->
+-            binding.ivProfilePreview.load(user.profileImageUrl) {
++            binding.ivProfilePreview.load(MediaUrlResolver.resolve(user.profileImageUrl)) {
+                 placeholder(com.nexa.social.R.drawable.ic_profile)
+                 error(com.nexa.social.R.drawable.ic_profile)
+                 transformations(CircleCropTransformation())
+             }
++            binding.ivCoverPreview.load(MediaUrlResolver.resolve(user.coverImageUrl)) {
++                error(com.nexa.social.R.drawable.ic_gallery)
++            }
+             binding.etDisplayName.setText(user.displayName)
+             binding.etBio.setText(user.bio ?: "")
+             binding.etLocation.setText(user.location ?: "")
+@@ -109,63 +128,15 @@ class EditProfileBottomSheetDialogFragment : BottomSheetDialogFragment() {
+ 
+             lifecycleScope.launch {
+                 var profileImageUrl = user.profileImageUrl
+-                var temporaryFile: File? = null
+-
+-                selectedProfileImageUri?.let { uri ->
+-                    val mimeType = requireContext().contentResolver.getType(uri) ?: "image/jpeg"
+-
+-                    if (mimeType !in listOf("image/jpeg", "image/png", "image/webp")) {
+-                        binding.btnSaveProfile.isEnabled = true
+-                        Toast.makeText(context, "Choose a JPEG, PNG, or WebP image", Toast.LENGTH_LONG).show()
+-                        return@launch
+-                    }
+-
+-                    val extension = when (mimeType) {
+-                        "image/png" -> ".png"
+-                        "image/webp" -> ".webp"
+-                        else -> ".jpg"
+-                    }
+-
+-                    temporaryFile = File.createTempFile(
+-                        "profile_upload_",
+-                        extension,
+-                        requireContext().cacheDir
+-                    )
+-
+-                    requireContext().contentResolver.openInputStream(uri)?.use { input ->
+-                        temporaryFile!!.outputStream().use { output ->
+-                            input.copyTo(output)
+-                        }
+-                    } ?: throw IllegalStateException("Unable to read the selected image")
+-
+-                    if (temporaryFile!!.length() > 10L * 1024L * 1024L) {
+-                        temporaryFile!!.delete()
+-                        binding.btnSaveProfile.isEnabled = true
+-                        Toast.makeText(context, "Profile image must be under 10 MB", Toast.LENGTH_LONG).show()
+-                        return@launch
+-                    }
+-
+-                    val fileBody = temporaryFile!!.asRequestBody(mimeType.toMediaTypeOrNull())
+-                    val filePart = MultipartBody.Part.createFormData(
+-                        "file",
+-                        temporaryFile!!.name,
+-                        fileBody
+-                    )
+-                    val kindPart = "avatar".toRequestBody("text/plain".toMediaTypeOrNull())
+-
+-                    val uploadResponse =
+-                        com.nexa.social.NexaApiClient.userApi.uploadProfileImage(filePart, kindPart)
+-
+-                    profileImageUrl = uploadResponse.body()?.data?.publicUrl
+-
+-                    if (!uploadResponse.isSuccessful || profileImageUrl.isNullOrBlank()) {
+-                        temporaryFile!!.delete()
+-                        binding.btnSaveProfile.isEnabled = true
+-                        val message = uploadResponse.body()?.error?.message
+-                            ?: "Profile image upload failed (${uploadResponse.code()})"
+-                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+-                        return@launch
+-                    }
++                var coverImageUrl = user.coverImageUrl
++
++                try {
++                    selectedProfileImageUri?.let { profileImageUrl = uploadImage(it) }
++                    selectedCoverImageUri?.let { coverImageUrl = uploadImage(it) }
++                } catch (error: Exception) {
++                    binding.btnSaveProfile.isEnabled = true
++                    Toast.makeText(context, error.message ?: "Image upload failed", Toast.LENGTH_LONG).show()
++                    return@launch
+                 }
+ 
+                 val req = UpdateProfileRequest(
+@@ -173,16 +144,15 @@ class EditProfileBottomSheetDialogFragment : BottomSheetDialogFragment() {
+                     bio = bio.ifEmpty { null },
+                     location = location.ifEmpty { null },
+                     websiteUrl = website.ifEmpty { null },
+-                    profileImageUrl = profileImageUrl
++                    profileImageUrl = profileImageUrl,
++                    coverImageUrl = coverImageUrl
+                 )
+ 
+                 userRepository.updateProfile(user.userId, req).onSuccess { updatedUser ->
+-                    temporaryFile?.delete()
+                     Toast.makeText(context, "Profile updated successfully", Toast.LENGTH_SHORT).show()
+                     onProfileUpdatedCallback?.invoke(updatedUser)
+                     dismiss()
+                 }.onFailure { err ->
+-                    temporaryFile?.delete()
+                     Toast.makeText(context, "Failed to update: ${err.message}", Toast.LENGTH_SHORT).show()
+                     binding.btnSaveProfile.isEnabled = true
+                 }
+@@ -190,6 +160,25 @@ class EditProfileBottomSheetDialogFragment : BottomSheetDialogFragment() {
+         }
+     }
+ 
++    private suspend fun uploadImage(uri: Uri): String {
++        val prepared = MediaFilePreparer.prepare(
++            context = requireContext(),
++            uri = uri,
++            kind = MediaFilePreparer.Kind.IMAGE,
++            maxBytes = 10L * 1024L * 1024L
++        ).getOrElse { throw it }
++        return try {
++            val fileBody = prepared.file.asRequestBody(prepared.mimeType.toMediaTypeOrNull())
++            val filePart = MultipartBody.Part.createFormData("file", prepared.file.name, fileBody)
++            val kindPart = "avatar".toRequestBody("text/plain".toMediaTypeOrNull())
++            val response = com.nexa.social.NexaApiClient.userApi.uploadProfileImage(filePart, kindPart)
++            response.body()?.data?.publicUrl?.takeIf { response.isSuccessful && it.isNotBlank() }
++                ?: throw IllegalStateException(response.body()?.error?.message ?: "Image upload failed (${response.code()})")
++        } finally {
++            prepared.file.delete()
++        }
++    }
++
+     override fun onDestroyView() {
+         super.onDestroyView()
+         _binding = null
+diff --git a/android/app/src/main/java/com/nexa/social/ui/SettingsActivity.kt b/android/app/src/main/java/com/nexa/social/ui/SettingsActivity.kt
+new file mode 100644
+index 0000000..7983b78
+--- /dev/null
++++ b/android/app/src/main/java/com/nexa/social/ui/SettingsActivity.kt
+@@ -0,0 +1,151 @@
++package com.nexa.social.ui
++
++import android.content.Intent
++import android.os.Bundle
++import android.view.View
++import android.widget.Toast
++import androidx.appcompat.app.AppCompatActivity
++import androidx.lifecycle.lifecycleScope
++import com.google.android.material.dialog.MaterialAlertDialogBuilder
++import com.nexa.social.NexaApiClient
++import com.nexa.social.data.repository.AuthRepository
++import com.nexa.social.data.repository.UserRepository
++import com.nexa.social.databinding.ActivitySettingsBinding
++import com.nexa.social.utils.PreferenceManager
++import com.nexa.social.utils.SocketManager
++import com.nexa.social.utils.ThemeManager
++import com.nexa.social.utils.TokenManager
++import kotlinx.coroutines.launch
++
++class SettingsActivity : AppCompatActivity() {
++    private lateinit var binding: ActivitySettingsBinding
++    private lateinit var preferences: PreferenceManager
++    private var changingMfa = false
++
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++        binding = ActivitySettingsBinding.inflate(layoutInflater)
++        setContentView(binding.root)
++        preferences = PreferenceManager(this)
++
++        binding.toolbar.setNavigationOnClickListener { finish() }
++        binding.btnTheme.setOnClickListener {
++            ThemeManager.showThemeSelectionDialog(this)
++            binding.root.postDelayed({ updateThemeLabel() }, 300)
++        }
++        binding.btnEditProfile.setOnClickListener { openProfileEditor() }
++        binding.btnLogout.setOnClickListener { confirmLogout(allDevices = false) }
++        binding.btnLogoutAll.setOnClickListener { confirmLogout(allDevices = true) }
++        binding.switchEmailMfa.setOnCheckedChangeListener { _, enabled ->
++            if (!changingMfa) updateMfa(enabled)
++        }
++
++        updateThemeLabel()
++        loadSecurityStatus()
++    }
++
++    private fun updateThemeLabel() {
++        val name = when (ThemeManager.getSavedThemeMode(this)) {
++            ThemeManager.THEME_LIGHT -> "Light"
++            ThemeManager.THEME_DARK -> "Dark"
++            else -> "System default"
++        }
++        binding.btnTheme.text = "Appearance: $name"
++    }
++
++    private fun openProfileEditor() {
++        val username = preferences.username
++        if (username.isNullOrBlank()) return
++        setLoading(true)
++        lifecycleScope.launch {
++            UserRepository().getProfile(username).onSuccess { user ->
++                setLoading(false)
++                EditProfileBottomSheetDialogFragment.newInstance(user) { updated ->
++                    preferences.displayName = updated.displayName
++                }.show(supportFragmentManager, "edit_profile")
++            }.onFailure {
++                setLoading(false)
++                Toast.makeText(this@SettingsActivity, it.message ?: "Unable to load profile", Toast.LENGTH_LONG).show()
++            }
++        }
++    }
++
++    private fun loadSecurityStatus() {
++        setLoading(true)
++        lifecycleScope.launch {
++            try {
++                val response = NexaApiClient.securityApi.getStatus()
++                val status = response.body()?.data
++                if (!response.isSuccessful || status == null) throw IllegalStateException("Unable to load security status")
++                changingMfa = true
++                binding.switchEmailMfa.isChecked = status.mfaEnabled
++                changingMfa = false
++                binding.switchEmailMfa.isEnabled = status.emailVerified
++                binding.tvMfaHelp.text = if (status.emailVerified) {
++                    "A one-time code will be emailed when you sign in."
++                } else {
++                    "Verify your email before enabling email two-factor authentication."
++                }
++            } catch (error: Exception) {
++                Toast.makeText(this@SettingsActivity, error.message ?: "Unable to load settings", Toast.LENGTH_LONG).show()
++            } finally {
++                setLoading(false)
++            }
++        }
++    }
++
++    private fun updateMfa(enabled: Boolean) {
++        setLoading(true)
++        lifecycleScope.launch {
++            try {
++                val response = if (enabled) NexaApiClient.securityApi.enableEmailMfa()
++                else NexaApiClient.securityApi.disableMfa()
++                if (!response.isSuccessful) {
++                    throw IllegalStateException(response.body()?.error?.message ?: "Unable to update two-factor authentication")
++                }
++                Toast.makeText(this@SettingsActivity, if (enabled) "Email 2FA enabled" else "2FA disabled", Toast.LENGTH_SHORT).show()
++            } catch (error: Exception) {
++                changingMfa = true
++                binding.switchEmailMfa.isChecked = !enabled
++                changingMfa = false
++                Toast.makeText(this@SettingsActivity, error.message ?: "Unable to update 2FA", Toast.LENGTH_LONG).show()
++            } finally {
++                setLoading(false)
++            }
++        }
++    }
++
++    private fun confirmLogout(allDevices: Boolean) {
++        MaterialAlertDialogBuilder(this)
++            .setTitle(if (allDevices) "Log out from all devices?" else "Log out?")
++            .setMessage(if (allDevices) "All refresh sessions will be revoked, including this device." else "Your session on this device will be cleared.")
++            .setPositiveButton("Log out") { _, _ -> logout(allDevices) }
++            .setNegativeButton("Cancel", null)
++            .show()
++    }
++
++    private fun logout(allDevices: Boolean) {
++        setLoading(true)
++        lifecycleScope.launch {
++            if (allDevices) {
++                try { NexaApiClient.securityApi.logoutAllDevices() } catch (_: Exception) { }
++                SocketManager.disconnect()
++                TokenManager(this@SettingsActivity).clear()
++            } else {
++                AuthRepository(TokenManager(this@SettingsActivity)).logout()
++            }
++            startActivity(Intent(this@SettingsActivity, LoginActivity::class.java).apply {
++                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
++            })
++            finish()
++        }
++    }
++
++    private fun setLoading(loading: Boolean) {
++        binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
++        binding.btnEditProfile.isEnabled = !loading
++        binding.btnTheme.isEnabled = !loading
++        binding.btnLogout.isEnabled = !loading
++        binding.btnLogoutAll.isEnabled = !loading
++    }
++}
+diff --git a/android/app/src/main/java/com/nexa/social/ui/UserListActivity.kt b/android/app/src/main/java/com/nexa/social/ui/UserListActivity.kt
+new file mode 100644
+index 0000000..e3f77ee
+--- /dev/null
++++ b/android/app/src/main/java/com/nexa/social/ui/UserListActivity.kt
+@@ -0,0 +1,60 @@
++package com.nexa.social.ui
++
++import android.content.Intent
++import android.os.Bundle
++import android.view.View
++import android.widget.Toast
++import androidx.appcompat.app.AppCompatActivity
++import androidx.lifecycle.lifecycleScope
++import com.nexa.social.data.repository.UserRepository
++import com.nexa.social.databinding.ActivityUserListBinding
++import com.nexa.social.ui.adapters.UserAdapter
++import kotlinx.coroutines.launch
++
++class UserListActivity : AppCompatActivity() {
++    private lateinit var binding: ActivityUserListBinding
++    private val repository = UserRepository()
++    private val adapter = UserAdapter { user ->
++        startActivity(Intent(this, UserProfileActivity::class.java).apply {
++            putExtra(UserProfileActivity.EXTRA_USERNAME, user.username)
++        })
++    }
++
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++        binding = ActivityUserListBinding.inflate(layoutInflater)
++        setContentView(binding.root)
++        binding.toolbar.setNavigationOnClickListener { finish() }
++        binding.rvUsers.adapter = adapter
++        loadUsers()
++    }
++
++    private fun loadUsers() {
++        val userId = intent.getIntExtra(EXTRA_USER_ID, 0)
++        val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_FOLLOWERS
++        if (userId <= 0) {
++            finish()
++            return
++        }
++        binding.toolbar.title = if (mode == MODE_FOLLOWING) "Following" else "Followers"
++        binding.progressBar.visibility = View.VISIBLE
++        lifecycleScope.launch {
++            val result = if (mode == MODE_FOLLOWING) repository.getFollowing(userId) else repository.getFollowers(userId)
++            binding.progressBar.visibility = View.GONE
++            result.onSuccess {
++                adapter.submitList(it)
++                binding.tvEmpty.visibility = if (it.isEmpty()) View.VISIBLE else View.GONE
++            }.onFailure {
++                Toast.makeText(this@UserListActivity, it.message ?: "Unable to load accounts", Toast.LENGTH_LONG).show()
++                binding.tvEmpty.visibility = View.VISIBLE
++            }
++        }
++    }
++
++    companion object {
++        const val EXTRA_USER_ID = "userId"
++        const val EXTRA_MODE = "mode"
++        const val MODE_FOLLOWERS = "followers"
++        const val MODE_FOLLOWING = "following"
++    }
++}
+diff --git a/android/app/src/main/java/com/nexa/social/ui/UserProfileActivity.kt b/android/app/src/main/java/com/nexa/social/ui/UserProfileActivity.kt
+new file mode 100644
+index 0000000..0ac1efb
+--- /dev/null
++++ b/android/app/src/main/java/com/nexa/social/ui/UserProfileActivity.kt
+@@ -0,0 +1,34 @@
++package com.nexa.social.ui
++
++import android.os.Bundle
++import androidx.appcompat.app.AppCompatActivity
++import androidx.core.os.bundleOf
++import com.nexa.social.R
++import com.nexa.social.databinding.ActivityUserProfileBinding
++import com.nexa.social.ui.fragments.ProfileFragment
++
++class UserProfileActivity : AppCompatActivity() {
++    private lateinit var binding: ActivityUserProfileBinding
++
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++        val username = intent.getStringExtra(EXTRA_USERNAME)?.trim().orEmpty()
++        if (username.isBlank()) {
++            finish()
++            return
++        }
++        binding = ActivityUserProfileBinding.inflate(layoutInflater)
++        setContentView(binding.root)
++        binding.toolbar.title = "@$username"
++        binding.toolbar.setNavigationOnClickListener { finish() }
++        if (savedInstanceState == null) {
++            supportFragmentManager.beginTransaction()
++                .replace(R.id.profileContainer, ProfileFragment::class.java, bundleOf("username" to username))
++                .commit()
++        }
++    }
++
++    companion object {
++        const val EXTRA_USERNAME = "username"
++    }
++}
+diff --git a/android/app/src/main/java/com/nexa/social/ui/adapters/CommentAdapter.kt b/android/app/src/main/java/com/nexa/social/ui/adapters/CommentAdapter.kt
+index 913b9e5..d15dfa0 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/adapters/CommentAdapter.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/adapters/CommentAdapter.kt
+@@ -7,7 +7,7 @@ import androidx.recyclerview.widget.ListAdapter
+ import androidx.recyclerview.widget.RecyclerView
+ import coil.load
+ import coil.transform.CircleCropTransformation
+-import com.nexa.social.NexaApiClient
++import com.nexa.social.utils.MediaUrlResolver
+ import com.nexa.social.R
+ import com.nexa.social.data.models.Comment
+ import com.nexa.social.databinding.ItemCommentBinding
+@@ -30,9 +30,7 @@ class CommentAdapter : ListAdapter<Comment, CommentAdapter.CommentViewHolder>(Co
+             binding.tvCommentContent.text = comment.content
+             binding.tvCommentTimestamp.text = comment.createdAt?.take(10) ?: ""
+ 
+-            val avatarUrl = comment.author?.profileImageUrl?.let {
+-                if (it.startsWith("http")) it else "${NexaApiClient.BASE_URL.removeSuffix("api/")}${it.removePrefix("/")}"
+-            }
++            val avatarUrl = MediaUrlResolver.resolve(comment.author?.profileImageUrl)
+             binding.ivCommentAvatar.load(avatarUrl) {
+                 crossfade(true)
+                 placeholder(R.drawable.ic_profile)
+diff --git a/android/app/src/main/java/com/nexa/social/ui/adapters/ConversationAdapter.kt b/android/app/src/main/java/com/nexa/social/ui/adapters/ConversationAdapter.kt
+index d3a6735..5f89f9a 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/adapters/ConversationAdapter.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/adapters/ConversationAdapter.kt
+@@ -8,7 +8,7 @@ import androidx.recyclerview.widget.ListAdapter
+ import androidx.recyclerview.widget.RecyclerView
+ import coil.load
+ import coil.transform.CircleCropTransformation
+-import com.nexa.social.NexaApiClient
++import com.nexa.social.utils.MediaUrlResolver
+ import com.nexa.social.R
+ import com.nexa.social.data.models.Conversation
+ import com.nexa.social.databinding.ItemConversationBinding
+@@ -39,9 +39,7 @@ class ConversationAdapter(
+                 binding.unreadBadge.visibility = View.GONE
+             }
+ 
+-            val avatarUrl = conversation.profileImageUrl?.let {
+-                if (it.startsWith("http")) it else "${NexaApiClient.BASE_URL.removeSuffix("api/")}${it.removePrefix("/")}"
+-            }
++            val avatarUrl = MediaUrlResolver.resolve(conversation.profileImageUrl)
+             binding.ivAvatar.load(avatarUrl) {
+                 crossfade(true)
+                 placeholder(R.drawable.ic_profile)
+diff --git a/android/app/src/main/java/com/nexa/social/ui/adapters/PostAdapter.kt b/android/app/src/main/java/com/nexa/social/ui/adapters/PostAdapter.kt
+index 20878c9..d3121d9 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/adapters/PostAdapter.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/adapters/PostAdapter.kt
+@@ -13,15 +13,16 @@ import androidx.recyclerview.widget.ListAdapter
+ import androidx.recyclerview.widget.RecyclerView
+ import coil.load
+ import coil.transform.CircleCropTransformation
+-import com.nexa.social.NexaApiClient
+ import com.nexa.social.R
+ import com.nexa.social.data.models.Post
+ import com.nexa.social.databinding.ItemPostBinding
++import com.nexa.social.utils.MediaUrlResolver
+ 
+ class PostAdapter(
+     private val onLikeClick: (Post) -> Unit,
+     private val onCommentClick: (Post) -> Unit,
+-    private val onBookmarkClick: (Post) -> Unit
++    private val onBookmarkClick: (Post) -> Unit,
++    private val onAuthorClick: (Post) -> Unit = {}
+ ) : ListAdapter<Post, PostAdapter.PostViewHolder>(PostDiffCallback()) {
+ 
+     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PostViewHolder {
+@@ -43,9 +44,7 @@ class PostAdapter(
+             binding.tvTimestamp.text = post.createdAt
+ 
+             // Avatar
+-            val avatarUrl = post.author.profileImageUrl?.let {
+-                if (it.startsWith("http")) it else "${NexaApiClient.BASE_URL.removeSuffix("api/")}${it.removePrefix("/")}"
+-            }
++            val avatarUrl = MediaUrlResolver.resolve(post.author.profileImageUrl)
+             binding.ivAvatar.load(avatarUrl) {
+                 crossfade(true)
+                 placeholder(R.drawable.ic_profile)
+@@ -56,9 +55,10 @@ class PostAdapter(
+             // Post Image
+             if (!post.imageUrl.isNullOrEmpty()) {
+                 binding.ivPostImage.visibility = View.VISIBLE
+-                val imageUrl = if (post.imageUrl.startsWith("http")) post.imageUrl else "${NexaApiClient.BASE_URL.removeSuffix("api/")}${post.imageUrl.removePrefix("/")}"
++                val imageUrl = MediaUrlResolver.resolve(post.imageUrl)
+                 binding.ivPostImage.load(imageUrl) {
+                     crossfade(true)
++                    error(R.drawable.ic_gallery)
+                 }
+             } else {
+                 binding.ivPostImage.visibility = View.GONE
+@@ -70,12 +70,15 @@ class PostAdapter(
+             binding.btnLike.setOnClickListener { onLikeClick(post) }
+             binding.btnComment.setOnClickListener { onCommentClick(post) }
+             binding.btnBookmark.setOnClickListener { onBookmarkClick(post) }
++            binding.ivAvatar.setOnClickListener { onAuthorClick(post) }
++            binding.tvDisplayName.setOnClickListener { onAuthorClick(post) }
++            binding.tvUsername.setOnClickListener { onAuthorClick(post) }
+             binding.btnShare.setOnClickListener {
+                 val shareText = buildString {
+                     if (!post.content.isNullOrBlank()) append(post.content)
+                     if (!post.imageUrl.isNullOrBlank()) {
+                         if (isNotEmpty()) append("\n")
+-                        append(post.imageUrl)
++                        append(MediaUrlResolver.resolve(post.imageUrl) ?: post.imageUrl)
+                     }
+                 }
+                 val intent = Intent(Intent.ACTION_SEND).apply {
+diff --git a/android/app/src/main/java/com/nexa/social/ui/adapters/ProfileGridAdapter.kt b/android/app/src/main/java/com/nexa/social/ui/adapters/ProfileGridAdapter.kt
+new file mode 100644
+index 0000000..a35a829
+--- /dev/null
++++ b/android/app/src/main/java/com/nexa/social/ui/adapters/ProfileGridAdapter.kt
+@@ -0,0 +1,46 @@
++package com.nexa.social.ui.adapters
++
++import android.view.LayoutInflater
++import android.view.View
++import android.view.ViewGroup
++import androidx.recyclerview.widget.DiffUtil
++import androidx.recyclerview.widget.ListAdapter
++import androidx.recyclerview.widget.RecyclerView
++import coil.load
++import com.nexa.social.R
++import com.nexa.social.data.models.Post
++import com.nexa.social.databinding.ItemProfileGridBinding
++import com.nexa.social.utils.MediaUrlResolver
++
++class ProfileGridAdapter(
++    private val onPostClick: (Post) -> Unit
++) : ListAdapter<Post, ProfileGridAdapter.GridViewHolder>(Diff()) {
++
++    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): GridViewHolder {
++        val binding = ItemProfileGridBinding.inflate(LayoutInflater.from(parent.context), parent, false)
++        return GridViewHolder(binding)
++    }
++
++    override fun onBindViewHolder(holder: GridViewHolder, position: Int) = holder.bind(getItem(position))
++
++    inner class GridViewHolder(private val binding: ItemProfileGridBinding) : RecyclerView.ViewHolder(binding.root) {
++        fun bind(post: Post) {
++            val mediaUrl = MediaUrlResolver.resolve(post.imageUrl)
++            binding.ivMedia.visibility = if (mediaUrl == null) View.GONE else View.VISIBLE
++            binding.tvTextPreview.visibility = if (mediaUrl == null) View.VISIBLE else View.GONE
++            binding.tvTextPreview.text = post.content.orEmpty().ifBlank { "Post" }
++            if (mediaUrl != null) {
++                binding.ivMedia.load(mediaUrl) {
++                    crossfade(true)
++                    error(R.drawable.ic_gallery)
++                }
++            }
++            binding.root.setOnClickListener { onPostClick(post) }
++        }
++    }
++
++    private class Diff : DiffUtil.ItemCallback<Post>() {
++        override fun areItemsTheSame(oldItem: Post, newItem: Post) = oldItem.postId == newItem.postId
++        override fun areContentsTheSame(oldItem: Post, newItem: Post) = oldItem == newItem
++    }
++}
+diff --git a/android/app/src/main/java/com/nexa/social/ui/adapters/ReelAdapter.kt b/android/app/src/main/java/com/nexa/social/ui/adapters/ReelAdapter.kt
+index 4ef60e8..7ca42a3 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/adapters/ReelAdapter.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/adapters/ReelAdapter.kt
+@@ -7,12 +7,13 @@ import androidx.media3.exoplayer.ExoPlayer
+ import androidx.recyclerview.widget.DiffUtil
+ import androidx.recyclerview.widget.ListAdapter
+ import androidx.recyclerview.widget.RecyclerView
+-import com.nexa.social.NexaApiClient
+ import com.nexa.social.data.models.Reel
+ import com.nexa.social.databinding.ItemReelBinding
++import com.nexa.social.utils.MediaUrlResolver
+ 
+ class ReelAdapter(
+-    private val onLikeClick: (Reel) -> Unit
++    private val onLikeClick: (Reel) -> Unit,
++    private val onAuthorClick: (Reel) -> Unit = {}
+ ) : ListAdapter<Reel, ReelAdapter.ReelViewHolder>(ReelDiffCallback()) {
+ 
+     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ReelViewHolder {
+@@ -39,7 +40,7 @@ class ReelAdapter(
+ 
+             // Initialize player
+             player = ExoPlayer.Builder(binding.root.context).build().apply {
+-                val videoUrl = if (reel.videoUrl.startsWith("http")) reel.videoUrl else "${NexaApiClient.BASE_URL.removeSuffix("api/")}${reel.videoUrl.removePrefix("/")}"
++                val videoUrl = MediaUrlResolver.resolve(reel.videoUrl) ?: return@apply
+                 setMediaItem(MediaItem.fromUri(videoUrl))
+                 prepare()
+                 repeatMode = ExoPlayer.REPEAT_MODE_ONE
+@@ -47,6 +48,7 @@ class ReelAdapter(
+             binding.playerView.player = player
+ 
+             binding.btnLike.setOnClickListener { onLikeClick(reel) }
++            binding.tvAuthor.setOnClickListener { onAuthorClick(reel) }
+         }
+ 
+         fun play() {
+diff --git a/android/app/src/main/java/com/nexa/social/ui/adapters/UserAdapter.kt b/android/app/src/main/java/com/nexa/social/ui/adapters/UserAdapter.kt
+index 4b8a5cf..78125c4 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/adapters/UserAdapter.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/adapters/UserAdapter.kt
+@@ -7,10 +7,10 @@ import androidx.recyclerview.widget.ListAdapter
+ import androidx.recyclerview.widget.RecyclerView
+ import coil.load
+ import coil.transform.CircleCropTransformation
+-import com.nexa.social.NexaApiClient
+ import com.nexa.social.R
+ import com.nexa.social.data.models.User
+ import com.nexa.social.databinding.ItemUserBinding
++import com.nexa.social.utils.MediaUrlResolver
+ 
+ class UserAdapter(
+     private val onClick: (User) -> Unit
+@@ -30,9 +30,7 @@ class UserAdapter(
+             binding.tvDisplayName.text = user.displayName
+             binding.tvUsername.text = "@${user.username}"
+ 
+-            val avatarUrl = user.profileImageUrl?.let {
+-                if (it.startsWith("http")) it else "${NexaApiClient.BASE_URL.removeSuffix("api/")}${it.removePrefix("/")}"
+-            }
++            val avatarUrl = MediaUrlResolver.resolve(user.profileImageUrl)
+             binding.ivAvatar.load(avatarUrl) {
+                 crossfade(true)
+                 placeholder(R.drawable.ic_profile)
+diff --git a/android/app/src/main/java/com/nexa/social/ui/fragments/HomeFragment.kt b/android/app/src/main/java/com/nexa/social/ui/fragments/HomeFragment.kt
+index 9cc98d5..ac276cb 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/fragments/HomeFragment.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/fragments/HomeFragment.kt
+@@ -8,6 +8,8 @@ import android.widget.Toast
+ import androidx.fragment.app.Fragment
+ import androidx.fragment.app.activityViewModels
+ import androidx.lifecycle.lifecycleScope
++import androidx.navigation.fragment.findNavController
++import com.nexa.social.R
+ import com.nexa.social.databinding.FragmentHomeBinding
+ import com.nexa.social.ui.adapters.PostAdapter
+ import com.nexa.social.ui.viewmodels.HomeUiState
+@@ -43,6 +45,10 @@ class HomeFragment : Fragment() {
+             },
+             onBookmarkClick = { post ->
+                 viewModel.toggleBookmark(post)
++            },
++            onAuthorClick = { post ->
++                val bundle = Bundle().apply { putString("username", post.author.username) }
++                findNavController().navigate(R.id.navigation_profile, bundle)
+             }
+         )
+         binding.rvFeed.adapter = postAdapter
+diff --git a/android/app/src/main/java/com/nexa/social/ui/fragments/ProfileFragment.kt b/android/app/src/main/java/com/nexa/social/ui/fragments/ProfileFragment.kt
+index a215f2a..3c2dbe5 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/fragments/ProfileFragment.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/fragments/ProfileFragment.kt
+@@ -9,8 +9,8 @@ import androidx.fragment.app.viewModels
+ import androidx.lifecycle.lifecycleScope
+ import coil.load
+ import coil.transform.CircleCropTransformation
+-import com.nexa.social.NexaApiClient
+ import com.nexa.social.R
++import com.nexa.social.data.models.Post
+ import com.nexa.social.data.models.User
+ import com.nexa.social.databinding.FragmentProfileBinding
+ import com.nexa.social.ui.viewmodels.ProfileUiState
+@@ -19,14 +19,18 @@ import com.nexa.social.utils.PreferenceManager
+ import kotlinx.coroutines.launch
+ 
+ import android.content.Intent
+-import com.nexa.social.data.repository.AuthRepository
+ import com.nexa.social.data.repository.PostRepository
+ import com.nexa.social.ui.CommentsBottomSheetDialogFragment
+ import com.nexa.social.ui.ChatActivity
+ import com.nexa.social.ui.EditProfileBottomSheetDialogFragment
+-import com.nexa.social.ui.LoginActivity
++import com.nexa.social.ui.SettingsActivity
++import com.nexa.social.ui.UserListActivity
+ import com.nexa.social.ui.adapters.PostAdapter
+-import com.nexa.social.utils.TokenManager
++import com.nexa.social.ui.adapters.ProfileGridAdapter
++import com.nexa.social.utils.MediaUrlResolver
++import androidx.recyclerview.widget.GridLayoutManager
++import androidx.recyclerview.widget.LinearLayoutManager
++import com.google.android.material.tabs.TabLayout
+ 
+ class ProfileFragment : Fragment() {
+     private var _binding: FragmentProfileBinding? = null
+@@ -35,6 +39,8 @@ class ProfileFragment : Fragment() {
+     private lateinit var prefManager: PreferenceManager
+     private val postRepository = PostRepository()
+     private lateinit var postAdapter: PostAdapter
++    private lateinit var gridAdapter: ProfileGridAdapter
++    private var loadedPosts: List<Post> = emptyList()
+     private var isFollowing = false
+ 
+     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+@@ -46,7 +52,6 @@ class ProfileFragment : Fragment() {
+         super.onViewCreated(view, savedInstanceState)
+         prefManager = PreferenceManager(requireContext())
+         setupRecyclerView()
+-        setupLogoutButton()
+         observeViewModel()
+ 
+         val username = arguments?.getString("username") ?: prefManager.username
+@@ -71,31 +76,27 @@ class ProfileFragment : Fragment() {
+                     if (post.isBookmarked) postRepository.unbookmarkPost(post.postId)
+                     else postRepository.bookmarkPost(post.postId)
+                 }
+-            }
++            },
++            onAuthorClick = { }
+         )
++        gridAdapter = ProfileGridAdapter { post ->
++            CommentsBottomSheetDialogFragment.newInstance(post.postId)
++                .show(childFragmentManager, "comments")
++        }
++        binding.rvUserPosts.layoutManager = LinearLayoutManager(requireContext())
+         binding.rvUserPosts.adapter = postAdapter
++        binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
++            override fun onTabSelected(tab: TabLayout.Tab) = showPosts(tab.position == 1)
++            override fun onTabUnselected(tab: TabLayout.Tab) = Unit
++            override fun onTabReselected(tab: TabLayout.Tab) = Unit
++        })
+     }
+ 
+-    private fun setupLogoutButton() {
+-        binding.btnLogout.setOnClickListener {
+-            androidx.appcompat.app.AlertDialog.Builder(requireContext())
+-                .setTitle("Account Settings & Logout")
+-                .setMessage("Are you sure you want to log out of Nexa Social on this device?")
+-                .setPositiveButton("Log Out") { _, _ ->
+-                    lifecycleScope.launch {
+-                        try {
+-                            val tm = TokenManager(requireContext())
+-                            AuthRepository(tm).logout()
+-                        } catch (_: Exception) {}
+-                        val intent = Intent(requireContext(), LoginActivity::class.java).apply {
+-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+-                        }
+-                        startActivity(intent)
+-                    }
+-                }
+-                .setNegativeButton("Cancel", null)
+-                .show()
+-        }
++    private fun showPosts(asGrid: Boolean) {
++        binding.rvUserPosts.layoutManager = if (asGrid) GridLayoutManager(requireContext(), 3)
++        else LinearLayoutManager(requireContext())
++        binding.rvUserPosts.adapter = if (asGrid) gridAdapter else postAdapter
++        if (asGrid) gridAdapter.submitList(loadedPosts) else postAdapter.submitList(loadedPosts)
+     }
+ 
+     private fun observeViewModel() {
+@@ -123,10 +124,9 @@ class ProfileFragment : Fragment() {
+         binding.tvBio.text = user.bio ?: ""
+         binding.tvFollowersCount.text = user.followersCount.toString()
+         binding.tvFollowingCount.text = user.followingCount.toString()
++        isFollowing = user.isFollowing
+ 
+-        val avatarUrl = user.profileImageUrl?.let {
+-            if (it.startsWith("http")) it else "${NexaApiClient.BASE_URL.removeSuffix("api/")}${it.removePrefix("/")}"
+-        }
++        val avatarUrl = MediaUrlResolver.resolve(user.profileImageUrl)
+         binding.ivAvatar.load(avatarUrl) {
+             crossfade(true)
+             placeholder(R.drawable.ic_profile)
+@@ -134,14 +134,18 @@ class ProfileFragment : Fragment() {
+             transformations(CircleCropTransformation())
+         }
+ 
+-        user.coverImageUrl?.let {
+-            val coverUrl = if (it.startsWith("http")) it else "${NexaApiClient.BASE_URL.removeSuffix("api/")}${it.removePrefix("/")}"
++        val coverUrl = MediaUrlResolver.resolve(user.coverImageUrl)
++        if (coverUrl != null) {
+             binding.ivCover.load(coverUrl) {
+                 crossfade(true)
++                error(R.drawable.ic_gallery)
+             }
++        } else {
++            binding.ivCover.setImageDrawable(null)
+         }
+ 
+         val isOwner = user.userId == prefManager.userId || user.username == prefManager.username
++        binding.btnSettings.visibility = if (isOwner) View.VISIBLE else View.GONE
+         if (isOwner) {
+             binding.btnEditProfile.visibility = View.VISIBLE
+             binding.btnFollow.visibility = View.GONE
+@@ -151,15 +155,19 @@ class ProfileFragment : Fragment() {
+                     viewModel.updateProfileLocally(updatedUser)
+                 }.show(childFragmentManager, "edit_profile")
+             }
++            binding.btnSettings.setOnClickListener {
++                startActivity(Intent(requireContext(), SettingsActivity::class.java))
++            }
+         } else {
+             binding.btnEditProfile.visibility = View.GONE
+             binding.btnFollow.visibility = View.VISIBLE
+             binding.btnMessage.visibility = View.VISIBLE
+             binding.btnFollow.text = if (isFollowing) "Following" else "Follow"
+             binding.btnFollow.setOnClickListener {
+-                isFollowing = !isFollowing
++                val wasFollowing = isFollowing
++                isFollowing = !wasFollowing
+                 binding.btnFollow.text = if (isFollowing) "Following" else "Follow"
+-                viewModel.toggleFollow(user, !isFollowing)
++                viewModel.toggleFollow(user.copy(isFollowing = wasFollowing), wasFollowing)
+             }
+             binding.btnMessage.setOnClickListener {
+                 val intent = Intent(requireContext(), ChatActivity::class.java).apply {
+@@ -171,15 +179,28 @@ class ProfileFragment : Fragment() {
+             }
+         }
+ 
+-        // Load posts for user
++        binding.followersContainer.setOnClickListener {
++            openUserList(user.userId, UserListActivity.MODE_FOLLOWERS)
++        }
++        binding.followingContainer.setOnClickListener {
++            openUserList(user.userId, UserListActivity.MODE_FOLLOWING)
++        }
++
+         lifecycleScope.launch {
+-            postRepository.getFeed().onSuccess { allPosts ->
+-                val userPosts = allPosts.filter { it.userId == user.userId || it.author.userId == user.userId }
+-                postAdapter.submitList(userPosts)
++            postRepository.getUserPosts(user.userId).onSuccess { userPosts ->
++                loadedPosts = userPosts
++                showPosts(binding.tabLayout.selectedTabPosition == 1)
+             }
+         }
+     }
+ 
++    private fun openUserList(userId: Int, mode: String) {
++        startActivity(Intent(requireContext(), UserListActivity::class.java).apply {
++            putExtra(UserListActivity.EXTRA_USER_ID, userId)
++            putExtra(UserListActivity.EXTRA_MODE, mode)
++        })
++    }
++
+     override fun onDestroyView() {
+         super.onDestroyView()
+         _binding = null
+diff --git a/android/app/src/main/java/com/nexa/social/ui/fragments/ReelsFragment.kt b/android/app/src/main/java/com/nexa/social/ui/fragments/ReelsFragment.kt
+index 45b7634..ebb63cc 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/fragments/ReelsFragment.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/fragments/ReelsFragment.kt
+@@ -7,6 +7,8 @@ import android.view.ViewGroup
+ import androidx.fragment.app.Fragment
+ import androidx.fragment.app.viewModels
+ import androidx.lifecycle.lifecycleScope
++import androidx.navigation.fragment.findNavController
++import com.nexa.social.R
+ import com.nexa.social.databinding.FragmentReelsBinding
+ import com.nexa.social.ui.adapters.ReelAdapter
+ import com.nexa.social.ui.viewmodels.ReelsUiState
+@@ -31,9 +33,13 @@ class ReelsFragment : Fragment() {
+     }
+ 
+     private fun setupViewPager() {
+-        reelAdapter = ReelAdapter { reel ->
+-            viewModel.toggleLike(reel)
+-        }
++        reelAdapter = ReelAdapter(
++            onLikeClick = { reel -> viewModel.toggleLike(reel) },
++            onAuthorClick = { reel ->
++                val bundle = Bundle().apply { putString("username", reel.author.username) }
++                findNavController().navigate(R.id.navigation_profile, bundle)
++            }
++        )
+         binding.viewPager.adapter = reelAdapter
+ 
+         binding.viewPager.registerOnPageChangeCallback(object : androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
+diff --git a/android/app/src/main/java/com/nexa/social/ui/viewmodels/ProfileViewModel.kt b/android/app/src/main/java/com/nexa/social/ui/viewmodels/ProfileViewModel.kt
+index a0677e3..ba1ffae 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/viewmodels/ProfileViewModel.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/viewmodels/ProfileViewModel.kt
+@@ -44,7 +44,9 @@ class ProfileViewModel(private val repository: UserRepository = UserRepository()
+             }
+             res.onSuccess {
+                 val newCount = if (isCurrentlyFollowing) maxOf(0, user.followersCount - 1) else user.followersCount + 1
+-                _uiState.value = ProfileUiState.Success(user.copy(followersCount = newCount))
++                _uiState.value = ProfileUiState.Success(
++                    user.copy(followersCount = newCount, isFollowing = !isCurrentlyFollowing)
++                )
+             }
+         }
+     }
+diff --git a/android/app/src/main/java/com/nexa/social/utils/MediaFilePreparer.kt b/android/app/src/main/java/com/nexa/social/utils/MediaFilePreparer.kt
+new file mode 100644
+index 0000000..9b00f8b
+--- /dev/null
++++ b/android/app/src/main/java/com/nexa/social/utils/MediaFilePreparer.kt
+@@ -0,0 +1,108 @@
++package com.nexa.social.utils
++
++import android.content.Context
++import android.media.MediaMetadataRetriever
++import android.net.Uri
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++import java.io.File
++
++object MediaFilePreparer {
++    enum class Kind { IMAGE, VIDEO }
++
++    data class PreparedMedia(
++        val file: File,
++        val mimeType: String,
++        val durationMs: Long? = null
++    )
++
++    suspend fun prepare(
++        context: Context,
++        uri: Uri,
++        kind: Kind,
++        maxBytes: Long,
++        maxDurationMs: Long? = null
++    ): Result<PreparedMedia> = withContext(Dispatchers.IO) {
++        runCatching {
++            val resolver = context.contentResolver
++            val header = ByteArray(16)
++            val read = resolver.openInputStream(uri)?.use { it.read(header) }
++                ?: throw IllegalArgumentException("Unable to read selected media")
++            if (read < 4) throw IllegalArgumentException("Selected media is empty or invalid")
++
++            val detected = detectMimeType(header, resolver.getType(uri))
++                ?: throw IllegalArgumentException("Unsupported media format")
++            if (kind == Kind.IMAGE && !detected.startsWith("image/")) {
++                throw IllegalArgumentException("Choose a JPEG, PNG, WebP, or GIF image")
++            }
++            if (kind == Kind.VIDEO && !detected.startsWith("video/")) {
++                throw IllegalArgumentException("Choose an MP4, WebM, or MOV video")
++            }
++
++            val extension = extensionFor(detected)
++            val temporaryFile = File.createTempFile("nexa_upload_", extension, context.cacheDir)
++            try {
++                resolver.openInputStream(uri)?.use { input ->
++                    temporaryFile.outputStream().buffered().use { output -> input.copyTo(output) }
++                } ?: throw IllegalArgumentException("Unable to open selected media")
++
++                if (temporaryFile.length() <= 0L) throw IllegalArgumentException("Selected media is empty")
++                if (temporaryFile.length() > maxBytes) {
++                    throw IllegalArgumentException("Selected media exceeds the upload size limit")
++                }
++
++                val duration = if (kind == Kind.VIDEO) videoDuration(context, uri) else null
++                if (maxDurationMs != null && duration != null && duration > maxDurationMs) {
++                    throw IllegalArgumentException("Bytes videos must be 60 seconds or shorter")
++                }
++
++                PreparedMedia(temporaryFile, detected, duration)
++            } catch (error: Throwable) {
++                temporaryFile.delete()
++                throw error
++            }
++        }
++    }
++
++    internal fun detectMimeType(header: ByteArray, declaredMime: String?): String? {
++        if (header.size >= 3 && header[0] == 0xFF.toByte() && header[1] == 0xD8.toByte() && header[2] == 0xFF.toByte()) {
++            return "image/jpeg"
++        }
++        if (header.size >= 8 && header[0] == 0x89.toByte() && header[1] == 0x50.toByte() && header[2] == 0x4E.toByte() && header[3] == 0x47.toByte()) {
++            return "image/png"
++        }
++        if (header.size >= 12 && String(header, 0, 4, Charsets.US_ASCII) == "RIFF" && String(header, 8, 4, Charsets.US_ASCII) == "WEBP") {
++            return "image/webp"
++        }
++        if (header.size >= 6 && (String(header, 0, 6, Charsets.US_ASCII) == "GIF87a" || String(header, 0, 6, Charsets.US_ASCII) == "GIF89a")) {
++            return "image/gif"
++        }
++        if (header.size >= 8 && String(header, 4, 4, Charsets.US_ASCII) == "ftyp") {
++            return if (declaredMime == "video/quicktime") "video/quicktime" else "video/mp4"
++        }
++        if (header.size >= 4 && header[0] == 0x1A.toByte() && header[1] == 0x45.toByte() && header[2] == 0xDF.toByte() && header[3] == 0xA3.toByte()) {
++            return "video/webm"
++        }
++        return null
++    }
++
++    private fun extensionFor(mimeType: String): String = when (mimeType) {
++        "image/jpeg" -> ".jpg"
++        "image/png" -> ".png"
++        "image/webp" -> ".webp"
++        "image/gif" -> ".gif"
++        "video/webm" -> ".webm"
++        "video/quicktime" -> ".mov"
++        else -> ".mp4"
++    }
++
++    private fun videoDuration(context: Context, uri: Uri): Long? {
++        val retriever = MediaMetadataRetriever()
++        return try {
++            retriever.setDataSource(context, uri)
++            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
++        } finally {
++            retriever.release()
++        }
++    }
++}
+diff --git a/android/app/src/main/java/com/nexa/social/utils/MediaUrlResolver.kt b/android/app/src/main/java/com/nexa/social/utils/MediaUrlResolver.kt
+new file mode 100644
+index 0000000..04b9029
+--- /dev/null
++++ b/android/app/src/main/java/com/nexa/social/utils/MediaUrlResolver.kt
+@@ -0,0 +1,18 @@
++package com.nexa.social.utils
++
++import com.nexa.social.NexaApiClient
++
++object MediaUrlResolver {
++    fun resolve(value: String?): String? {
++        val mediaUrl = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
++        if (mediaUrl.startsWith("https://", ignoreCase = true) ||
++            mediaUrl.startsWith("http://", ignoreCase = true)
++        ) {
++            return mediaUrl
++        }
++        if (mediaUrl.startsWith("//")) return "https:$mediaUrl"
++
++        val serverOrigin = NexaApiClient.BASE_URL.removeSuffix("api/").removeSuffix("/")
++        return "$serverOrigin/${mediaUrl.removePrefix("/")}"
++    }
++}
+diff --git a/android/app/src/main/res/drawable/ic_settings.xml b/android/app/src/main/res/drawable/ic_settings.xml
+new file mode 100644
+index 0000000..b6d35bf
+--- /dev/null
++++ b/android/app/src/main/res/drawable/ic_settings.xml
+@@ -0,0 +1,10 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:fillColor="@android:color/white"
++        android:pathData="M19.43,12.98c0.04,-0.32 0.07,-0.65 0.07,-0.98s-0.03,-0.66 -0.08,-0.98l2.11,-1.65c0.19,-0.15 0.24,-0.42 0.12,-0.64l-2,-3.46c-0.12,-0.22 -0.37,-0.31 -0.6,-0.22l-2.49,1c-0.52,-0.4 -1.08,-0.73 -1.69,-0.98L14.5,2.42C14.47,2.18 14.25,2 14,2h-4c-0.25,0 -0.46,0.18 -0.5,0.42L9.13,5.07c-0.61,0.25 -1.18,0.59 -1.69,0.98l-2.49,-1c-0.23,-0.08 -0.48,0 -0.6,0.22l-2,3.46c-0.13,0.22 -0.07,0.49 0.12,0.64l2.11,1.65c-0.05,0.32 -0.09,0.66 -0.09,0.98s0.03,0.66 0.08,0.98l-2.11,1.65c-0.19,0.15 -0.24,0.42 -0.12,0.64l2,3.46c0.12,0.22 0.37,0.31 0.6,0.22l2.49,-1c0.52,0.4 1.08,0.73 1.69,0.98l0.37,2.65c0.04,0.24 0.25,0.42 0.5,0.42h4c0.25,0 0.46,-0.18 0.5,-0.42l0.37,-2.65c0.61,-0.25 1.18,-0.58 1.69,-0.98l2.49,1c0.23,0.08 0.48,0 0.6,-0.22l2,-3.46c0.12,-0.22 0.07,-0.49 -0.12,-0.64zM12,15.5A3.5,3.5 0,1 1,12,8a3.5,3.5 0,0 1,0,7.5z" />
++</vector>
+diff --git a/android/app/src/main/res/layout/activity_create_reel.xml b/android/app/src/main/res/layout/activity_create_reel.xml
+new file mode 100644
+index 0000000..daedbf5
+--- /dev/null
++++ b/android/app/src/main/res/layout/activity_create_reel.xml
+@@ -0,0 +1,132 @@
++<?xml version="1.0" encoding="utf-8"?>
++<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:background="@color/background_dark"
++    android:fillViewport="true">
++
++    <androidx.constraintlayout.widget.ConstraintLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:padding="16dp">
++
++        <ImageButton
++            android:id="@+id/btnClose"
++            android:layout_width="40dp"
++            android:layout_height="40dp"
++            android:background="?attr/selectableItemBackgroundBorderless"
++            android:contentDescription="Close"
++            android:src="@drawable/ic_close"
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintTop_toTopOf="parent"
++            app:tint="@color/text_white" />
++
++        <TextView
++            android:id="@+id/tvTitle"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:text="Create Byte"
++            android:textColor="@color/text_white"
++            android:textSize="18sp"
++            android:textStyle="bold"
++            app:layout_constraintBottom_toBottomOf="@id/btnClose"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintTop_toTopOf="@id/btnClose" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/btnPublish"
++            android:layout_width="wrap_content"
++            android:layout_height="40dp"
++            android:backgroundTint="@color/brand_primary"
++            android:text="Publish"
++            android:textColor="@color/text_white"
++            app:cornerRadius="20dp"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintTop_toTopOf="parent" />
++
++        <FrameLayout
++            android:id="@+id/mediaPreviewContainer"
++            android:layout_width="0dp"
++            android:layout_height="420dp"
++            android:layout_marginTop="20dp"
++            android:background="@android:color/black"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintTop_toBottomOf="@id/btnClose">
++
++            <androidx.media3.ui.PlayerView
++                android:id="@+id/playerPreview"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:visibility="gone"
++                app:resize_mode="fit"
++                app:use_controller="true" />
++
++            <TextView
++                android:id="@+id/tvVideoHelp"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:background="@color/background_card"
++                android:gravity="center"
++                android:padding="24dp"
++                android:text="Choose an MP4, WebM, or MOV video\nMaximum length: 60 seconds"
++                android:textColor="@color/text_secondary"
++                android:textSize="14sp" />
++        </FrameLayout>
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/btnChooseVideo"
++            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
++            android:layout_width="0dp"
++            android:layout_height="52dp"
++            android:layout_marginTop="16dp"
++            android:text="Choose Video"
++            android:textColor="@color/text_white"
++            app:cornerRadius="14dp"
++            app:icon="@drawable/ic_gallery"
++            app:iconTint="@color/brand_cyan"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintTop_toBottomOf="@id/mediaPreviewContainer"
++            app:strokeColor="@color/border_dark" />
++
++        <com.google.android.material.textfield.TextInputLayout
++            android:id="@+id/tilCaption"
++            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="16dp"
++            android:hint="Caption (optional)"
++            app:boxBackgroundColor="@color/background_card"
++            app:boxStrokeColor="@color/brand_primary"
++            app:counterEnabled="true"
++            app:counterMaxLength="500"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintTop_toBottomOf="@id/btnChooseVideo">
++
++            <com.google.android.material.textfield.TextInputEditText
++                android:id="@+id/etCaption"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:gravity="top|start"
++                android:inputType="textMultiLine"
++                android:maxLength="500"
++                android:minLines="3"
++                android:textColor="@color/text_white" />
++        </com.google.android.material.textfield.TextInputLayout>
++
++        <ProgressBar
++            android:id="@+id/progressBar"
++            android:layout_width="40dp"
++            android:layout_height="40dp"
++            android:layout_marginTop="20dp"
++            android:visibility="gone"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintTop_toBottomOf="@id/tilCaption" />
++
++    </androidx.constraintlayout.widget.ConstraintLayout>
++</ScrollView>
+diff --git a/android/app/src/main/res/layout/activity_settings.xml b/android/app/src/main/res/layout/activity_settings.xml
+new file mode 100644
+index 0000000..af078af
+--- /dev/null
++++ b/android/app/src/main/res/layout/activity_settings.xml
+@@ -0,0 +1,111 @@
++<?xml version="1.0" encoding="utf-8"?>
++<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:background="@color/background_dark"
++    android:fillViewport="true">
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:orientation="vertical">
++
++        <com.google.android.material.appbar.MaterialToolbar
++            android:id="@+id/toolbar"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:background="@color/background_card"
++            android:navigationIcon="@drawable/ic_back"
++            android:title="Settings"
++            app:titleTextColor="@color/text_white" />
++
++        <TextView
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginStart="20dp"
++            android:layout_marginTop="24dp"
++            android:text="Account"
++            android:textColor="@color/brand_emerald"
++            android:textStyle="bold" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/btnEditProfile"
++            style="@style/Widget.MaterialComponents.Button.TextButton"
++            android:layout_width="match_parent"
++            android:layout_height="56dp"
++            android:gravity="start|center_vertical"
++            android:text="Edit profile"
++            android:textColor="@color/text_white" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/btnTheme"
++            style="@style/Widget.MaterialComponents.Button.TextButton"
++            android:layout_width="match_parent"
++            android:layout_height="56dp"
++            android:gravity="start|center_vertical"
++            android:text="Appearance: System default"
++            android:textColor="@color/text_white" />
++
++        <TextView
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginStart="20dp"
++            android:layout_marginTop="20dp"
++            android:text="Security"
++            android:textColor="@color/brand_emerald"
++            android:textStyle="bold" />
++
++        <com.google.android.material.materialswitch.MaterialSwitch
++            android:id="@+id/switchEmailMfa"
++            android:layout_width="match_parent"
++            android:layout_height="64dp"
++            android:paddingStart="20dp"
++            android:paddingEnd="20dp"
++            android:text="Email two-factor authentication"
++            android:textColor="@color/text_white" />
++
++        <TextView
++            android:id="@+id/tvMfaHelp"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:paddingStart="20dp"
++            android:paddingEnd="20dp"
++            android:paddingBottom="16dp"
++            android:text="A one-time code will be emailed when you sign in. Your email must be verified first."
++            android:textColor="@color/text_secondary"
++            android:textSize="12sp" />
++
++        <ProgressBar
++            android:id="@+id/progressBar"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_gravity="center_horizontal"
++            android:visibility="gone" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/btnLogout"
++            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
++            android:layout_width="match_parent"
++            android:layout_height="52dp"
++            android:layout_marginStart="20dp"
++            android:layout_marginTop="24dp"
++            android:layout_marginEnd="20dp"
++            android:text="Log out on this device"
++            android:textColor="@color/text_white"
++            app:strokeColor="@color/border_dark" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/btnLogoutAll"
++            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
++            android:layout_width="match_parent"
++            android:layout_height="52dp"
++            android:layout_marginStart="20dp"
++            android:layout_marginTop="12dp"
++            android:layout_marginEnd="20dp"
++            android:layout_marginBottom="24dp"
++            android:text="Log out from all devices"
++            android:textColor="@color/error_red"
++            app:strokeColor="@color/error_red" />
++    </LinearLayout>
++</androidx.core.widget.NestedScrollView>
+diff --git a/android/app/src/main/res/layout/activity_user_list.xml b/android/app/src/main/res/layout/activity_user_list.xml
+new file mode 100644
+index 0000000..5e53189
+--- /dev/null
++++ b/android/app/src/main/res/layout/activity_user_list.xml
+@@ -0,0 +1,50 @@
++<?xml version="1.0" encoding="utf-8"?>
++<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:background="@color/background_dark">
++
++    <com.google.android.material.appbar.MaterialToolbar
++        android:id="@+id/toolbar"
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:background="@color/background_card"
++        android:navigationIcon="@drawable/ic_back"
++        app:titleTextColor="@color/text_white"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toTopOf="parent" />
++
++    <androidx.recyclerview.widget.RecyclerView
++        android:id="@+id/rvUsers"
++        android:layout_width="0dp"
++        android:layout_height="0dp"
++        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
++        app:layout_constraintBottom_toBottomOf="parent"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toBottomOf="@id/toolbar" />
++
++    <ProgressBar
++        android:id="@+id/progressBar"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:visibility="gone"
++        app:layout_constraintBottom_toBottomOf="parent"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toBottomOf="@id/toolbar" />
++
++    <TextView
++        android:id="@+id/tvEmpty"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:text="No accounts to show"
++        android:textColor="@color/text_secondary"
++        android:visibility="gone"
++        app:layout_constraintBottom_toBottomOf="parent"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toBottomOf="@id/toolbar" />
++</androidx.constraintlayout.widget.ConstraintLayout>
+diff --git a/android/app/src/main/res/layout/activity_user_profile.xml b/android/app/src/main/res/layout/activity_user_profile.xml
+new file mode 100644
+index 0000000..dcc6572
+--- /dev/null
++++ b/android/app/src/main/res/layout/activity_user_profile.xml
+@@ -0,0 +1,28 @@
++<?xml version="1.0" encoding="utf-8"?>
++<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:background="@color/background_dark">
++
++    <com.google.android.material.appbar.MaterialToolbar
++        android:id="@+id/toolbar"
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:background="@color/background_card"
++        android:navigationIcon="@drawable/ic_back"
++        android:title="Profile"
++        app:titleTextColor="@color/text_white"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toTopOf="parent" />
++
++    <androidx.fragment.app.FragmentContainerView
++        android:id="@+id/profileContainer"
++        android:layout_width="0dp"
++        android:layout_height="0dp"
++        app:layout_constraintBottom_toBottomOf="parent"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toBottomOf="@id/toolbar" />
++</androidx.constraintlayout.widget.ConstraintLayout>
+diff --git a/android/app/src/main/res/layout/dialog_edit_profile.xml b/android/app/src/main/res/layout/dialog_edit_profile.xml
+index 7432440..79f87aa 100644
+--- a/android/app/src/main/res/layout/dialog_edit_profile.xml
++++ b/android/app/src/main/res/layout/dialog_edit_profile.xml
+@@ -1,9 +1,14 @@
+ <?xml version="1.0" encoding="utf-8"?>
+-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
++<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:app="http://schemas.android.com/apk/res-auto"
+     android:layout_width="match_parent"
+     android:layout_height="wrap_content"
+     android:background="@color/background_dark"
++    android:fillViewport="true">
++
++<androidx.constraintlayout.widget.ConstraintLayout
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
+     android:padding="16dp">
+ 
+     <View
+@@ -54,6 +59,29 @@
+         app:layout_constraintTop_toBottomOf="@id/ivProfilePreview"
+         app:strokeColor="@color/brand_emerald" />
+ 
++    <ImageView
++        android:id="@+id/ivCoverPreview"
++        android:layout_width="match_parent"
++        android:layout_height="120dp"
++        android:layout_marginTop="14dp"
++        android:background="@color/background_card"
++        android:contentDescription="Profile banner preview"
++        android:scaleType="centerCrop"
++        app:layout_constraintTop_toBottomOf="@id/btnChooseProfileImage" />
++
++    <com.google.android.material.button.MaterialButton
++        android:id="@+id/btnChooseCoverImage"
++        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="8dp"
++        android:text="Choose Banner Image"
++        android:textColor="@color/text_white"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toBottomOf="@id/ivCoverPreview"
++        app:strokeColor="@color/brand_emerald" />
++
+     <com.google.android.material.textfield.TextInputLayout
+         android:id="@+id/tilDisplayName"
+         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+@@ -62,7 +90,7 @@
+         android:layout_marginTop="16dp"
+         android:hint="Display Name"
+         app:boxStrokeColor="@color/brand_emerald"
+-        app:layout_constraintTop_toBottomOf="@id/btnChooseProfileImage">
++        app:layout_constraintTop_toBottomOf="@id/btnChooseCoverImage">
+ 
+         <com.google.android.material.textfield.TextInputEditText
+             android:id="@+id/etDisplayName"
+@@ -141,3 +169,4 @@
+         app:layout_constraintTop_toBottomOf="@id/tilWebsite" />
+ 
+ </androidx.constraintlayout.widget.ConstraintLayout>
++</androidx.core.widget.NestedScrollView>
+diff --git a/android/app/src/main/res/layout/fragment_profile.xml b/android/app/src/main/res/layout/fragment_profile.xml
+index 0c7c838..c7b2860 100644
+--- a/android/app/src/main/res/layout/fragment_profile.xml
++++ b/android/app/src/main/res/layout/fragment_profile.xml
+@@ -80,13 +80,13 @@
+             app:strokeColor="@color/border_dark" />
+ 
+         <ImageButton
+-            android:id="@+id/btnLogout"
++            android:id="@+id/btnSettings"
+             android:layout_width="36dp"
+             android:layout_height="36dp"
+             android:layout_margin="12dp"
+             android:background="?attr/selectableItemBackgroundBorderless"
+-            android:contentDescription="Settings and Logout"
+-            android:src="@drawable/ic_logout"
++            android:contentDescription="Settings"
++            android:src="@drawable/ic_settings"
+             app:layout_constraintEnd_toEndOf="parent"
+             app:layout_constraintTop_toTopOf="parent"
+             app:tint="@color/text_white" />
+@@ -142,38 +142,60 @@
+             android:paddingEnd="16dp"
+             app:layout_constraintTop_toBottomOf="@id/tvBio">
+ 
+-            <TextView
+-                android:id="@+id/tvFollowingCount"
++            <LinearLayout
++                android:id="@+id/followingContainer"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+-                android:textColor="@color/text_white"
+-                android:textSize="14sp"
+-                android:textStyle="bold" />
+-
+-            <TextView
+-                android:layout_width="wrap_content"
+-                android:layout_height="wrap_content"
+-                android:layout_marginStart="4dp"
+-                android:text="Following"
+-                android:textColor="@color/text_secondary"
+-                android:textSize="14sp" />
+-
+-            <TextView
+-                android:id="@+id/tvFollowersCount"
++                android:background="?attr/selectableItemBackground"
++                android:clickable="true"
++                android:focusable="true"
++                android:orientation="horizontal"
++                android:padding="6dp">
++
++                <TextView
++                    android:id="@+id/tvFollowingCount"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:textColor="@color/text_white"
++                    android:textSize="14sp"
++                    android:textStyle="bold" />
++
++                <TextView
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:layout_marginStart="4dp"
++                    android:text="Following"
++                    android:textColor="@color/text_secondary"
++                    android:textSize="14sp" />
++            </LinearLayout>
++
++            <LinearLayout
++                android:id="@+id/followersContainer"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:layout_marginStart="16dp"
+-                android:textColor="@color/text_white"
+-                android:textSize="14sp"
+-                android:textStyle="bold" />
+-
+-            <TextView
+-                android:layout_width="wrap_content"
+-                android:layout_height="wrap_content"
+-                android:layout_marginStart="4dp"
+-                android:text="Followers"
+-                android:textColor="@color/text_secondary"
+-                android:textSize="14sp" />
++                android:background="?attr/selectableItemBackground"
++                android:clickable="true"
++                android:focusable="true"
++                android:orientation="horizontal"
++                android:padding="6dp">
++
++                <TextView
++                    android:id="@+id/tvFollowersCount"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:textColor="@color/text_white"
++                    android:textSize="14sp"
++                    android:textStyle="bold" />
++
++                <TextView
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:layout_marginStart="4dp"
++                    android:text="Followers"
++                    android:textColor="@color/text_secondary"
++                    android:textSize="14sp" />
++            </LinearLayout>
+         </LinearLayout>
+ 
+         <View
+@@ -202,16 +224,16 @@
+             <com.google.android.material.tabs.TabItem
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+-                android:text="Likes" />
++                android:text="Grid" />
+         </com.google.android.material.tabs.TabLayout>
+ 
+         <!-- RecyclerView for User Posts -->
+         <androidx.recyclerview.widget.RecyclerView
+             android:id="@+id/rvUserPosts"
+             android:layout_width="match_parent"
+-            android:layout_height="0dp"
++            android:layout_height="wrap_content"
++            android:nestedScrollingEnabled="false"
+             app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+-            app:layout_constraintBottom_toBottomOf="parent"
+             app:layout_constraintTop_toBottomOf="@id/tabLayout" />
+ 
+         <ProgressBar
+diff --git a/android/app/src/main/res/layout/item_profile_grid.xml b/android/app/src/main/res/layout/item_profile_grid.xml
+new file mode 100644
+index 0000000..700a73d
+--- /dev/null
++++ b/android/app/src/main/res/layout/item_profile_grid.xml
+@@ -0,0 +1,27 @@
++<?xml version="1.0" encoding="utf-8"?>
++<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="120dp"
++    android:layout_margin="1dp"
++    android:background="@color/background_card"
++    android:foreground="?attr/selectableItemBackground"
++    android:clickable="true"
++    android:focusable="true">
++
++    <ImageView
++        android:id="@+id/ivMedia"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent"
++        android:contentDescription="Post media"
++        android:scaleType="centerCrop" />
++
++    <TextView
++        android:id="@+id/tvTextPreview"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent"
++        android:gravity="center"
++        android:maxLines="5"
++        android:padding="10dp"
++        android:textColor="@color/text_white"
++        android:textSize="12sp" />
++</FrameLayout>
+diff --git a/android/app/src/main/res/values-night/colors.xml b/android/app/src/main/res/values-night/colors.xml
+new file mode 100644
+index 0000000..baad1d0
+--- /dev/null
++++ b/android/app/src/main/res/values-night/colors.xml
+@@ -0,0 +1,10 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <color name="background_dark">#0B0F19</color>
++    <color name="background_card">#151E2E</color>
++    <color name="background_card_light">#1E293B</color>
++    <color name="text_white">#FFFFFF</color>
++    <color name="text_secondary">#94A3B8</color>
++    <color name="text_muted">#64748B</color>
++    <color name="border_dark">#1E293B</color>
++</resources>
+diff --git a/android/app/src/main/res/values/colors.xml b/android/app/src/main/res/values/colors.xml
+index 7a7a584..fbd68cb 100644
+--- a/android/app/src/main/res/values/colors.xml
++++ b/android/app/src/main/res/values/colors.xml
+@@ -7,14 +7,14 @@
+     <color name="brand_emerald">#10B981</color>
+     <color name="error_red">#EF4444</color>
+ 
+-    <!-- Dark Palette Tokens -->
+-    <color name="background_dark">#0B0F19</color>
+-    <color name="background_card">#151E2E</color>
+-    <color name="background_card_light">#1E293B</color>
+-    <color name="text_white">#FFFFFF</color>
+-    <color name="text_secondary">#94A3B8</color>
++    <!-- Adaptive app tokens (light values; overridden in values-night) -->
++    <color name="background_dark">#F8FAFC</color>
++    <color name="background_card">#FFFFFF</color>
++    <color name="background_card_light">#E2E8F0</color>
++    <color name="text_white">#0F172A</color>
++    <color name="text_secondary">#475569</color>
+     <color name="text_muted">#64748B</color>
+-    <color name="border_dark">#1E293B</color>
++    <color name="border_dark">#E2E8F0</color>
+ 
+     <!-- Light Palette Tokens -->
+     <color name="background_light">#F8FAFC</color>
+diff --git a/android/app/src/test/java/com/nexa/social/ApiContractTest.kt b/android/app/src/test/java/com/nexa/social/ApiContractTest.kt
+index f705020..2522597 100644
+--- a/android/app/src/test/java/com/nexa/social/ApiContractTest.kt
++++ b/android/app/src/test/java/com/nexa/social/ApiContractTest.kt
+@@ -5,8 +5,10 @@ import com.nexa.social.data.api.AuthApi
+ import com.nexa.social.data.api.GroupApi
+ import com.nexa.social.data.api.MessageApi
+ import com.nexa.social.data.api.PostApi
++import com.nexa.social.data.api.SecurityApi
+ import com.nexa.social.data.api.UserApi
+ import com.nexa.social.data.models.CreatePostRequest
++import com.nexa.social.data.models.CreateReelRequest
+ import com.nexa.social.data.models.FcmTokenRequest
+ import com.nexa.social.data.models.ForgotPasswordRequest
+ import com.nexa.social.data.models.LoginRequest
+@@ -39,6 +41,7 @@ class ApiContractTest {
+     private lateinit var userApi: UserApi
+     private lateinit var groupApi: GroupApi
+     private lateinit var postApi: PostApi
++    private lateinit var securityApi: SecurityApi
+ 
+     @Before
+     fun setUp() {
+@@ -58,6 +61,7 @@ class ApiContractTest {
+         userApi = retrofit.create(UserApi::class.java)
+         groupApi = retrofit.create(GroupApi::class.java)
+         postApi = retrofit.create(PostApi::class.java)
++        securityApi = retrofit.create(SecurityApi::class.java)
+     }
+ 
+     @After
+@@ -341,4 +345,37 @@ class ApiContractTest {
+         assertTrue(response.isSuccessful)
+         assertEquals(2, response.body()?.data?.size)
+     }
++
++    @Test
++    fun `Bytes contracts use production reels routes`() = runBlocking {
++        mockServer.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json").setBody("""{"data":[]}"""))
++        val listResponse = postApi.getReels()
++        val listRequest = mockServer.takeRequest()
++        assertEquals("GET", listRequest.method)
++        assertTrue(listRequest.path?.startsWith("/reels") == true)
++        assertTrue(listResponse.isSuccessful)
++
++        mockServer.enqueue(MockResponse().setResponseCode(201).setHeader("Content-Type", "application/json").setBody("""
++            {"data":{"reelId":9,"userId":1,"videoUrl":"https://cdn.example/byte.mp4","caption":"Byte","author":{"userId":1,"username":"alice","displayName":"Alice"}}}
++        """.trimIndent()))
++        val createResponse = postApi.createReel(CreateReelRequest("https://cdn.example/byte.mp4", "Byte"))
++        val createRequest = mockServer.takeRequest()
++        assertEquals("POST", createRequest.method)
++        assertEquals("/reels", createRequest.path)
++        val json = JSONObject(createRequest.body.readUtf8())
++        assertEquals("https://cdn.example/byte.mp4", json.getString("videoUrl"))
++        assertTrue(createResponse.isSuccessful)
++    }
++
++    @Test
++    fun `profile posts and security settings routes match backend`() = runBlocking {
++        mockServer.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json").setBody("""{"data":[]}"""))
++        postApi.getUserPosts(42)
++        assertTrue(mockServer.takeRequest().path?.startsWith("/posts/user/42") == true)
++
++        mockServer.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json").setBody("""{"data":{"emailVerified":true,"mfaEnabled":true}}"""))
++        val status = securityApi.getStatus()
++        assertEquals("/security/status", mockServer.takeRequest().path)
++        assertEquals(true, status.body()?.data?.mfaEnabled)
++    }
+ }
+diff --git a/android/app/src/test/java/com/nexa/social/MediaValidatorTest.kt b/android/app/src/test/java/com/nexa/social/MediaValidatorTest.kt
+index 34b7de7..77f7f6b 100644
+--- a/android/app/src/test/java/com/nexa/social/MediaValidatorTest.kt
++++ b/android/app/src/test/java/com/nexa/social/MediaValidatorTest.kt
+@@ -1,5 +1,6 @@
+ package com.nexa.social
+ 
++import com.nexa.social.utils.MediaFilePreparer
+ import org.junit.Assert.assertEquals
+ import org.junit.Assert.assertNull
+ import org.junit.Test
+@@ -71,4 +72,13 @@ class MediaValidatorTest {
+         // Short bytes
+         assertNull(detectMimeType(byteArrayOf(0xFF.toByte(), 0xD8.toByte())))
+     }
++
++    @Test
++    fun `detects MP4 and WebM video signatures`() {
++        val mp4 = byteArrayOf(0, 0, 0, 24, 'f'.code.toByte(), 't'.code.toByte(), 'y'.code.toByte(), 'p'.code.toByte())
++        assertEquals("video/mp4", MediaFilePreparer.detectMimeType(mp4, "video/mp4"))
++
++        val webm = byteArrayOf(0x1A, 0x45, 0xDF.toByte(), 0xA3.toByte())
++        assertEquals("video/webm", MediaFilePreparer.detectMimeType(webm, "video/webm"))
++    }
+ }
+diff --git a/client/src/api/posts.api.ts b/client/src/api/posts.api.ts
+index 044a546..4053cec 100644
+--- a/client/src/api/posts.api.ts
++++ b/client/src/api/posts.api.ts
+@@ -19,6 +19,13 @@ export const postsApi = {
+     return res.data.data;
+   },
+ 
++  async getUserPosts(userId: number, cursor?: number): Promise<ApiResponse<Post[]>> {
++    const res = await api.get<ApiResponse<Post[]>>(`/posts/user/${userId}`, {
++      params: { cursor, limit: 50 }
++    });
++    return res.data;
++  },
++
+   async updatePost(id: number, data: { content?: string; tags?: string; collaborator?: string }): Promise<Post> {
+     const res = await api.put<ApiResponse<Post>>(`/posts/${id}`, data);
+     return res.data.data;
+diff --git a/client/src/pages/ProfilePage.tsx b/client/src/pages/ProfilePage.tsx
+index 38cd493..21687c2 100644
+--- a/client/src/pages/ProfilePage.tsx
++++ b/client/src/pages/ProfilePage.tsx
+@@ -31,7 +31,7 @@ export const ProfilePage: React.FC = () => {
+ 
+   const { data: postsRes, isLoading: isPostsLoading } = useQuery({
+     queryKey: ['user-posts', user?.userId],
+-    queryFn: () => postsApi.getFeed('global'),
++    queryFn: () => postsApi.getUserPosts(user!.userId),
+     enabled: !!user?.userId
+   });
+ 
+@@ -40,7 +40,7 @@ export const ProfilePage: React.FC = () => {
+     queryFn: () => socialApi.getReels()
+   });
+ 
+-  const userPosts = (postsRes?.data || []).filter((p) => p.userId === user?.userId);
++  const userPosts = postsRes?.data || [];
+   const userReels = reelsList.filter((r) => r.userId === user?.userId);
+ 
+   const handleProfileUpdated = (updatedUser: User) => {
+diff --git a/server/src/controllers/post.controller.ts b/server/src/controllers/post.controller.ts
+index 64f2279..4dd454a 100644
+--- a/server/src/controllers/post.controller.ts
++++ b/server/src/controllers/post.controller.ts
+@@ -77,6 +77,21 @@ export class PostController {
+     }
+   }
+ 
++  async getUserPosts(req: AuthenticatedRequest, res: Response, next: NextFunction) {
++    try {
++      const userId = Number(req.params.userId);
++      if (!Number.isInteger(userId) || userId <= 0) {
++        return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Valid user ID required', details: [] } });
++      }
++      const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
++      const limit = Math.min(Number(req.query.limit) || 20, 50);
++      const result = await postService.getUserPosts(userId, req.user?.userId, cursor, limit);
++      return sendSuccess(res, result.data, undefined, { nextCursor: result.nextCursor, hasMore: result.hasMore });
++    } catch (err) {
++      next(err);
++    }
++  }
++
+   async likePost(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+     try {
+       if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+diff --git a/server/src/routes/post.routes.ts b/server/src/routes/post.routes.ts
+index 81bd3e9..6d479d8 100644
+--- a/server/src/routes/post.routes.ts
++++ b/server/src/routes/post.routes.ts
+@@ -10,6 +10,7 @@ const controller = new PostController();
+ 
+ router.get('/feed', optionalAuth, (req, res, next) => controller.getFeed(req, res, next));
+ router.get('/bookmarks', requireAuth, (req, res, next) => controller.getUserBookmarks(req, res, next));
++router.get('/user/:userId', optionalAuth, (req, res, next) => controller.getUserPosts(req, res, next));
+ 
+ router.post('/create', requireAuth, validate(createPostSchema), (req, res, next) => controller.createPost(req, res, next));
+ router.get('/:id', optionalAuth, (req, res, next) => controller.getPostById(req, res, next));
+diff --git a/server/src/routes/security.routes.ts b/server/src/routes/security.routes.ts
+index db35e65..90a8a77 100644
+--- a/server/src/routes/security.routes.ts
++++ b/server/src/routes/security.routes.ts
+@@ -1,6 +1,6 @@
+ import { Router } from 'express';
+ import { requireAuth } from '../middleware/auth.middleware.js';
+-import { getSecurityRepository } from '../repositories/factory.js';
++import { getAuthRepository, getSecurityRepository } from '../repositories/factory.js';
+ import { getUserRepository } from '../repositories/factory.js';
+ import { comparePassword } from '../utils/hash.js';
+ import { sendSuccess } from '../utils/response.js';
+@@ -57,6 +57,21 @@ securityRouter.post('/mfa/confirm', requireAuth, async (req, res, next) => {
+   }
+ });
+ 
++securityRouter.post('/mfa/email', requireAuth, async (req, res, next) => {
++  try {
++    const authReq = req as AuthenticatedRequest;
++    const repo = getSecurityRepository();
++    const settings = await repo.getSecuritySettings(authReq.user!.userId);
++    if (!settings?.emailVerifiedAt) {
++      throw { statusCode: 409, code: 'EMAIL_NOT_VERIFIED', message: 'Verify your email before enabling email two-factor authentication' };
++    }
++    await repo.updateSecuritySettings(authReq.user!.userId, { mfaEnabled: true });
++    sendSuccess(res, { emailVerified: true, mfaEnabled: true, lastProtectionCheckAt: new Date().toISOString() });
++  } catch (err) {
++    next(err);
++  }
++});
++
+ securityRouter.delete('/mfa', requireAuth, async (req, res, next) => {
+   try {
+     const authReq = req as AuthenticatedRequest;
+@@ -79,13 +94,14 @@ securityRouter.get('/sessions', requireAuth, async (req, res, next) => {
+   }
+ });
+ 
+-securityRouter.delete('/sessions/:sessionId', requireAuth, async (req, res, next) => {
++securityRouter.delete('/sessions/all', requireAuth, async (req, res, next) => {
+   try {
+     const authReq = req as AuthenticatedRequest;
+-    const { sessionId } = req.params;
+-    const repo = getSecurityRepository();
+-    const success = await repo.revokeSession(sessionId, authReq.user!.userId);
+-    sendSuccess(res, { revoked: success });
++    await Promise.all([
++      getAuthRepository().revokeAllUserTokens(authReq.user!.userId),
++      getSecurityRepository().revokeOtherSessions(authReq.user!.userId, '')
++    ]);
++    sendSuccess(res, { revokedAll: true });
+   } catch (err) {
+     next(err);
+   }
+@@ -101,3 +117,15 @@ securityRouter.delete('/sessions/others', requireAuth, async (req, res, next) =>
+     next(err);
+   }
+ });
++
++securityRouter.delete('/sessions/:sessionId', requireAuth, async (req, res, next) => {
++  try {
++    const authReq = req as AuthenticatedRequest;
++    const { sessionId } = req.params;
++    const repo = getSecurityRepository();
++    const success = await repo.revokeSession(sessionId, authReq.user!.userId);
++    sendSuccess(res, { revoked: success });
++  } catch (err) {
++    next(err);
++  }
++});
+-- 
+2.51.1

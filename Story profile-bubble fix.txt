@@ -1,0 +1,250 @@
+From 4b0a04f27fd3e128a0a5a951d7a4a7c925ad825b Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 23 Aug 2026 11:06:03 +0200
+Subject: [PATCH] fix(android): merge own stories into profile bubble
+
+---
+ .../com/nexa/social/ui/StoryViewerActivity.kt | 56 ++++++++++++++-----
+ .../nexa/social/ui/adapters/StoryAdapter.kt   | 46 +++++++++++----
+ .../nexa/social/ui/fragments/HomeFragment.kt  |  6 +-
+ .../main/res/layout/activity_story_viewer.xml | 13 ++++-
+ 4 files changed, 93 insertions(+), 28 deletions(-)
+
+diff --git a/android/app/src/main/java/com/nexa/social/ui/StoryViewerActivity.kt b/android/app/src/main/java/com/nexa/social/ui/StoryViewerActivity.kt
+index f2a472b..3618461 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/StoryViewerActivity.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/StoryViewerActivity.kt
+@@ -14,44 +14,72 @@ import com.nexa.social.utils.MediaUrlResolver
+ 
+ class StoryViewerActivity : AppCompatActivity() {
+     private lateinit var binding: ActivityStoryViewerBinding
++    private var storyUrls: List<String> = emptyList()
++    private var storyCaptions: List<String> = emptyList()
++    private var currentStoryIndex = 0
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+         binding = ActivityStoryViewerBinding.inflate(layoutInflater)
+         setContentView(binding.root)
+ 
+-        val mediaUrl = intent.getStringExtra(EXTRA_MEDIA_URL)
+         val avatarUrl = intent.getStringExtra(EXTRA_AVATAR_URL)
+         val authorName = intent.getStringExtra(EXTRA_AUTHOR_NAME).orEmpty()
+-        val caption = intent.getStringExtra(EXTRA_CAPTION).orEmpty()
++        storyUrls = intent.getStringArrayListExtra(EXTRA_MEDIA_URLS).orEmpty().filter { it.isNotBlank() }
++        storyCaptions = intent.getStringArrayListExtra(EXTRA_CAPTIONS).orEmpty()
+ 
+-        binding.tvAuthorName.text = authorName
+-        binding.ivStoryMedia.load(MediaUrlResolver.resolve(mediaUrl)) {
+-            crossfade(true)
+-            error(R.drawable.ic_profile)
++        if (storyUrls.isEmpty()) {
++            finish()
++            return
+         }
++
++        binding.tvAuthorName.text = authorName
+         binding.ivAuthorAvatar.load(MediaUrlResolver.resolve(avatarUrl)) {
+             crossfade(true)
+             placeholder(R.drawable.ic_profile)
+             error(R.drawable.ic_profile)
+             transformations(CircleCropTransformation())
+         }
++        binding.btnClose.setOnClickListener { finish() }
++        binding.ivStoryMedia.setOnClickListener { showNextStory() }
++        renderStory()
++    }
++
++    private fun renderStory() {
++        val caption = storyCaptions.getOrNull(currentStoryIndex).orEmpty()
++        binding.ivStoryMedia.load(MediaUrlResolver.resolve(storyUrls[currentStoryIndex])) {
++            crossfade(true)
++            error(R.drawable.ic_profile)
++        }
+         binding.tvCaption.text = caption
+         binding.tvCaption.visibility = if (caption.isBlank()) View.GONE else View.VISIBLE
+-        binding.btnClose.setOnClickListener { finish() }
++        binding.tvStoryProgress.text = "${currentStoryIndex + 1} / ${storyUrls.size}"
++    }
++
++    private fun showNextStory() {
++        if (currentStoryIndex >= storyUrls.lastIndex) {
++            finish()
++            return
++        }
++        currentStoryIndex += 1
++        renderStory()
+     }
+ 
+     companion object {
+-        private const val EXTRA_MEDIA_URL = "storyMediaUrl"
++        private const val EXTRA_MEDIA_URLS = "storyMediaUrls"
+         private const val EXTRA_AVATAR_URL = "storyAvatarUrl"
+         private const val EXTRA_AUTHOR_NAME = "storyAuthorName"
+-        private const val EXTRA_CAPTION = "storyCaption"
++        private const val EXTRA_CAPTIONS = "storyCaptions"
+ 
+-        fun createIntent(context: Context, story: Story): Intent = Intent(context, StoryViewerActivity::class.java).apply {
+-            putExtra(EXTRA_MEDIA_URL, story.mediaUrl)
+-            putExtra(EXTRA_AVATAR_URL, story.author.profileImageUrl)
+-            putExtra(EXTRA_AUTHOR_NAME, story.author.displayName.ifBlank { "@${story.author.username}" })
+-            putExtra(EXTRA_CAPTION, story.caption)
++        fun createIntent(context: Context, stories: List<Story>): Intent {
++            require(stories.isNotEmpty()) { "At least one story is required" }
++            val author = stories.first().author
++            return Intent(context, StoryViewerActivity::class.java).apply {
++                putStringArrayListExtra(EXTRA_MEDIA_URLS, ArrayList(stories.map { it.mediaUrl }))
++                putStringArrayListExtra(EXTRA_CAPTIONS, ArrayList(stories.map { it.caption.orEmpty() }))
++                putExtra(EXTRA_AVATAR_URL, author.profileImageUrl)
++                putExtra(EXTRA_AUTHOR_NAME, author.displayName.ifBlank { "@${author.username}" })
++            }
+         }
+     }
+ }
+diff --git a/android/app/src/main/java/com/nexa/social/ui/adapters/StoryAdapter.kt b/android/app/src/main/java/com/nexa/social/ui/adapters/StoryAdapter.kt
+index 5b7388f..d727d1c 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/adapters/StoryAdapter.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/adapters/StoryAdapter.kt
+@@ -12,24 +12,36 @@ import com.nexa.social.databinding.ItemStoryBinding
+ import com.nexa.social.utils.MediaUrlResolver
+ 
+ class StoryAdapter(
++    private val currentUserId: Int,
+     private val onAddStory: () -> Unit,
+-    private val onStoryClick: (Story) -> Unit
++    private val onStoryClick: (List<Story>) -> Unit
+ ) : RecyclerView.Adapter<StoryAdapter.StoryViewHolder>() {
+ 
+-    private var stories: List<Story> = emptyList()
++    private var ownStories: List<Story> = emptyList()
++    private var storyGroups: List<List<Story>> = emptyList()
+ 
+     init {
+         setHasStableIds(true)
+     }
+ 
+     fun submitStories(items: List<Story>) {
+-        stories = items
++        val groupedStories = items
++            .groupBy { it.userId }
++            .values
++            .map { group -> group.sortedBy { it.createdAt.orEmpty() } }
++
++        ownStories = groupedStories.firstOrNull { it.firstOrNull()?.userId == currentUserId }.orEmpty()
++        storyGroups = groupedStories.filterNot { it.firstOrNull()?.userId == currentUserId }
+         notifyDataSetChanged()
+     }
+ 
+-    override fun getItemCount(): Int = stories.size + 1
++    override fun getItemCount(): Int = storyGroups.size + 1
+ 
+-    override fun getItemId(position: Int): Long = if (position == 0) Long.MIN_VALUE else stories[position - 1].storyId.toLong()
++    override fun getItemId(position: Int): Long = if (position == 0) {
++        Long.MIN_VALUE
++    } else {
++        storyGroups[position - 1].first().userId.toLong()
++    }
+ 
+     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): StoryViewHolder {
+         val binding = ItemStoryBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+@@ -37,18 +49,29 @@ class StoryAdapter(
+     }
+ 
+     override fun onBindViewHolder(holder: StoryViewHolder, position: Int) {
+-        if (position == 0) holder.bindAdd() else holder.bindStory(stories[position - 1])
++        if (position == 0) holder.bindYourStory(ownStories) else holder.bindStoryGroup(storyGroups[position - 1])
+     }
+ 
+     inner class StoryViewHolder(private val binding: ItemStoryBinding) : RecyclerView.ViewHolder(binding.root) {
+-        fun bindAdd() {
++        fun bindYourStory(stories: List<Story>) {
+             binding.tvStoryUsername.text = "Your story"
+             binding.tvAddBadge.visibility = View.VISIBLE
+-            binding.ivStoryAvatar.setImageResource(R.drawable.ic_profile)
+-            binding.root.setOnClickListener { onAddStory() }
++            val ownStory = stories.lastOrNull()
++            val avatarUrl = MediaUrlResolver.resolve(ownStory?.author?.profileImageUrl)
++            binding.ivStoryAvatar.load(avatarUrl) {
++                crossfade(true)
++                placeholder(R.drawable.ic_profile)
++                error(R.drawable.ic_profile)
++                transformations(CircleCropTransformation())
++            }
++            binding.tvAddBadge.setOnClickListener { onAddStory() }
++            binding.root.setOnClickListener {
++                if (stories.isEmpty()) onAddStory() else onStoryClick(stories)
++            }
+         }
+ 
+-        fun bindStory(story: Story) {
++        fun bindStoryGroup(stories: List<Story>) {
++            val story = stories.first()
+             binding.tvStoryUsername.text = story.author.username
+             binding.tvAddBadge.visibility = View.GONE
+             val previewUrl = MediaUrlResolver.resolve(story.author.profileImageUrl ?: story.mediaUrl)
+@@ -58,7 +81,8 @@ class StoryAdapter(
+                 error(R.drawable.ic_profile)
+                 transformations(CircleCropTransformation())
+             }
+-            binding.root.setOnClickListener { onStoryClick(story) }
++            binding.tvAddBadge.setOnClickListener(null)
++            binding.root.setOnClickListener { onStoryClick(stories) }
+         }
+     }
+ }
+diff --git a/android/app/src/main/java/com/nexa/social/ui/fragments/HomeFragment.kt b/android/app/src/main/java/com/nexa/social/ui/fragments/HomeFragment.kt
+index 12b9fa1..c6b5eba 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/fragments/HomeFragment.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/fragments/HomeFragment.kt
+@@ -18,6 +18,7 @@ import com.nexa.social.ui.adapters.StoryAdapter
+ import com.nexa.social.data.repository.StoryRepository
+ import com.nexa.social.ui.CreateStoryActivity
+ import com.nexa.social.ui.StoryViewerActivity
++import com.nexa.social.utils.PreferenceManager
+ import com.nexa.social.ui.viewmodels.HomeUiState
+ import com.nexa.social.ui.viewmodels.HomeViewModel
+ import kotlinx.coroutines.launch
+@@ -51,11 +52,12 @@ class HomeFragment : Fragment() {
+ 
+     private fun setupStories() {
+         storyAdapter = StoryAdapter(
++            currentUserId = PreferenceManager(requireContext()).userId,
+             onAddStory = {
+                 createStoryLauncher.launch(Intent(requireContext(), CreateStoryActivity::class.java))
+             },
+-            onStoryClick = { story ->
+-                startActivity(StoryViewerActivity.createIntent(requireContext(), story))
++            onStoryClick = { stories ->
++                startActivity(StoryViewerActivity.createIntent(requireContext(), stories))
+             }
+         )
+         binding.rvStories.adapter = storyAdapter
+diff --git a/android/app/src/main/res/layout/activity_story_viewer.xml b/android/app/src/main/res/layout/activity_story_viewer.xml
+index 33671f7..b8025d1 100644
+--- a/android/app/src/main/res/layout/activity_story_viewer.xml
++++ b/android/app/src/main/res/layout/activity_story_viewer.xml
+@@ -48,10 +48,21 @@
+         android:textSize="15sp"
+         android:textStyle="bold"
+         app:layout_constraintBottom_toBottomOf="@id/ivAuthorAvatar"
+-        app:layout_constraintEnd_toStartOf="@id/btnClose"
++        app:layout_constraintEnd_toStartOf="@id/tvStoryProgress"
+         app:layout_constraintStart_toEndOf="@id/ivAuthorAvatar"
+         app:layout_constraintTop_toTopOf="@id/ivAuthorAvatar" />
+ 
++    <TextView
++        android:id="@+id/tvStoryProgress"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginEnd="8dp"
++        android:textColor="@android:color/white"
++        android:textSize="12sp"
++        app:layout_constraintBottom_toBottomOf="@id/ivAuthorAvatar"
++        app:layout_constraintEnd_toStartOf="@id/btnClose"
++        app:layout_constraintTop_toTopOf="@id/ivAuthorAvatar" />
++
+     <ImageButton
+         android:id="@+id/btnClose"
+         android:layout_width="48dp"
+-- 
+2.51.1

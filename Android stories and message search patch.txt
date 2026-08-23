@@ -1,0 +1,1087 @@
+From fb203057c10db76d33d83862a15e1f51651ce782 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 23 Aug 2026 10:37:32 +0200
+Subject: [PATCH] feat(android): add stories tray and message search
+
+---
+ android/app/src/main/AndroidManifest.xml      |   9 ++
+ .../java/com/nexa/social/NexaApiClient.kt     |   2 +
+ .../java/com/nexa/social/data/api/StoryApi.kt |  22 +++
+ .../com/nexa/social/data/models/Models.kt     |  15 ++
+ .../social/data/repository/StoryRepository.kt |  25 ++++
+ .../com/nexa/social/ui/CreateStoryActivity.kt |  94 +++++++++++++
+ .../com/nexa/social/ui/StoryViewerActivity.kt |  57 ++++++++
+ .../nexa/social/ui/adapters/StoryAdapter.kt   |  64 +++++++++
+ .../nexa/social/ui/fragments/HomeFragment.kt  |  41 ++++++
+ .../social/ui/fragments/MessagesFragment.kt   | 113 +++++++++++++--
+ .../main/res/drawable/bg_story_add_badge.xml  |   5 +
+ .../main/res/layout/activity_create_story.xml | 131 ++++++++++++++++++
+ .../main/res/layout/activity_story_viewer.xml |  83 +++++++++++
+ .../app/src/main/res/layout/fragment_home.xml |  32 ++++-
+ .../src/main/res/layout/fragment_messages.xml |  61 +++++++-
+ .../app/src/main/res/layout/item_story.xml    |  54 ++++++++
+ 16 files changed, 786 insertions(+), 22 deletions(-)
+ create mode 100644 android/app/src/main/java/com/nexa/social/data/api/StoryApi.kt
+ create mode 100644 android/app/src/main/java/com/nexa/social/data/repository/StoryRepository.kt
+ create mode 100644 android/app/src/main/java/com/nexa/social/ui/CreateStoryActivity.kt
+ create mode 100644 android/app/src/main/java/com/nexa/social/ui/StoryViewerActivity.kt
+ create mode 100644 android/app/src/main/java/com/nexa/social/ui/adapters/StoryAdapter.kt
+ create mode 100644 android/app/src/main/res/drawable/bg_story_add_badge.xml
+ create mode 100644 android/app/src/main/res/layout/activity_create_story.xml
+ create mode 100644 android/app/src/main/res/layout/activity_story_viewer.xml
+ create mode 100644 android/app/src/main/res/layout/item_story.xml
+
+diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
+index 4fd8c5f..fd31f71 100644
+--- a/android/app/src/main/AndroidManifest.xml
++++ b/android/app/src/main/AndroidManifest.xml
+@@ -108,6 +108,15 @@
+             android:exported="false"
+             android:windowSoftInputMode="adjustResize" />
+ 
++        <activity
++            android:name=".ui.CreateStoryActivity"
++            android:exported="false"
++            android:windowSoftInputMode="adjustResize" />
++
++        <activity
++            android:name=".ui.StoryViewerActivity"
++            android:exported="false" />
++
+         <activity
+             android:name=".ui.SettingsActivity"
+             android:exported="false" />
+diff --git a/android/app/src/main/java/com/nexa/social/NexaApiClient.kt b/android/app/src/main/java/com/nexa/social/NexaApiClient.kt
+index a2aeb05..67453f3 100644
+--- a/android/app/src/main/java/com/nexa/social/NexaApiClient.kt
++++ b/android/app/src/main/java/com/nexa/social/NexaApiClient.kt
+@@ -7,6 +7,7 @@ import com.nexa.social.data.api.GroupApi
+ import com.nexa.social.data.api.MessageApi
+ import com.nexa.social.data.api.PostApi
+ import com.nexa.social.data.api.SecurityApi
++import com.nexa.social.data.api.StoryApi
+ import com.nexa.social.data.api.TokenAuthenticator
+ import com.nexa.social.data.api.UserApi
+ import com.nexa.social.utils.TokenManager
+@@ -88,4 +89,5 @@ object NexaApiClient {
+     val groupApi: GroupApi by lazy { retrofit.create(GroupApi::class.java) }
+     val userApi: UserApi by lazy { retrofit.create(UserApi::class.java) }
+     val securityApi: SecurityApi by lazy { retrofit.create(SecurityApi::class.java) }
++    val storyApi: StoryApi by lazy { retrofit.create(StoryApi::class.java) }
+ }
+diff --git a/android/app/src/main/java/com/nexa/social/data/api/StoryApi.kt b/android/app/src/main/java/com/nexa/social/data/api/StoryApi.kt
+new file mode 100644
+index 0000000..23cde94
+--- /dev/null
++++ b/android/app/src/main/java/com/nexa/social/data/api/StoryApi.kt
+@@ -0,0 +1,22 @@
++package com.nexa.social.data.api
++
++import com.nexa.social.data.models.ApiResponse
++import com.nexa.social.data.models.CreateStoryRequest
++import com.nexa.social.data.models.Story
++import retrofit2.Response
++import retrofit2.http.Body
++import retrofit2.http.DELETE
++import retrofit2.http.GET
++import retrofit2.http.POST
++import retrofit2.http.Path
++
++interface StoryApi {
++    @GET("stories/feed")
++    suspend fun getFeed(): Response<ApiResponse<List<Story>>>
++
++    @POST("stories")
++    suspend fun createStory(@Body request: CreateStoryRequest): Response<ApiResponse<Story>>
++
++    @DELETE("stories/{id}")
++    suspend fun deleteStory(@Path("id") storyId: Int): Response<ApiResponse<Map<String, Any>>>
++}
+diff --git a/android/app/src/main/java/com/nexa/social/data/models/Models.kt b/android/app/src/main/java/com/nexa/social/data/models/Models.kt
+index 502d626..736fe4b 100644
+--- a/android/app/src/main/java/com/nexa/social/data/models/Models.kt
++++ b/android/app/src/main/java/com/nexa/social/data/models/Models.kt
+@@ -111,6 +111,21 @@ data class Reel(
+     @SerializedName("createdAt") val createdAt: String?
+ )
+ 
++data class Story(
++    @SerializedName("storyId") val storyId: Int,
++    @SerializedName("userId") val userId: Int,
++    @SerializedName("author") val author: User,
++    @SerializedName("mediaUrl") val mediaUrl: String,
++    @SerializedName("caption") val caption: String?,
++    @SerializedName("createdAt") val createdAt: String?,
++    @SerializedName("expiresAt") val expiresAt: String?
++)
++
++data class CreateStoryRequest(
++    @SerializedName("mediaUrl") val mediaUrl: String,
++    @SerializedName("caption") val caption: String? = null
++)
++
+ data class Message(
+     @SerializedName("messageId") val messageId: Int,
+     @SerializedName("senderId") val senderId: Int,
+diff --git a/android/app/src/main/java/com/nexa/social/data/repository/StoryRepository.kt b/android/app/src/main/java/com/nexa/social/data/repository/StoryRepository.kt
+new file mode 100644
+index 0000000..7735379
+--- /dev/null
++++ b/android/app/src/main/java/com/nexa/social/data/repository/StoryRepository.kt
+@@ -0,0 +1,25 @@
++package com.nexa.social.data.repository
++
++import com.nexa.social.NexaApiClient
++import com.nexa.social.data.models.CreateStoryRequest
++import com.nexa.social.data.models.Story
++
++class StoryRepository {
++    suspend fun getFeed(): Result<List<Story>> = runCatching {
++        val response = NexaApiClient.storyApi.getFeed()
++        val body = response.body()
++        if (!response.isSuccessful) {
++            throw IllegalStateException(body?.error?.message ?: body?.message ?: "Unable to load stories")
++        }
++        body?.data ?: throw IllegalStateException(body?.error?.message ?: body?.message ?: "Stories response was empty")
++    }
++
++    suspend fun createStory(mediaUrl: String, caption: String?): Result<Story> = runCatching {
++        val response = NexaApiClient.storyApi.createStory(CreateStoryRequest(mediaUrl, caption))
++        val body = response.body()
++        if (!response.isSuccessful) {
++            throw IllegalStateException(body?.error?.message ?: body?.message ?: "Unable to publish story")
++        }
++        body?.data ?: throw IllegalStateException(body?.error?.message ?: body?.message ?: "Story response was empty")
++    }
++}
+diff --git a/android/app/src/main/java/com/nexa/social/ui/CreateStoryActivity.kt b/android/app/src/main/java/com/nexa/social/ui/CreateStoryActivity.kt
+new file mode 100644
+index 0000000..568c902
+--- /dev/null
++++ b/android/app/src/main/java/com/nexa/social/ui/CreateStoryActivity.kt
+@@ -0,0 +1,94 @@
++package com.nexa.social.ui
++
++import android.net.Uri
++import android.os.Bundle
++import android.view.View
++import android.widget.Toast
++import androidx.activity.result.PickVisualMediaRequest
++import androidx.activity.result.contract.ActivityResultContracts
++import androidx.appcompat.app.AppCompatActivity
++import androidx.lifecycle.lifecycleScope
++import com.nexa.social.NexaApiClient
++import com.nexa.social.data.repository.StoryRepository
++import com.nexa.social.databinding.ActivityCreateStoryBinding
++import com.nexa.social.utils.MediaFilePreparer
++import kotlinx.coroutines.launch
++import okhttp3.MediaType.Companion.toMediaTypeOrNull
++import okhttp3.MultipartBody
++import okhttp3.RequestBody.Companion.asRequestBody
++import okhttp3.RequestBody.Companion.toRequestBody
++
++class CreateStoryActivity : AppCompatActivity() {
++    private lateinit var binding: ActivityCreateStoryBinding
++    private val storyRepository = StoryRepository()
++    private var selectedPhotoUri: Uri? = null
++
++    private val photoPicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
++        if (uri != null) {
++            selectedPhotoUri = uri
++            binding.ivPreview.setImageURI(uri)
++            binding.ivPreview.visibility = View.VISIBLE
++            binding.tvPhotoHelp.visibility = View.GONE
++        }
++    }
++
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++        binding = ActivityCreateStoryBinding.inflate(layoutInflater)
++        setContentView(binding.root)
++
++        binding.btnClose.setOnClickListener { finish() }
++        binding.btnChoosePhoto.setOnClickListener {
++            photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
++        }
++        binding.btnPublish.setOnClickListener { publishStory() }
++    }
++
++    private fun publishStory() {
++        val uri = selectedPhotoUri
++        if (uri == null) {
++            Toast.makeText(this, "Choose a photo first", Toast.LENGTH_SHORT).show()
++            return
++        }
++
++        setLoading(true)
++        lifecycleScope.launch {
++            var prepared: MediaFilePreparer.PreparedMedia? = null
++            try {
++                prepared = MediaFilePreparer.prepare(
++                    context = this@CreateStoryActivity,
++                    uri = uri,
++                    kind = MediaFilePreparer.Kind.IMAGE,
++                    maxBytes = 20L * 1024L * 1024L
++                ).getOrElse { throw it }
++
++                val fileBody = prepared.file.asRequestBody(prepared.mimeType.toMediaTypeOrNull())
++                val filePart = MultipartBody.Part.createFormData("file", prepared.file.name, fileBody)
++                val kindPart = "story".toRequestBody("text/plain".toMediaTypeOrNull())
++                val upload = NexaApiClient.postApi.uploadMedia(filePart, kindPart)
++                val publicUrl = upload.body()?.data?.publicUrl
++                if (!upload.isSuccessful || publicUrl.isNullOrBlank()) {
++                    throw IllegalStateException(upload.body()?.error?.message ?: "Story upload failed (${upload.code()})")
++                }
++
++                val caption = binding.etCaption.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
++                storyRepository.createStory(publicUrl, caption).getOrElse { throw it }
++                Toast.makeText(this@CreateStoryActivity, "Story shared", Toast.LENGTH_SHORT).show()
++                setResult(RESULT_OK)
++                finish()
++            } catch (error: Exception) {
++                Toast.makeText(this@CreateStoryActivity, error.message ?: "Unable to share story", Toast.LENGTH_LONG).show()
++            } finally {
++                prepared?.file?.delete()
++                setLoading(false)
++            }
++        }
++    }
++
++    private fun setLoading(loading: Boolean) {
++        binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
++        binding.btnClose.isEnabled = !loading
++        binding.btnChoosePhoto.isEnabled = !loading
++        binding.btnPublish.isEnabled = !loading
++    }
++}
+diff --git a/android/app/src/main/java/com/nexa/social/ui/StoryViewerActivity.kt b/android/app/src/main/java/com/nexa/social/ui/StoryViewerActivity.kt
+new file mode 100644
+index 0000000..f2a472b
+--- /dev/null
++++ b/android/app/src/main/java/com/nexa/social/ui/StoryViewerActivity.kt
+@@ -0,0 +1,57 @@
++package com.nexa.social.ui
++
++import android.content.Context
++import android.content.Intent
++import android.os.Bundle
++import android.view.View
++import androidx.appcompat.app.AppCompatActivity
++import coil.load
++import coil.transform.CircleCropTransformation
++import com.nexa.social.R
++import com.nexa.social.data.models.Story
++import com.nexa.social.databinding.ActivityStoryViewerBinding
++import com.nexa.social.utils.MediaUrlResolver
++
++class StoryViewerActivity : AppCompatActivity() {
++    private lateinit var binding: ActivityStoryViewerBinding
++
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++        binding = ActivityStoryViewerBinding.inflate(layoutInflater)
++        setContentView(binding.root)
++
++        val mediaUrl = intent.getStringExtra(EXTRA_MEDIA_URL)
++        val avatarUrl = intent.getStringExtra(EXTRA_AVATAR_URL)
++        val authorName = intent.getStringExtra(EXTRA_AUTHOR_NAME).orEmpty()
++        val caption = intent.getStringExtra(EXTRA_CAPTION).orEmpty()
++
++        binding.tvAuthorName.text = authorName
++        binding.ivStoryMedia.load(MediaUrlResolver.resolve(mediaUrl)) {
++            crossfade(true)
++            error(R.drawable.ic_profile)
++        }
++        binding.ivAuthorAvatar.load(MediaUrlResolver.resolve(avatarUrl)) {
++            crossfade(true)
++            placeholder(R.drawable.ic_profile)
++            error(R.drawable.ic_profile)
++            transformations(CircleCropTransformation())
++        }
++        binding.tvCaption.text = caption
++        binding.tvCaption.visibility = if (caption.isBlank()) View.GONE else View.VISIBLE
++        binding.btnClose.setOnClickListener { finish() }
++    }
++
++    companion object {
++        private const val EXTRA_MEDIA_URL = "storyMediaUrl"
++        private const val EXTRA_AVATAR_URL = "storyAvatarUrl"
++        private const val EXTRA_AUTHOR_NAME = "storyAuthorName"
++        private const val EXTRA_CAPTION = "storyCaption"
++
++        fun createIntent(context: Context, story: Story): Intent = Intent(context, StoryViewerActivity::class.java).apply {
++            putExtra(EXTRA_MEDIA_URL, story.mediaUrl)
++            putExtra(EXTRA_AVATAR_URL, story.author.profileImageUrl)
++            putExtra(EXTRA_AUTHOR_NAME, story.author.displayName.ifBlank { "@${story.author.username}" })
++            putExtra(EXTRA_CAPTION, story.caption)
++        }
++    }
++}
+diff --git a/android/app/src/main/java/com/nexa/social/ui/adapters/StoryAdapter.kt b/android/app/src/main/java/com/nexa/social/ui/adapters/StoryAdapter.kt
+new file mode 100644
+index 0000000..5b7388f
+--- /dev/null
++++ b/android/app/src/main/java/com/nexa/social/ui/adapters/StoryAdapter.kt
+@@ -0,0 +1,64 @@
++package com.nexa.social.ui.adapters
++
++import android.view.LayoutInflater
++import android.view.View
++import android.view.ViewGroup
++import androidx.recyclerview.widget.RecyclerView
++import coil.load
++import coil.transform.CircleCropTransformation
++import com.nexa.social.R
++import com.nexa.social.data.models.Story
++import com.nexa.social.databinding.ItemStoryBinding
++import com.nexa.social.utils.MediaUrlResolver
++
++class StoryAdapter(
++    private val onAddStory: () -> Unit,
++    private val onStoryClick: (Story) -> Unit
++) : RecyclerView.Adapter<StoryAdapter.StoryViewHolder>() {
++
++    private var stories: List<Story> = emptyList()
++
++    init {
++        setHasStableIds(true)
++    }
++
++    fun submitStories(items: List<Story>) {
++        stories = items
++        notifyDataSetChanged()
++    }
++
++    override fun getItemCount(): Int = stories.size + 1
++
++    override fun getItemId(position: Int): Long = if (position == 0) Long.MIN_VALUE else stories[position - 1].storyId.toLong()
++
++    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): StoryViewHolder {
++        val binding = ItemStoryBinding.inflate(LayoutInflater.from(parent.context), parent, false)
++        return StoryViewHolder(binding)
++    }
++
++    override fun onBindViewHolder(holder: StoryViewHolder, position: Int) {
++        if (position == 0) holder.bindAdd() else holder.bindStory(stories[position - 1])
++    }
++
++    inner class StoryViewHolder(private val binding: ItemStoryBinding) : RecyclerView.ViewHolder(binding.root) {
++        fun bindAdd() {
++            binding.tvStoryUsername.text = "Your story"
++            binding.tvAddBadge.visibility = View.VISIBLE
++            binding.ivStoryAvatar.setImageResource(R.drawable.ic_profile)
++            binding.root.setOnClickListener { onAddStory() }
++        }
++
++        fun bindStory(story: Story) {
++            binding.tvStoryUsername.text = story.author.username
++            binding.tvAddBadge.visibility = View.GONE
++            val previewUrl = MediaUrlResolver.resolve(story.author.profileImageUrl ?: story.mediaUrl)
++            binding.ivStoryAvatar.load(previewUrl) {
++                crossfade(true)
++                placeholder(R.drawable.ic_profile)
++                error(R.drawable.ic_profile)
++                transformations(CircleCropTransformation())
++            }
++            binding.root.setOnClickListener { onStoryClick(story) }
++        }
++    }
++}
+diff --git a/android/app/src/main/java/com/nexa/social/ui/fragments/HomeFragment.kt b/android/app/src/main/java/com/nexa/social/ui/fragments/HomeFragment.kt
+index ac276cb..12b9fa1 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/fragments/HomeFragment.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/fragments/HomeFragment.kt
+@@ -1,5 +1,6 @@
+ package com.nexa.social.ui.fragments
+ 
++import android.content.Intent
+ import android.os.Bundle
+ import android.view.LayoutInflater
+ import android.view.View
+@@ -7,11 +8,16 @@ import android.view.ViewGroup
+ import android.widget.Toast
+ import androidx.fragment.app.Fragment
+ import androidx.fragment.app.activityViewModels
++import androidx.activity.result.contract.ActivityResultContracts
+ import androidx.lifecycle.lifecycleScope
+ import androidx.navigation.fragment.findNavController
+ import com.nexa.social.R
+ import com.nexa.social.databinding.FragmentHomeBinding
+ import com.nexa.social.ui.adapters.PostAdapter
++import com.nexa.social.ui.adapters.StoryAdapter
++import com.nexa.social.data.repository.StoryRepository
++import com.nexa.social.ui.CreateStoryActivity
++import com.nexa.social.ui.StoryViewerActivity
+ import com.nexa.social.ui.viewmodels.HomeUiState
+ import com.nexa.social.ui.viewmodels.HomeViewModel
+ import kotlinx.coroutines.launch
+@@ -21,6 +27,14 @@ class HomeFragment : Fragment() {
+     private val binding get() = _binding!!
+     private val viewModel: HomeViewModel by activityViewModels()
+     private lateinit var postAdapter: PostAdapter
++    private lateinit var storyAdapter: StoryAdapter
++    private val storyRepository = StoryRepository()
++
++    private val createStoryLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
++        if (result.resultCode == android.app.Activity.RESULT_OK && _binding != null) {
++            loadStories()
++        }
++    }
+ 
+     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+         _binding = FragmentHomeBinding.inflate(inflater, container, false)
+@@ -30,10 +44,35 @@ class HomeFragment : Fragment() {
+     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+         super.onViewCreated(view, savedInstanceState)
+         setupRecyclerView()
++        setupStories()
+         setupSwipeRefresh()
+         observeViewModel()
+     }
+ 
++    private fun setupStories() {
++        storyAdapter = StoryAdapter(
++            onAddStory = {
++                createStoryLauncher.launch(Intent(requireContext(), CreateStoryActivity::class.java))
++            },
++            onStoryClick = { story ->
++                startActivity(StoryViewerActivity.createIntent(requireContext(), story))
++            }
++        )
++        binding.rvStories.adapter = storyAdapter
++    }
++
++    private fun loadStories() {
++        viewLifecycleOwner.lifecycleScope.launch {
++            storyRepository.getFeed()
++                .onSuccess { storyAdapter.submitStories(it) }
++                .onFailure {
++                    if (storyAdapter.itemCount <= 1) {
++                        Toast.makeText(requireContext(), "Stories are temporarily unavailable", Toast.LENGTH_SHORT).show()
++                    }
++                }
++        }
++    }
++
+     private fun setupRecyclerView() {
+         postAdapter = PostAdapter(
+             onLikeClick = { post ->
+@@ -71,6 +110,7 @@ class HomeFragment : Fragment() {
+     private fun setupSwipeRefresh() {
+         binding.swipeRefresh.setOnRefreshListener {
+             viewModel.loadFeed(isRefresh = true)
++            loadStories()
+         }
+     }
+ 
+@@ -112,6 +152,7 @@ class HomeFragment : Fragment() {
+     override fun onResume() {
+         super.onResume()
+         viewModel.loadFeed(isRefresh = true)
++        loadStories()
+     }
+ 
+     override fun onDestroyView() {
+diff --git a/android/app/src/main/java/com/nexa/social/ui/fragments/MessagesFragment.kt b/android/app/src/main/java/com/nexa/social/ui/fragments/MessagesFragment.kt
+index 8ea7c62..450d2e2 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/fragments/MessagesFragment.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/fragments/MessagesFragment.kt
+@@ -2,6 +2,8 @@ package com.nexa.social.ui.fragments
+ 
+ import android.content.Intent
+ import android.os.Bundle
++import android.text.Editable
++import android.text.TextWatcher
+ import android.view.LayoutInflater
+ import android.view.View
+ import android.view.ViewGroup
+@@ -11,8 +13,13 @@ import androidx.lifecycle.lifecycleScope
+ import com.nexa.social.databinding.FragmentMessagesBinding
+ import com.nexa.social.ui.ChatActivity
+ import com.nexa.social.ui.adapters.ConversationAdapter
++import com.nexa.social.ui.adapters.UserAdapter
+ import com.nexa.social.ui.viewmodels.MessagesUiState
+ import com.nexa.social.ui.viewmodels.MessagesViewModel
++import com.nexa.social.data.models.Conversation
++import com.nexa.social.data.repository.UserRepository
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.delay
+ import kotlinx.coroutines.launch
+ 
+ class MessagesFragment : Fragment() {
+@@ -20,6 +27,10 @@ class MessagesFragment : Fragment() {
+     private val binding get() = _binding!!
+     private val viewModel: MessagesViewModel by viewModels()
+     private lateinit var conversationAdapter: ConversationAdapter
++    private lateinit var userAdapter: UserAdapter
++    private val userRepository = UserRepository()
++    private var allConversations: List<Conversation> = emptyList()
++    private var searchJob: Job? = null
+ 
+     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+         _binding = FragmentMessagesBinding.inflate(inflater, container, false)
+@@ -29,29 +40,101 @@ class MessagesFragment : Fragment() {
+     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+         super.onViewCreated(view, savedInstanceState)
+         setupRecyclerView()
++        setupSearch()
+         setupSwipeRefresh()
+         observeViewModel()
+     }
+ 
+     private fun setupRecyclerView() {
+         conversationAdapter = ConversationAdapter { conversation ->
+-            if (conversation.otherUserId > 0) {
+-                val intent = Intent(context, ChatActivity::class.java).apply {
+-                    putExtra(ChatActivity.EXTRA_TARGET_ID, conversation.otherUserId)
+-                    val targetName = if (conversation.displayName.isNotBlank()) conversation.displayName else conversation.username
+-                    putExtra(ChatActivity.EXTRA_TARGET_NAME, targetName)
+-                    putExtra(ChatActivity.EXTRA_CHAT_TYPE, "direct")
+-                    // Backward-compatible extras
+-                    putExtra("userId", conversation.otherUserId)
+-                    putExtra("username", conversation.username)
+-                    putExtra("displayName", conversation.displayName)
+-                }
+-                startActivity(intent)
+-            }
++            openDirectChat(conversation.otherUserId, conversation.username, conversation.displayName)
+         }
++        userAdapter = UserAdapter { user -> openDirectChat(user.userId, user.username, user.displayName) }
+         binding.rvConversations.adapter = conversationAdapter
+     }
+ 
++    private fun setupSearch() {
++        binding.etSearch.addTextChangedListener(object : TextWatcher {
++            override fun beforeTextChanged(text: CharSequence?, start: Int, count: Int, after: Int) = Unit
++            override fun onTextChanged(text: CharSequence?, start: Int, before: Int, count: Int) {
++                applySearch(text?.toString().orEmpty())
++            }
++            override fun afterTextChanged(text: Editable?) = Unit
++        })
++    }
++
++    private fun applySearch(rawQuery: String) {
++        val query = rawQuery.trim()
++        searchJob?.cancel()
++
++        if (query.isEmpty()) {
++            binding.progressBar.visibility = View.GONE
++            binding.tvError.visibility = View.GONE
++            binding.tvSearchMode.text = "Conversations"
++            binding.rvConversations.adapter = conversationAdapter
++            conversationAdapter.submitList(allConversations)
++            return
++        }
++
++        val matchingConversations = allConversations.filter { conversation ->
++            conversation.displayName.contains(query, ignoreCase = true) ||
++                conversation.username.contains(query, ignoreCase = true) ||
++                conversation.lastMessage.contains(query, ignoreCase = true)
++        }
++
++        if (matchingConversations.isNotEmpty()) {
++            binding.progressBar.visibility = View.GONE
++            binding.tvError.visibility = View.GONE
++            binding.tvSearchMode.text = "Matching conversations"
++            binding.rvConversations.adapter = conversationAdapter
++            conversationAdapter.submitList(matchingConversations)
++            return
++        }
++
++        if (query.length < 2) {
++            binding.progressBar.visibility = View.GONE
++            binding.tvSearchMode.text = "Search accounts"
++            binding.rvConversations.adapter = userAdapter
++            userAdapter.submitList(emptyList())
++            binding.tvError.visibility = View.VISIBLE
++            binding.tvError.text = "Type at least 2 characters to find an account"
++            return
++        }
++
++        binding.tvSearchMode.text = "Searching accounts"
++        binding.progressBar.visibility = View.VISIBLE
++        binding.tvError.visibility = View.GONE
++        searchJob = viewLifecycleOwner.lifecycleScope.launch {
++            delay(300)
++            val currentQuery = binding.etSearch.text?.toString()?.trim().orEmpty()
++            if (!currentQuery.equals(query, ignoreCase = true)) return@launch
++
++            val users = userRepository.searchUsers(query).getOrElse { emptyList() }
++            if (_binding == null || !binding.etSearch.text?.toString()?.trim().equals(query, ignoreCase = true)) {
++                return@launch
++            }
++            binding.progressBar.visibility = View.GONE
++            binding.rvConversations.adapter = userAdapter
++            binding.tvSearchMode.text = "Accounts"
++            userAdapter.submitList(users)
++            binding.tvError.visibility = if (users.isEmpty()) View.VISIBLE else View.GONE
++            binding.tvError.text = "No conversations or accounts found"
++        }
++    }
++
++    private fun openDirectChat(userId: Int, username: String, displayName: String) {
++        if (userId <= 0) return
++        val intent = Intent(context, ChatActivity::class.java).apply {
++            putExtra(ChatActivity.EXTRA_TARGET_ID, userId)
++            putExtra(ChatActivity.EXTRA_TARGET_NAME, displayName.ifBlank { username })
++            putExtra(ChatActivity.EXTRA_CHAT_TYPE, "direct")
++            putExtra("userId", userId)
++            putExtra("username", username)
++            putExtra("displayName", displayName)
++        }
++        startActivity(intent)
++    }
++
+     private fun setupSwipeRefresh() {
+         binding.swipeRefresh.setOnRefreshListener {
+             viewModel.loadConversations()
+@@ -75,7 +158,8 @@ class MessagesFragment : Fragment() {
+                         binding.progressBar.visibility = View.GONE
+                         binding.swipeRefresh.isRefreshing = false
+                         binding.tvError.visibility = View.GONE
+-                        conversationAdapter.submitList(state.conversations)
++                        allConversations = state.conversations
++                        applySearch(binding.etSearch.text?.toString().orEmpty())
+                     }
+                     is MessagesUiState.Error -> {
+                         binding.progressBar.visibility = View.GONE
+@@ -89,6 +173,7 @@ class MessagesFragment : Fragment() {
+     }
+ 
+     override fun onDestroyView() {
++        searchJob?.cancel()
+         super.onDestroyView()
+         _binding = null
+     }
+diff --git a/android/app/src/main/res/drawable/bg_story_add_badge.xml b/android/app/src/main/res/drawable/bg_story_add_badge.xml
+new file mode 100644
+index 0000000..2ee2ccf
+--- /dev/null
++++ b/android/app/src/main/res/drawable/bg_story_add_badge.xml
+@@ -0,0 +1,5 @@
++<?xml version="1.0" encoding="utf-8"?>
++<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
++    <solid android:color="@color/brand_primary" />
++    <stroke android:width="2dp" android:color="@color/background_dark" />
++</shape>
+diff --git a/android/app/src/main/res/layout/activity_create_story.xml b/android/app/src/main/res/layout/activity_create_story.xml
+new file mode 100644
+index 0000000..5aa39e2
+--- /dev/null
++++ b/android/app/src/main/res/layout/activity_create_story.xml
+@@ -0,0 +1,131 @@
++<?xml version="1.0" encoding="utf-8"?>
++<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:background="@color/background_dark"
++    android:padding="16dp">
++
++    <ImageButton
++        android:id="@+id/btnClose"
++        android:layout_width="40dp"
++        android:layout_height="40dp"
++        android:background="?attr/selectableItemBackgroundBorderless"
++        android:contentDescription="Close"
++        android:src="@drawable/ic_close"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toTopOf="parent"
++        app:tint="@color/text_white" />
++
++    <TextView
++        android:id="@+id/tvTitle"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:text="New story"
++        android:textColor="@color/text_white"
++        android:textSize="19sp"
++        android:textStyle="bold"
++        app:layout_constraintBottom_toBottomOf="@id/btnClose"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toTopOf="@id/btnClose" />
++
++    <com.google.android.material.button.MaterialButton
++        android:id="@+id/btnPublish"
++        android:layout_width="wrap_content"
++        android:layout_height="40dp"
++        android:backgroundTint="@color/brand_primary"
++        android:text="Share"
++        android:textColor="@android:color/white"
++        app:cornerRadius="20dp"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintTop_toTopOf="parent" />
++
++    <com.google.android.material.card.MaterialCardView
++        android:id="@+id/cardPreview"
++        android:layout_width="0dp"
++        android:layout_height="0dp"
++        android:layout_marginTop="16dp"
++        android:layout_marginBottom="16dp"
++        app:cardBackgroundColor="@android:color/black"
++        app:cardCornerRadius="18dp"
++        app:layout_constraintBottom_toTopOf="@id/btnChoosePhoto"
++        app:layout_constraintDimensionRatio="9:14"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toBottomOf="@id/btnClose">
++
++        <FrameLayout
++            android:layout_width="match_parent"
++            android:layout_height="match_parent">
++
++            <ImageView
++                android:id="@+id/ivPreview"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:contentDescription="Story preview"
++                android:scaleType="centerCrop"
++                android:visibility="gone" />
++
++            <TextView
++                android:id="@+id/tvPhotoHelp"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:gravity="center"
++                android:padding="24dp"
++                android:text="Choose a photo for your story\nStories disappear after 24 hours"
++                android:textColor="@color/text_secondary"
++                android:textSize="15sp" />
++        </FrameLayout>
++    </com.google.android.material.card.MaterialCardView>
++
++    <com.google.android.material.button.MaterialButton
++        android:id="@+id/btnChoosePhoto"
++        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
++        android:layout_width="0dp"
++        android:layout_height="52dp"
++        android:text="Choose Photo"
++        android:textColor="@color/text_white"
++        app:cornerRadius="14dp"
++        app:icon="@drawable/ic_gallery"
++        app:iconTint="@color/brand_cyan"
++        app:layout_constraintBottom_toTopOf="@id/tilCaption"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:strokeColor="@color/border_dark" />
++
++    <com.google.android.material.textfield.TextInputLayout
++        android:id="@+id/tilCaption"
++        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="12dp"
++        android:hint="Caption (optional)"
++        app:boxBackgroundColor="@color/background_card"
++        app:boxStrokeColor="@color/brand_primary"
++        app:counterEnabled="true"
++        app:counterMaxLength="500"
++        app:layout_constraintBottom_toBottomOf="parent"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent">
++
++        <com.google.android.material.textfield.TextInputEditText
++            android:id="@+id/etCaption"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:maxLength="500"
++            android:maxLines="2"
++            android:textColor="@color/text_white" />
++    </com.google.android.material.textfield.TextInputLayout>
++
++    <ProgressBar
++        android:id="@+id/progressBar"
++        android:layout_width="44dp"
++        android:layout_height="44dp"
++        android:visibility="gone"
++        app:layout_constraintBottom_toBottomOf="@id/cardPreview"
++        app:layout_constraintEnd_toEndOf="@id/cardPreview"
++        app:layout_constraintStart_toStartOf="@id/cardPreview"
++        app:layout_constraintTop_toTopOf="@id/cardPreview" />
++
++</androidx.constraintlayout.widget.ConstraintLayout>
+diff --git a/android/app/src/main/res/layout/activity_story_viewer.xml b/android/app/src/main/res/layout/activity_story_viewer.xml
+new file mode 100644
+index 0000000..33671f7
+--- /dev/null
++++ b/android/app/src/main/res/layout/activity_story_viewer.xml
+@@ -0,0 +1,83 @@
++<?xml version="1.0" encoding="utf-8"?>
++<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:background="@android:color/black">
++
++    <ImageView
++        android:id="@+id/ivStoryMedia"
++        android:layout_width="0dp"
++        android:layout_height="0dp"
++        android:contentDescription="Story media"
++        android:scaleType="fitCenter"
++        app:layout_constraintBottom_toBottomOf="parent"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toTopOf="parent" />
++
++    <View
++        android:id="@+id/topScrim"
++        android:layout_width="0dp"
++        android:layout_height="96dp"
++        android:background="#88000000"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toTopOf="parent" />
++
++    <com.google.android.material.imageview.ShapeableImageView
++        android:id="@+id/ivAuthorAvatar"
++        android:layout_width="44dp"
++        android:layout_height="44dp"
++        android:layout_marginStart="16dp"
++        android:layout_marginTop="28dp"
++        android:scaleType="centerCrop"
++        android:src="@drawable/ic_profile"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toTopOf="parent"
++        app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.CornerSize50Percent"
++        app:strokeColor="@color/brand_emerald"
++        app:strokeWidth="2dp" />
++
++    <TextView
++        android:id="@+id/tvAuthorName"
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_marginStart="12dp"
++        android:textColor="@android:color/white"
++        android:textSize="15sp"
++        android:textStyle="bold"
++        app:layout_constraintBottom_toBottomOf="@id/ivAuthorAvatar"
++        app:layout_constraintEnd_toStartOf="@id/btnClose"
++        app:layout_constraintStart_toEndOf="@id/ivAuthorAvatar"
++        app:layout_constraintTop_toTopOf="@id/ivAuthorAvatar" />
++
++    <ImageButton
++        android:id="@+id/btnClose"
++        android:layout_width="48dp"
++        android:layout_height="48dp"
++        android:layout_marginTop="26dp"
++        android:layout_marginEnd="10dp"
++        android:background="?attr/selectableItemBackgroundBorderless"
++        android:contentDescription="Close story"
++        android:src="@drawable/ic_close"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintTop_toTopOf="parent"
++        app:tint="@android:color/white" />
++
++    <TextView
++        android:id="@+id/tvCaption"
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_margin="20dp"
++        android:background="#88000000"
++        android:gravity="center"
++        android:padding="12dp"
++        android:textColor="@android:color/white"
++        android:textSize="15sp"
++        android:visibility="gone"
++        app:layout_constraintBottom_toBottomOf="parent"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent" />
++
++</androidx.constraintlayout.widget.ConstraintLayout>
+diff --git a/android/app/src/main/res/layout/fragment_home.xml b/android/app/src/main/res/layout/fragment_home.xml
+index d6ea2ff..29aae22 100644
+--- a/android/app/src/main/res/layout/fragment_home.xml
++++ b/android/app/src/main/res/layout/fragment_home.xml
+@@ -10,11 +10,37 @@
+         android:layout_width="match_parent"
+         android:layout_height="match_parent">
+ 
++        <androidx.recyclerview.widget.RecyclerView
++            android:id="@+id/rvStories"
++            android:layout_width="0dp"
++            android:layout_height="104dp"
++            android:clipToPadding="false"
++            android:orientation="horizontal"
++            android:overScrollMode="never"
++            android:paddingHorizontal="6dp"
++            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintTop_toTopOf="parent" />
++
++        <View
++            android:id="@+id/storyDivider"
++            android:layout_width="0dp"
++            android:layout_height="1dp"
++            android:background="@color/border_dark"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintTop_toBottomOf="@id/rvStories" />
++
+         <androidx.recyclerview.widget.RecyclerView
+             android:id="@+id/rvFeed"
+-            android:layout_width="match_parent"
+-            android:layout_height="match_parent"
+-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
++            android:layout_width="0dp"
++            android:layout_height="0dp"
++            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
++            app:layout_constraintBottom_toBottomOf="parent"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintTop_toBottomOf="@id/storyDivider" />
+ 
+         <ProgressBar
+             android:id="@+id/progressBar"
+diff --git a/android/app/src/main/res/layout/fragment_messages.xml b/android/app/src/main/res/layout/fragment_messages.xml
+index f6faf83..c5684c4 100644
+--- a/android/app/src/main/res/layout/fragment_messages.xml
++++ b/android/app/src/main/res/layout/fragment_messages.xml
+@@ -10,11 +10,62 @@
+         android:layout_width="match_parent"
+         android:layout_height="match_parent">
+ 
++        <com.google.android.material.textfield.TextInputLayout
++            android:id="@+id/tilSearch"
++            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_marginHorizontal="12dp"
++            android:layout_marginTop="10dp"
++            android:hint="Search messages or accounts"
++            app:boxBackgroundColor="@color/background_card"
++            app:boxCornerRadiusBottomEnd="18dp"
++            app:boxCornerRadiusBottomStart="18dp"
++            app:boxCornerRadiusTopEnd="18dp"
++            app:boxCornerRadiusTopStart="18dp"
++            app:boxStrokeColor="@color/brand_emerald"
++            app:endIconMode="clear_text"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintTop_toTopOf="parent"
++            app:startIconDrawable="@drawable/ic_explore"
++            app:startIconTint="@color/brand_emerald">
++
++            <com.google.android.material.textfield.TextInputEditText
++                android:id="@+id/etSearch"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:imeOptions="actionSearch"
++                android:inputType="text"
++                android:maxLines="1"
++                android:textColor="@color/text_white"
++                android:textColorHint="@color/text_muted" />
++        </com.google.android.material.textfield.TextInputLayout>
++
++        <TextView
++            android:id="@+id/tvSearchMode"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:paddingHorizontal="16dp"
++            android:paddingTop="8dp"
++            android:paddingBottom="4dp"
++            android:text="Conversations"
++            android:textColor="@color/text_secondary"
++            android:textSize="12sp"
++            android:textStyle="bold"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintTop_toBottomOf="@id/tilSearch" />
++
+         <androidx.recyclerview.widget.RecyclerView
+             android:id="@+id/rvConversations"
+-            android:layout_width="match_parent"
+-            android:layout_height="match_parent"
+-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
++            android:layout_width="0dp"
++            android:layout_height="0dp"
++            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
++            app:layout_constraintBottom_toBottomOf="parent"
++            app:layout_constraintEnd_toEndOf="parent"
++            app:layout_constraintStart_toStartOf="parent"
++            app:layout_constraintTop_toBottomOf="@id/tvSearchMode" />
+ 
+         <ProgressBar
+             android:id="@+id/progressBar"
+@@ -24,7 +75,7 @@
+             app:layout_constraintBottom_toBottomOf="parent"
+             app:layout_constraintEnd_toEndOf="parent"
+             app:layout_constraintStart_toStartOf="parent"
+-            app:layout_constraintTop_toTopOf="parent" />
++            app:layout_constraintTop_toBottomOf="@id/tvSearchMode" />
+ 
+         <TextView
+             android:id="@+id/tvError"
+@@ -35,7 +86,7 @@
+             app:layout_constraintBottom_toBottomOf="parent"
+             app:layout_constraintEnd_toEndOf="parent"
+             app:layout_constraintStart_toStartOf="parent"
+-            app:layout_constraintTop_toTopOf="parent" />
++            app:layout_constraintTop_toBottomOf="@id/tvSearchMode" />
+ 
+     </androidx.constraintlayout.widget.ConstraintLayout>
+ 
+diff --git a/android/app/src/main/res/layout/item_story.xml b/android/app/src/main/res/layout/item_story.xml
+new file mode 100644
+index 0000000..c405fdb
+--- /dev/null
++++ b/android/app/src/main/res/layout/item_story.xml
+@@ -0,0 +1,54 @@
++<?xml version="1.0" encoding="utf-8"?>
++<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="84dp"
++    android:layout_height="104dp"
++    android:background="?attr/selectableItemBackgroundBorderless"
++    android:clickable="true"
++    android:focusable="true"
++    android:paddingHorizontal="6dp"
++    android:paddingTop="8dp">
++
++    <com.google.android.material.imageview.ShapeableImageView
++        android:id="@+id/ivStoryAvatar"
++        android:layout_width="68dp"
++        android:layout_height="68dp"
++        android:contentDescription="Story"
++        android:scaleType="centerCrop"
++        android:src="@drawable/ic_profile"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toTopOf="parent"
++        app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.CornerSize50Percent"
++        app:strokeColor="@color/brand_emerald"
++        app:strokeWidth="3dp" />
++
++    <TextView
++        android:id="@+id/tvAddBadge"
++        android:layout_width="24dp"
++        android:layout_height="24dp"
++        android:background="@drawable/bg_story_add_badge"
++        android:gravity="center"
++        android:text="+"
++        android:textColor="@android:color/white"
++        android:textSize="18sp"
++        android:textStyle="bold"
++        android:visibility="gone"
++        app:layout_constraintBottom_toBottomOf="@id/ivStoryAvatar"
++        app:layout_constraintEnd_toEndOf="@id/ivStoryAvatar" />
++
++    <TextView
++        android:id="@+id/tvStoryUsername"
++        android:layout_width="76dp"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="5dp"
++        android:ellipsize="end"
++        android:gravity="center"
++        android:maxLines="1"
++        android:textColor="@color/text_white"
++        android:textSize="11sp"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toBottomOf="@id/ivStoryAvatar" />
++
++</androidx.constraintlayout.widget.ConstraintLayout>
+-- 
+2.51.1

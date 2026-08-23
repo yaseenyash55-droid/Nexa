@@ -1,0 +1,188 @@
+From 7f5db88f5bcab767f13fc643792160d0b92f9977 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 23 Aug 2026 09:59:31 +0200
+Subject: [PATCH 1/2] feat(messaging): open direct chats from user profiles
+
+---
+ .../social/ui/fragments/ProfileFragment.kt    | 11 ++++++
+ .../src/main/res/layout/fragment_profile.xml  | 16 +++++++++
+ .../src/components/profile/ProfileHeader.tsx  | 35 ++++++++++++++-----
+ client/src/pages/MessagesPage.tsx             | 21 +++++++++++
+ 4 files changed, 74 insertions(+), 9 deletions(-)
+
+diff --git a/android/app/src/main/java/com/nexa/social/ui/fragments/ProfileFragment.kt b/android/app/src/main/java/com/nexa/social/ui/fragments/ProfileFragment.kt
+index d3497b9..a215f2a 100644
+--- a/android/app/src/main/java/com/nexa/social/ui/fragments/ProfileFragment.kt
++++ b/android/app/src/main/java/com/nexa/social/ui/fragments/ProfileFragment.kt
+@@ -22,6 +22,7 @@ import android.content.Intent
+ import com.nexa.social.data.repository.AuthRepository
+ import com.nexa.social.data.repository.PostRepository
+ import com.nexa.social.ui.CommentsBottomSheetDialogFragment
++import com.nexa.social.ui.ChatActivity
+ import com.nexa.social.ui.EditProfileBottomSheetDialogFragment
+ import com.nexa.social.ui.LoginActivity
+ import com.nexa.social.ui.adapters.PostAdapter
+@@ -144,6 +145,7 @@ class ProfileFragment : Fragment() {
+         if (isOwner) {
+             binding.btnEditProfile.visibility = View.VISIBLE
+             binding.btnFollow.visibility = View.GONE
++            binding.btnMessage.visibility = View.GONE
+             binding.btnEditProfile.setOnClickListener {
+                 EditProfileBottomSheetDialogFragment.newInstance(user) { updatedUser ->
+                     viewModel.updateProfileLocally(updatedUser)
+@@ -152,12 +154,21 @@ class ProfileFragment : Fragment() {
+         } else {
+             binding.btnEditProfile.visibility = View.GONE
+             binding.btnFollow.visibility = View.VISIBLE
++            binding.btnMessage.visibility = View.VISIBLE
+             binding.btnFollow.text = if (isFollowing) "Following" else "Follow"
+             binding.btnFollow.setOnClickListener {
+                 isFollowing = !isFollowing
+                 binding.btnFollow.text = if (isFollowing) "Following" else "Follow"
+                 viewModel.toggleFollow(user, !isFollowing)
+             }
++            binding.btnMessage.setOnClickListener {
++                val intent = Intent(requireContext(), ChatActivity::class.java).apply {
++                    putExtra(ChatActivity.EXTRA_CHAT_TYPE, "direct")
++                    putExtra(ChatActivity.EXTRA_TARGET_ID, user.userId)
++                    putExtra(ChatActivity.EXTRA_TARGET_NAME, user.displayName)
++                }
++                startActivity(intent)
++            }
+         }
+ 
+         // Load posts for user
+diff --git a/android/app/src/main/res/layout/fragment_profile.xml b/android/app/src/main/res/layout/fragment_profile.xml
+index eb1b48c..0c7c838 100644
+--- a/android/app/src/main/res/layout/fragment_profile.xml
++++ b/android/app/src/main/res/layout/fragment_profile.xml
+@@ -63,6 +63,22 @@
+             app:layout_constraintEnd_toEndOf="parent"
+             app:layout_constraintTop_toBottomOf="@id/ivCover" />
+ 
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/btnMessage"
++            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="12dp"
++            android:layout_marginEnd="8dp"
++            android:text="Message"
++            android:textColor="@color/text_white"
++            android:textSize="12sp"
++            android:visibility="gone"
++            app:cornerRadius="20dp"
++            app:layout_constraintEnd_toStartOf="@id/btnFollow"
++            app:layout_constraintTop_toBottomOf="@id/ivCover"
++            app:strokeColor="@color/border_dark" />
++
+         <ImageButton
+             android:id="@+id/btnLogout"
+             android:layout_width="36dp"
+diff --git a/client/src/components/profile/ProfileHeader.tsx b/client/src/components/profile/ProfileHeader.tsx
+index 97caf55..cea34e1 100644
+--- a/client/src/components/profile/ProfileHeader.tsx
++++ b/client/src/components/profile/ProfileHeader.tsx
+@@ -1,8 +1,9 @@
+ import React, { useState } from 'react';
++import { useNavigate } from 'react-router-dom';
+ import { User } from '../../types/index.js';
+ import { Avatar } from '../ui/Avatar.js';
+ import { Button } from '../ui/Button.js';
+-import { MapPin, Link as LinkIcon, Calendar, Edit3 } from 'lucide-react';
++import { MapPin, Link as LinkIcon, Calendar, Edit3, MessageSquare } from 'lucide-react';
+ import { format } from 'date-fns';
+ import { useAuth } from '../../contexts/AuthContext.js';
+ import { useMutation, useQueryClient } from '@tanstack/react-query';
+@@ -17,6 +18,7 @@ interface ProfileHeaderProps {
+ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user, onEditClick }) => {
+   const { user: currentUser, requireAuth } = useAuth();
+   const queryClient = useQueryClient();
++  const navigate = useNavigate();
+ 
+   const isSelf = currentUser?.userId === user.userId;
+   const [isFollowing, setIsFollowing] = useState(user.isFollowing || false);
+@@ -68,14 +70,29 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user, onEditClick
+             Edit Profile
+           </Button>
+         ) : (
+-          <Button
+-            variant={isFollowing ? 'outline' : 'primary'}
+-            size="sm"
+-            onClick={() => requireAuth(() => followMutation.mutate(), `Log in to follow @${user.username}.`)}
+-            isLoading={followMutation.isPending}
+-          >
+-            {isFollowing ? 'Following' : 'Follow'}
+-          </Button>
++          <div className="flex items-center gap-2">
++            <Button
++              variant="outline"
++              size="sm"
++              leftIcon={<MessageSquare className="w-4 h-4" />}
++              onClick={() =>
++                requireAuth(
++                  () => navigate(`/messages?userId=${user.userId}`),
++                  `Log in to message @${user.username}.`
++                )
++              }
++            >
++              Message
++            </Button>
++            <Button
++              variant={isFollowing ? 'outline' : 'primary'}
++              size="sm"
++              onClick={() => requireAuth(() => followMutation.mutate(), `Log in to follow @${user.username}.`)}
++              isLoading={followMutation.isPending}
++            >
++              {isFollowing ? 'Following' : 'Follow'}
++            </Button>
++          </div>
+         )}
+       </div>
+ 
+diff --git a/client/src/pages/MessagesPage.tsx b/client/src/pages/MessagesPage.tsx
+index d9f3543..190bb3e 100644
+--- a/client/src/pages/MessagesPage.tsx
++++ b/client/src/pages/MessagesPage.tsx
+@@ -17,11 +17,14 @@ import { io, Socket } from 'socket.io-client';
+ import { API_BASE_URL, getAccessToken } from '../api/client.js';
+ import { useTheme } from '../contexts/ThemeContext.js';
+ import { decryptMessage, DecryptedMessageResult } from '../utils/e2ee.js';
++import { useSearchParams } from 'react-router-dom';
+ 
+ export const MessagesPage: React.FC = () => {
+   const { user: currentUser } = useAuth();
+   const queryClient = useQueryClient();
+   const { currentChatTheme } = useTheme();
++  const [searchParams] = useSearchParams();
++  const requestedUserId = Number.parseInt(searchParams.get('userId') || '', 10);
+ 
+   // Tab & Selection State
+   const [chatType, setChatType] = useState<'direct' | 'groups' | 'broadcasts'>('direct');
+@@ -56,6 +59,24 @@ export const MessagesPage: React.FC = () => {
+     queryFn: () => usersApi.getSuggestions()
+   });
+ 
++  const { data: requestedUser } = useQuery({
++    queryKey: ['message-target-user', requestedUserId],
++    queryFn: () => usersApi.getById(requestedUserId),
++    enabled:
++      Number.isInteger(requestedUserId) &&
++      requestedUserId > 0 &&
++      requestedUserId !== currentUser?.userId
++  });
++
++  useEffect(() => {
++    if (!requestedUser || requestedUser.userId === currentUser?.userId) return;
++
++    setChatType('direct');
++    setSelectedGroup(null);
++    setSelectedBroadcast(null);
++    setSelectedUser(requestedUser);
++  }, [currentUser?.userId, requestedUser]);
++
+   // Fetch user groups (Group Chats)
+   const { data: groups = [] } = useQuery({
+     queryKey: ['user-groups'],
+-- 
+2.51.1
