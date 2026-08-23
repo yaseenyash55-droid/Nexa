@@ -20,13 +20,41 @@ export class FakeEmailProvider implements IEmailProvider {
   }
 }
 
+function normalizeBrevoApiKey(rawKey?: string): string {
+  if (!rawKey) return '';
+  const trimmed = rawKey.trim();
+  if (trimmed.startsWith('xkeysib-') || trimmed.startsWith('xsmtpsib-')) {
+    return trimmed;
+  }
+  try {
+    const decoded = Buffer.from(trimmed, 'base64').toString('utf8');
+    if (decoded.includes('api_key') || decoded.includes('{')) {
+      const parsed = JSON.parse(decoded);
+      if (parsed.api_key && typeof parsed.api_key === 'string') {
+        return parsed.api_key.trim();
+      }
+    }
+  } catch {}
+
+  try {
+    if (trimmed.startsWith('{')) {
+      const parsed = JSON.parse(trimmed);
+      if (parsed.api_key && typeof parsed.api_key === 'string') {
+        return parsed.api_key.trim();
+      }
+    }
+  } catch {}
+
+  return trimmed;
+}
+
 export class BrevoEmailProvider implements IEmailProvider {
   private readonly apiKey: string;
   private readonly senderEmail: string;
   private readonly senderName: string;
 
   constructor() {
-    this.apiKey = process.env.BREVO_API_KEY?.trim() || '';
+    this.apiKey = normalizeBrevoApiKey(process.env.BREVO_API_KEY);
     this.senderEmail = process.env.BREVO_SENDER_EMAIL?.trim() || '';
     this.senderName = process.env.BREVO_SENDER_NAME?.trim() || 'Nexa';
 
