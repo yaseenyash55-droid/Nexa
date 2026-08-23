@@ -49,11 +49,12 @@ class HomeFragment : Fragment() {
 
     private fun setupStories() {
         storyAdapter = StoryAdapter(
+            currentUserId = com.nexa.social.utils.PreferenceManager(requireContext()).userId,
             onAddStory = {
                 createStoryLauncher.launch(Intent(requireContext(), CreateStoryActivity::class.java))
             },
-            onStoryClick = { story ->
-                startActivity(StoryViewerActivity.createIntent(requireContext(), story))
+            onStoryClick = { stories ->
+                startActivity(StoryViewerActivity.createIntent(requireContext(), stories))
             }
         )
         binding.rvStories.adapter = storyAdapter

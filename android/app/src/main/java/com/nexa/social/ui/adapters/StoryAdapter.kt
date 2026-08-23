@@ -12,24 +12,36 @@ import com.nexa.social.databinding.ItemStoryBinding
 import com.nexa.social.utils.MediaUrlResolver
 
 class StoryAdapter(
+    private val currentUserId: Int,
     private val onAddStory: () -> Unit,
-    private val onStoryClick: (Story) -> Unit
+    private val onStoryClick: (List<Story>) -> Unit
 ) : RecyclerView.Adapter<StoryAdapter.StoryViewHolder>() {
 
-    private var stories: List<Story> = emptyList()
+    private var ownStories: List<Story> = emptyList()
+    private var storyGroups: List<List<Story>> = emptyList()
 
     init {
         setHasStableIds(true)
     }
 
     fun submitStories(items: List<Story>) {
-        stories = items
+        val groupedStories = items
+            .groupBy { it.userId }
+            .values
+            .map { group -> group.sortedBy { it.createdAt.orEmpty() } }
+
+        ownStories = groupedStories.firstOrNull { it.firstOrNull()?.userId == currentUserId }.orEmpty()
+        storyGroups = groupedStories.filterNot { it.firstOrNull()?.userId == currentUserId }
         notifyDataSetChanged()
     }
 
-    override fun getItemCount(): Int = stories.size + 1
+    override fun getItemCount(): Int = storyGroups.size + 1
 
-    override fun getItemId(position: Int): Long = if (position == 0) Long.MIN_VALUE else stories[position - 1].storyId.toLong()
+    override fun getItemId(position: Int): Long = if (position == 0) {
+        Long.MIN_VALUE
+    } else {
+        storyGroups[position - 1].first().userId.toLong()
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): StoryViewHolder {
         val binding = ItemStoryBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -37,18 +49,29 @@ class StoryAdapter(
     }
 
     override fun onBindViewHolder(holder: StoryViewHolder, position: Int) {
-        if (position == 0) holder.bindAdd() else holder.bindStory(stories[position - 1])
+        if (position == 0) holder.bindYourStory(ownStories) else holder.bindStoryGroup(storyGroups[position - 1])
     }
 
     inner class StoryViewHolder(private val binding: ItemStoryBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bindAdd() {
+        fun bindYourStory(stories: List<Story>) {
             binding.tvStoryUsername.text = "Your story"
             binding.tvAddBadge.visibility = View.VISIBLE
-            binding.ivStoryAvatar.setImageResource(R.drawable.ic_profile)
-            binding.root.setOnClickListener { onAddStory() }
+            val ownStory = stories.lastOrNull()
+            val avatarUrl = MediaUrlResolver.resolve(ownStory?.author?.profileImageUrl)
+            binding.ivStoryAvatar.load(avatarUrl) {
+                crossfade(true)
+                placeholder(R.drawable.ic_profile)
+                error(R.drawable.ic_profile)
+                transformations(CircleCropTransformation())
+            }
+            binding.tvAddBadge.setOnClickListener { onAddStory() }
+            binding.root.setOnClickListener {
+                if (stories.isEmpty()) onAddStory() else onStoryClick(stories)
+            }
         }
 
-        fun bindStory(story: Story) {
+        fun bindStoryGroup(stories: List<Story>) {
+            val story = stories.first()
             binding.tvStoryUsername.text = story.author.username
             binding.tvAddBadge.visibility = View.GONE
             val previewUrl = MediaUrlResolver.resolve(story.author.profileImageUrl ?: story.mediaUrl)
@@ -58,7 +81,8 @@ class StoryAdapter(
                 error(R.drawable.ic_profile)
                 transformations(CircleCropTransformation())
             }
-            binding.root.setOnClickListener { onStoryClick(story) }
+            binding.tvAddBadge.setOnClickListener(null)
+            binding.root.setOnClickListener { onStoryClick(stories) }
         }
     }
 }

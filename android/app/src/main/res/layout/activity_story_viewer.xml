@@ -48,8 +48,19 @@
         android:textSize="15sp"
         android:textStyle="bold"
         app:layout_constraintBottom_toBottomOf="@id/ivAuthorAvatar"
-        app:layout_constraintEnd_toStartOf="@id/btnClose"
+        app:layout_constraintEnd_toStartOf="@id/tvStoryProgress"
         app:layout_constraintStart_toEndOf="@id/ivAuthorAvatar"
+        app:layout_constraintTop_toTopOf="@id/ivAuthorAvatar" />
+
+    <TextView
+        android:id="@+id/tvStoryProgress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:textColor="@android:color/white"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toBottomOf="@id/ivAuthorAvatar"
+        app:layout_constraintEnd_toStartOf="@id/btnClose"
         app:layout_constraintTop_toTopOf="@id/ivAuthorAvatar" />
 
     <ImageButton
