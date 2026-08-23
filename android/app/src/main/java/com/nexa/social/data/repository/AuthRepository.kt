@@ -1,5 +1,6 @@
 package com.nexa.social.data.repository
 
+import com.google.gson.JsonParser
 import com.nexa.social.NexaApiClient
 import com.nexa.social.data.models.ForgotPasswordRequest
 import com.nexa.social.data.models.LoginRequest
@@ -9,6 +10,7 @@ import com.nexa.social.data.models.VerifyEmailRequest
 import com.nexa.social.data.models.VerifyLoginOtpRequest
 import com.nexa.social.utils.SocketManager
 import com.nexa.social.utils.TokenManager
+import retrofit2.Response
 
 sealed interface LoginOutcome {
     data class Authenticated(val user: User) : LoginOutcome
@@ -24,18 +26,35 @@ class AuthRepository(private val tokenManager: TokenManager) {
     suspend fun register(request: RegisterRequest): Result<User> = try {
         val response = NexaApiClient.authApi.register(request)
         val data = response.body()?.data
+
         if (response.isSuccessful && data != null) {
-            saveSession(data.accessToken, data.refreshToken, data.user)
+            saveSession(
+                data.accessToken,
+                data.refreshToken,
+                data.user
+            )
+
             Result.success(data.user)
-        } else Result.failure(Exception(errorMessage(response.body()?.error?.message, response.body()?.message, "Registration failed (${response.code()})")))
-    } catch (e: Exception) { Result.failure(e) }
+        } else {
+            Result.failure(
+                Exception(
+                    extractErrorMessage(
+                        response,
+                        "Registration failed (${response.code()})"
+                    )
+                )
+            )
+        }
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
 
     suspend fun login(username: String, password: String): Result<LoginOutcome> = try {
         val response = NexaApiClient.authApi.login(LoginRequest(username, password))
         val body = response.body()
         val data = body?.data
         if (!response.isSuccessful || data == null) {
-            Result.failure(Exception(errorMessage(body?.error?.message, body?.message, "Invalid username/email or password (${response.code()})")))
+            Result.failure(Exception(extractErrorMessage(response, "Invalid username/email or password (${response.code()})")))
         } else if (data.mfaRequired) {
             val challengeId = data.challengeId
             if (challengeId.isNullOrBlank()) Result.failure(Exception("The server returned an invalid verification challenge"))
@@ -58,25 +77,25 @@ class AuthRepository(private val tokenManager: TokenManager) {
         if (response.isSuccessful && data != null) {
             saveSession(data.accessToken, data.refreshToken, data.user)
             Result.success(data.user)
-        } else Result.failure(Exception(errorMessage(body?.error?.message, body?.message, "Verification failed (${response.code()})")))
+        } else Result.failure(Exception(extractErrorMessage(response, "Verification failed (${response.code()})")))
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun forgotPassword(email: String): Result<String> = try {
         val response = NexaApiClient.authApi.forgotPassword(ForgotPasswordRequest(email))
         if (response.isSuccessful) Result.success(response.body()?.message ?: "Reset instructions sent")
-        else Result.failure(Exception(response.body()?.error?.message ?: "Failed to request password reset"))
+        else Result.failure(Exception(extractErrorMessage(response, "Failed to request password reset")))
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun verifyEmail(token: String): Result<String> = try {
         val response = NexaApiClient.authApi.verifyEmail(VerifyEmailRequest(token))
         if (response.isSuccessful) Result.success(response.body()?.message ?: "Email verified")
-        else Result.failure(Exception(response.body()?.error?.message ?: "Verification failed"))
+        else Result.failure(Exception(extractErrorMessage(response, "Verification failed")))
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun resendVerification(email: String): Result<String> = try {
         val response = NexaApiClient.authApi.resendVerification(mapOf("email" to email))
         if (response.isSuccessful) Result.success(response.body()?.message ?: "Verification email sent")
-        else Result.failure(Exception(response.body()?.error?.message ?: "Failed to resend verification email"))
+        else Result.failure(Exception(extractErrorMessage(response, "Failed to resend verification email")))
     } catch (e: Exception) { Result.failure(e) }
 
     suspend fun logout(): Result<Unit> {
@@ -91,5 +110,23 @@ class AuthRepository(private val tokenManager: TokenManager) {
         tokenManager.saveTokens(accessToken, refreshToken, user.userId, user.username, user.displayName)
     }
 
-    private fun errorMessage(error: String?, message: String?, fallback: String) = error ?: message ?: fallback
+    private fun extractErrorMessage(
+        response: Response<*>,
+        fallback: String
+    ): String {
+        return try {
+            val raw = response.errorBody()?.string()
+            if (raw.isNullOrBlank()) return fallback
+
+            val json = JsonParser.parseString(raw).asJsonObject
+
+            json.getAsJsonObject("error")
+                ?.get("message")
+                ?.asString
+                ?: json.get("message")?.asString
+                ?: fallback
+        } catch (_: Exception) {
+            fallback
+        }
+    }
 }
