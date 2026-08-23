@@ -110,6 +110,21 @@ data class Reel(
     @SerializedName("createdAt") val createdAt: String?
 )
 
+data class Story(
+    @SerializedName("storyId") val storyId: Int,
+    @SerializedName("userId") val userId: Int,
+    @SerializedName("author") val author: User,
+    @SerializedName("mediaUrl") val mediaUrl: String,
+    @SerializedName("caption") val caption: String?,
+    @SerializedName("createdAt") val createdAt: String?,
+    @SerializedName("expiresAt") val expiresAt: String?
+)
+
+data class CreateStoryRequest(
+    @SerializedName("mediaUrl") val mediaUrl: String,
+    @SerializedName("caption") val caption: String? = null
+)
+
 data class Message(
     @SerializedName("messageId") val messageId: Int,
     @SerializedName("senderId") val senderId: Int,

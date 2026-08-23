@@ -6,6 +6,7 @@ import com.nexa.social.data.api.AuthInterceptor
 import com.nexa.social.data.api.GroupApi
 import com.nexa.social.data.api.MessageApi
 import com.nexa.social.data.api.PostApi
+import com.nexa.social.data.api.StoryApi
 import com.nexa.social.data.api.TokenAuthenticator
 import com.nexa.social.data.api.UserApi
 import com.nexa.social.utils.TokenManager
@@ -86,4 +87,5 @@ object NexaApiClient {
     val messageApi: MessageApi by lazy { retrofit.create(MessageApi::class.java) }
     val groupApi: GroupApi by lazy { retrofit.create(GroupApi::class.java) }
     val userApi: UserApi by lazy { retrofit.create(UserApi::class.java) }
+    val storyApi: StoryApi by lazy { retrofit.create(StoryApi::class.java) }
 }

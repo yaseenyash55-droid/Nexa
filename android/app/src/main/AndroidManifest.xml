@@ -127,6 +127,15 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <activity
+            android:name=".ui.CreateStoryActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.StoryViewerActivity"
+            android:exported="false" />
+
         <!-- Firebase Cloud Messaging Service -->
         <service
             android:name=".service.NexaFirebaseMessagingService"

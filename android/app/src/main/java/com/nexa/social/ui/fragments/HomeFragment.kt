@@ -1,15 +1,21 @@
 package com.nexa.social.ui.fragments
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
+import com.nexa.social.data.repository.StoryRepository
 import com.nexa.social.databinding.FragmentHomeBinding
+import com.nexa.social.ui.CreateStoryActivity
+import com.nexa.social.ui.StoryViewerActivity
 import com.nexa.social.ui.adapters.PostAdapter
+import com.nexa.social.ui.adapters.StoryAdapter
 import com.nexa.social.ui.viewmodels.HomeUiState
 import com.nexa.social.ui.viewmodels.HomeViewModel
 import kotlinx.coroutines.launch
@@ -19,6 +25,14 @@ class HomeFragment : Fragment() {
     private val binding get() = _binding!!
     private val viewModel: HomeViewModel by activityViewModels()
     private lateinit var postAdapter: PostAdapter
+    private lateinit var storyAdapter: StoryAdapter
+    private val storyRepository = StoryRepository()
+
+    private val createStoryLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK && _binding != null) {
+            loadStories()
+        }
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
@@ -28,8 +42,33 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setupRecyclerView()
+        setupStories()
         setupSwipeRefresh()
         observeViewModel()
+    }
+
+    private fun setupStories() {
+        storyAdapter = StoryAdapter(
+            onAddStory = {
+                createStoryLauncher.launch(Intent(requireContext(), CreateStoryActivity::class.java))
+            },
+            onStoryClick = { story ->
+                startActivity(StoryViewerActivity.createIntent(requireContext(), story))
+            }
+        )
+        binding.rvStories.adapter = storyAdapter
+    }
+
+    private fun loadStories() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            storyRepository.getFeed()
+                .onSuccess { storyAdapter.submitStories(it) }
+                .onFailure {
+                    if (storyAdapter.itemCount <= 1) {
+                        Toast.makeText(requireContext(), "Stories are temporarily unavailable", Toast.LENGTH_SHORT).show()
+                    }
+                }
+        }
     }
 
     private fun setupRecyclerView() {
@@ -65,6 +104,7 @@ class HomeFragment : Fragment() {
     private fun setupSwipeRefresh() {
         binding.swipeRefresh.setOnRefreshListener {
             viewModel.loadFeed(isRefresh = true)
+            loadStories()
         }
     }
 
@@ -106,6 +146,7 @@ class HomeFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         viewModel.loadFeed(isRefresh = true)
+        loadStories()
     }
 
     override fun onDestroyView() {
