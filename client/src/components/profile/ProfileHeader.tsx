@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext.js';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '../../api/users.api.js';
 import { getMediaUrl, handleImageError } from '../../utils/media.js';
+import { FollowersFollowingModal, FollowModalTab } from './FollowersFollowingModal.js';
 
 interface ProfileHeaderProps {
   user: User;
@@ -22,6 +23,13 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user, onEditClick 
 
   const isSelf = currentUser?.userId === user.userId;
   const [isFollowing, setIsFollowing] = useState(user.isFollowing || false);
+  const [isFollowModalOpen, setIsFollowModalOpen] = useState(false);
+  const [followModalTab, setFollowModalTab] = useState<FollowModalTab>('followers');
+
+  const openFollowModal = (tab: FollowModalTab) => {
+    setFollowModalTab(tab);
+    setIsFollowModalOpen(true);
+  };
 
   const followMutation = useMutation({
     mutationFn: () => (isFollowing ? usersApi.unfollow(user.userId) : usersApi.follow(user.userId)),
@@ -131,18 +139,40 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user, onEditClick 
           </div>
         </div>
 
-        {/* Stats row */}
+        {/* Stats row with interactive follower / following triggers */}
         <div className="flex items-center gap-6 text-xs pt-2">
-          <div>
-            <span className="font-bold text-white">{user.followingCount || 0}</span>{' '}
+          <button
+            type="button"
+            onClick={() => openFollowModal('following')}
+            className="hover:underline text-left group transition-colors"
+          >
+            <span className="font-bold text-white group-hover:text-brand-400 transition-colors">
+              {user.followingCount || 0}
+            </span>{' '}
             <span className="text-slate-400">Following</span>
-          </div>
-          <div>
-            <span className="font-bold text-white">{user.followersCount || 0}</span>{' '}
+          </button>
+          <button
+            type="button"
+            onClick={() => openFollowModal('followers')}
+            className="hover:underline text-left group transition-colors"
+          >
+            <span className="font-bold text-white group-hover:text-brand-400 transition-colors">
+              {user.followersCount || 0}
+            </span>{' '}
             <span className="text-slate-400">Followers</span>
-          </div>
+          </button>
         </div>
       </div>
+
+      {/* Followers & Following Modal */}
+      <FollowersFollowingModal
+        isOpen={isFollowModalOpen}
+        onClose={() => setIsFollowModalOpen(false)}
+        userId={user.userId}
+        username={user.username}
+        initialTab={followModalTab}
+      />
     </div>
   );
 };
+
