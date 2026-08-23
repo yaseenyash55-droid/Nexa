@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import android.content.Intent
 import com.nexa.social.data.repository.AuthRepository
 import com.nexa.social.data.repository.PostRepository
+import com.nexa.social.ui.ChatActivity
 import com.nexa.social.ui.CommentsBottomSheetDialogFragment
 import com.nexa.social.ui.EditProfileBottomSheetDialogFragment
 import com.nexa.social.ui.LoginActivity
@@ -144,6 +145,7 @@ class ProfileFragment : Fragment() {
         if (isOwner) {
             binding.btnEditProfile.visibility = View.VISIBLE
             binding.btnFollow.visibility = View.GONE
+            binding.btnMessage.visibility = View.GONE
             binding.btnEditProfile.setOnClickListener {
                 EditProfileBottomSheetDialogFragment.newInstance(user) { updatedUser ->
                     viewModel.updateProfileLocally(updatedUser)
@@ -152,11 +154,20 @@ class ProfileFragment : Fragment() {
         } else {
             binding.btnEditProfile.visibility = View.GONE
             binding.btnFollow.visibility = View.VISIBLE
+            binding.btnMessage.visibility = View.VISIBLE
             binding.btnFollow.text = if (isFollowing) "Following" else "Follow"
             binding.btnFollow.setOnClickListener {
                 isFollowing = !isFollowing
                 binding.btnFollow.text = if (isFollowing) "Following" else "Follow"
                 viewModel.toggleFollow(user, !isFollowing)
+            }
+            binding.btnMessage.setOnClickListener {
+                val intent = Intent(requireContext(), ChatActivity::class.java).apply {
+                    putExtra(ChatActivity.EXTRA_CHAT_TYPE, "direct")
+                    putExtra(ChatActivity.EXTRA_TARGET_ID, user.userId)
+                    putExtra(ChatActivity.EXTRA_TARGET_NAME, user.displayName)
+                }
+                startActivity(intent)
             }
         }
 

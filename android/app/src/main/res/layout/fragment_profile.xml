@@ -63,6 +63,22 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toBottomOf="@id/ivCover" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnMessage"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="8dp"
+            android:text="Message"
+            android:textColor="@color/text_white"
+            android:textSize="12sp"
+            android:visibility="gone"
+            app:cornerRadius="20dp"
+            app:layout_constraintEnd_toStartOf="@id/btnFollow"
+            app:layout_constraintTop_toBottomOf="@id/ivCover"
+            app:strokeColor="@color/border_dark" />
+
         <ImageButton
             android:id="@+id/btnLogout"
             android:layout_width="36dp"

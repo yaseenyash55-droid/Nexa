@@ -14,6 +14,7 @@ import { CreateBroadcastModal } from '../components/chat/CreateBroadcastModal.js
 import { useAuth } from '../contexts/AuthContext.js';
 import { formatDistanceToNow } from 'date-fns';
 import { io, Socket } from 'socket.io-client';
+import { useSearchParams } from 'react-router-dom';
 import { API_BASE_URL, getAccessToken } from '../api/client.js';
 import { useTheme } from '../contexts/ThemeContext.js';
 import { decryptMessage, DecryptedMessageResult } from '../utils/e2ee.js';
@@ -22,6 +23,8 @@ export const MessagesPage: React.FC = () => {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const { currentChatTheme } = useTheme();
+  const [searchParams] = useSearchParams();
+  const requestedUserId = Number.parseInt(searchParams.get('userId') || '', 10);
 
   // Tab & Selection State
   const [chatType, setChatType] = useState<'direct' | 'groups' | 'broadcasts'>('direct');
@@ -55,6 +58,24 @@ export const MessagesPage: React.FC = () => {
     queryKey: ['chat-users'],
     queryFn: () => usersApi.getSuggestions()
   });
+
+  const { data: requestedUser } = useQuery({
+    queryKey: ['message-target-user', requestedUserId],
+    queryFn: () => usersApi.getById(requestedUserId),
+    enabled:
+      Number.isInteger(requestedUserId) &&
+      requestedUserId > 0 &&
+      requestedUserId !== currentUser?.userId
+  });
+
+  useEffect(() => {
+    if (!requestedUser || requestedUser.userId === currentUser?.userId) return;
+
+    setChatType('direct');
+    setSelectedGroup(null);
+    setSelectedBroadcast(null);
+    setSelectedUser(requestedUser);
+  }, [currentUser?.userId, requestedUser]);
 
   // Fetch user groups (Group Chats)
   const { data: groups = [] } = useQuery({

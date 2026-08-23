@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User } from '../../types/index.js';
 import { Avatar } from '../ui/Avatar.js';
 import { Button } from '../ui/Button.js';
-import { MapPin, Link as LinkIcon, Calendar, Edit3 } from 'lucide-react';
+import { MapPin, Link as LinkIcon, Calendar, Edit3, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext.js';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,6 +18,7 @@ interface ProfileHeaderProps {
 export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user, onEditClick }) => {
   const { user: currentUser, requireAuth } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const isSelf = currentUser?.userId === user.userId;
   const [isFollowing, setIsFollowing] = useState(user.isFollowing || false);
@@ -68,14 +70,29 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user, onEditClick 
             Edit Profile
           </Button>
         ) : (
-          <Button
-            variant={isFollowing ? 'outline' : 'primary'}
-            size="sm"
-            onClick={() => requireAuth(() => followMutation.mutate(), `Log in to follow @${user.username}.`)}
-            isLoading={followMutation.isPending}
-          >
-            {isFollowing ? 'Following' : 'Follow'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<MessageSquare className="w-4 h-4" />}
+              onClick={() =>
+                requireAuth(
+                  () => navigate(`/messages?userId=${user.userId}`),
+                  `Log in to message @${user.username}.`
+                )
+              }
+            >
+              Message
+            </Button>
+            <Button
+              variant={isFollowing ? 'outline' : 'primary'}
+              size="sm"
+              onClick={() => requireAuth(() => followMutation.mutate(), `Log in to follow @${user.username}.`)}
+              isLoading={followMutation.isPending}
+            >
+              {isFollowing ? 'Following' : 'Follow'}
+            </Button>
+          </div>
         )}
       </div>
 
