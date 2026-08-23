@@ -195,6 +195,11 @@ class ChatActivity : AppCompatActivity() {
             try {
                 if (chatType == "direct") {
                     val res = NexaApiClient.messageApi.getMessagesWithUser(targetId)
+                    if (!res.isSuccessful) {
+                        throw IllegalStateException(
+                            res.body()?.error?.message ?: "Server rejected message history (${res.code()})"
+                        )
+                    }
                     val rawMessages = res.body()?.data ?: emptyList()
                     val displayList = rawMessages.map { m ->
                         DisplayMessage(
@@ -214,6 +219,11 @@ class ChatActivity : AppCompatActivity() {
                     }
                 } else {
                     val res = NexaApiClient.groupApi.getGroupMessages(targetId)
+                    if (!res.isSuccessful) {
+                        throw IllegalStateException(
+                            res.body()?.error?.message ?: "Server rejected group history (${res.code()})"
+                        )
+                    }
                     val rawMessages = res.body()?.data ?: emptyList()
                     val displayList = rawMessages.map { m ->
                         DisplayMessage(
@@ -242,7 +252,7 @@ class ChatActivity : AppCompatActivity() {
 
     private fun sendMessage(content: String) {
         val currentUserId = prefManager.userId
-        binding.etMessage.setText("")
+        binding.btnSend.isEnabled = false
 
         if (chatType == "direct") {
             stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
@@ -255,42 +265,60 @@ class ChatActivity : AppCompatActivity() {
                 if (chatType == "direct") {
                     val req = SendDirectMessageRequest(receiverId = targetId, content = content)
                     val res = NexaApiClient.messageApi.sendMessage(req)
-                    val msg = res.body()?.data
-                    if (msg != null) {
-                        val displayMsg = DisplayMessage(
-                            id = msg.messageId,
-                            senderId = msg.senderId,
-                            senderName = null,
-                            content = msg.content,
-                            isSelf = true,
-                            timestamp = msg.createdAt
+                    if (!res.isSuccessful) {
+                        throw IllegalStateException(
+                            res.body()?.error?.message ?: "Server rejected message (${res.code()})"
                         )
-                        withContext(Dispatchers.Main) {
-                            adapter.addMessage(displayMsg)
-                            binding.rvMessages.smoothScrollToPosition(adapter.itemCount - 1)
+                    }
+                    val msg = res.body()?.data
+                        ?: throw IllegalStateException("Server returned an empty message response")
+                    val displayMsg = DisplayMessage(
+                        id = msg.messageId,
+                        senderId = msg.senderId,
+                        senderName = null,
+                        content = msg.content,
+                        isSelf = true,
+                        timestamp = msg.createdAt
+                    )
+                    withContext(Dispatchers.Main) {
+                        if (binding.etMessage.text.toString().trim() == content) {
+                            binding.etMessage.setText("")
                         }
+                        adapter.addMessage(displayMsg)
+                        binding.rvMessages.smoothScrollToPosition(adapter.itemCount - 1)
                     }
                 } else {
                     val res = NexaApiClient.groupApi.sendGroupMessage(targetId, mapOf("content" to content))
-                    val msg = res.body()?.data
-                    if (msg != null) {
-                        val displayMsg = DisplayMessage(
-                            id = msg.messageId,
-                            senderId = msg.senderId,
-                            senderName = msg.sender.displayName,
-                            content = msg.content,
-                            isSelf = true,
-                            timestamp = msg.createdAt
+                    if (!res.isSuccessful) {
+                        throw IllegalStateException(
+                            res.body()?.error?.message ?: "Server rejected group message (${res.code()})"
                         )
-                        withContext(Dispatchers.Main) {
-                            adapter.addMessage(displayMsg)
-                            binding.rvMessages.smoothScrollToPosition(adapter.itemCount - 1)
+                    }
+                    val msg = res.body()?.data
+                        ?: throw IllegalStateException("Server returned an empty group message response")
+                    val displayMsg = DisplayMessage(
+                        id = msg.messageId,
+                        senderId = msg.senderId,
+                        senderName = msg.sender.displayName,
+                        content = msg.content,
+                        isSelf = true,
+                        timestamp = msg.createdAt
+                    )
+                    withContext(Dispatchers.Main) {
+                        if (binding.etMessage.text.toString().trim() == content) {
+                            binding.etMessage.setText("")
                         }
+                        adapter.addMessage(displayMsg)
+                        binding.rvMessages.smoothScrollToPosition(adapter.itemCount - 1)
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@ChatActivity, "Failed to send: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                withContext(Dispatchers.Main) {
+                    binding.btnSend.isEnabled = true
                 }
             }
         }

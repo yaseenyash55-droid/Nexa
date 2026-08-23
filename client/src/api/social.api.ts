@@ -1,6 +1,16 @@
 import { api } from './client.js';
 import { Story, Reel, Message, ApiResponse } from '../types/index.js';
 
+export interface ConversationSummary {
+  otherUserId: number;
+  username: string;
+  displayName: string;
+  profileImageUrl?: string | null;
+  lastMessage: string;
+  lastMessageAt: string | null;
+  unreadCount: number;
+}
+
 export const socialApi = {
   uploadMedia: async (file: File, kind: 'avatar' | 'photo' | 'story' | 'reel' | 'chat'): Promise<{ publicUrl: string }> => {
     const form = new FormData();
@@ -51,8 +61,8 @@ export const socialApi = {
   },
 
   // Direct Messaging API
-  getConversations: async (): Promise<{ userId: number; username: string; displayName: string; profileImageUrl?: string; lastMessage: string; lastMessageAt: string }[]> => {
-    const res = await api.get('/messages/conversations');
+  getConversations: async (): Promise<ConversationSummary[]> => {
+    const res = await api.get<ApiResponse<ConversationSummary[]>>('/conversations');
     return res.data.data;
   },
 

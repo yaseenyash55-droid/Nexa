@@ -118,6 +118,16 @@ export interface Message {
   createdAt: string;
 }
 
+export interface ConversationSummary {
+  otherUserId: number;
+  username: string;
+  displayName: string;
+  profileImageUrl?: string | null;
+  lastMessage: string;
+  lastMessageAt: string | null;
+  unreadCount: number;
+}
+
 export interface Group {
   groupId: number;
   name: string;

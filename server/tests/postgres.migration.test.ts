@@ -180,6 +180,39 @@ describe('PostgreSQL Migration Unit Tests', () => {
 
       spy.mockRestore();
     });
+
+    it('PostgresMessageRepository returns the flat conversation contract used by Android', async () => {
+      const messageRepo = new PostgresMessageRepository();
+      const spy = vi.spyOn(postgresPool, 'executePostgresSql').mockResolvedValue({
+        rows: [{
+          partner_id: '821',
+          username: 'leon_yash',
+          display_name: 'Yash',
+          profile_image_url: 'https://cdn.nexa.social/leon.png',
+          last_message: 'hi',
+          last_message_at: new Date('2026-08-23T13:05:21.829Z'),
+          last_message_sender_id: '821',
+          unread_count: '1'
+        }],
+        rowCount: 1
+      });
+
+      const conversations = await messageRepo.getConversations(999);
+
+      expect(conversations).toEqual([{
+        otherUserId: 821,
+        username: 'leon_yash',
+        displayName: 'Yash',
+        profileImageUrl: 'https://cdn.nexa.social/leon.png',
+        lastMessage: 'hi',
+        lastMessageAt: '2026-08-23T13:05:21.829Z',
+        unreadCount: 1
+      }]);
+      expect(conversations[0]).not.toHaveProperty('partnerId');
+      expect(conversations[0]).not.toHaveProperty('user');
+
+      spy.mockRestore();
+    });
   });
 
   describe('PostgreSQL DDL & Seed File Syntax Validation', () => {

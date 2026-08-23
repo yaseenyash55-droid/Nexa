@@ -1,7 +1,7 @@
 import oracledb from 'oracledb';
 import { executeSql, withTransaction } from '../../db/pool.js';
 import { IMessageRepository } from '../types.js';
-import { Message } from '../../types/index.js';
+import { ConversationSummary, Message } from '../../types/index.js';
 
 interface RawMessageRow {
   MESSAGE_ID: number;
@@ -123,7 +123,7 @@ export class OracleMessageRepository implements IMessageRepository {
     });
   }
 
-  async getConversations(userId: number): Promise<any[]> {
+  async getConversations(userId: number): Promise<ConversationSummary[]> {
     const sql = `
       SELECT
           other_user_id,
@@ -147,13 +147,13 @@ export class OracleMessageRepository implements IMessageRepository {
     `;
     const res = await executeSql(sql, { userId });
     return (res.rows || []).map((row: any) => ({
-      otherUserId: row.OTHER_USER_ID,
+      otherUserId: Number(row.OTHER_USER_ID),
       username: row.USERNAME,
       displayName: row.DISPLAY_NAME,
       profileImageUrl: row.PROFILE_IMAGE_URL,
       lastMessage: row.LAST_MESSAGE,
       lastMessageAt: row.LAST_MESSAGE_AT ? row.LAST_MESSAGE_AT.toISOString() : null,
-      unreadCount: row.UNREAD_COUNT
+      unreadCount: Number(row.UNREAD_COUNT || 0)
     }));
   }
 }

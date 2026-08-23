@@ -146,20 +146,36 @@ data class MarkReadResponse(
     @SerializedName("readAt") val readAt: String?
 )
 
+data class ConversationParticipant(
+    @SerializedName("userId") val userId: Int? = null,
+    @SerializedName("username") val username: String? = null,
+    @SerializedName("displayName") val displayName: String? = null,
+    @SerializedName("profileImageUrl") val profileImageUrl: String? = null
+)
+
 data class Conversation(
-    @SerializedName("otherUserId") val otherUserId: Int,
+    @SerializedName(value = "otherUserId", alternate = ["partnerId"]) val otherUserId: Int,
     @SerializedName("username") val username: String? = null,
     @SerializedName("displayName") val displayName: String? = null,
     @SerializedName("profileImageUrl") val profileImageUrl: String? = null,
     @SerializedName("lastMessage") val lastMessage: String? = null,
     @SerializedName("lastMessageAt") val lastMessageAt: String? = null,
-    @SerializedName("unreadCount") val unreadCount: Int = 0
+    @SerializedName("unreadCount") val unreadCount: Int = 0,
+    @SerializedName("user") val participant: ConversationParticipant? = null
 ) {
     fun resolvedUsername(): String =
-        username?.trim()?.takeIf { it.isNotEmpty() } ?: "user_$otherUserId"
+        username?.trim()?.takeIf { it.isNotEmpty() }
+            ?: participant?.username?.trim()?.takeIf { it.isNotEmpty() }
+            ?: "user_$otherUserId"
 
     fun resolvedDisplayName(): String =
-        displayName?.trim()?.takeIf { it.isNotEmpty() } ?: resolvedUsername()
+        displayName?.trim()?.takeIf { it.isNotEmpty() }
+            ?: participant?.displayName?.trim()?.takeIf { it.isNotEmpty() }
+            ?: resolvedUsername()
+
+    fun resolvedProfileImageUrl(): String? =
+        profileImageUrl?.trim()?.takeIf { it.isNotEmpty() }
+            ?: participant?.profileImageUrl?.trim()?.takeIf { it.isNotEmpty() }
 
     fun messagePreview(): String =
         lastMessage?.trim()?.takeIf { it.isNotEmpty() } ?: "Start a conversation"

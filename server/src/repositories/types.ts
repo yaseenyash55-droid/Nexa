@@ -1,4 +1,4 @@
-import { User, Post, Comment, Notification, Story, Reel, Message, PaginatedResult } from '../types/index.js';
+import { User, Post, Comment, Notification, Story, Reel, Message, ConversationSummary, PaginatedResult } from '../types/index.js';
 
 export interface IUserRepository {
   createUser(user: {
@@ -104,7 +104,7 @@ export interface IMessageRepository {
   sendMessage(msg: { senderId: number; receiverId: number; content: string }): Promise<Message>;
   getMessagesBetweenUsers(userA: number, userB: number): Promise<Message[]>;
   markMessageAsRead(messageId: number, receiverUserId: number): Promise<{ rowsAffected: number; readAt: Date | null; senderId: number | null }>;
-  getConversations(userId: number): Promise<any[]>;
+  getConversations(userId: number): Promise<ConversationSummary[]>;
 }
 
 export interface IAuthRepository {

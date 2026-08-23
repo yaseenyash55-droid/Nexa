@@ -46,4 +46,29 @@ class ConversationNullSafetyTest {
         assertTrue(conversation.matchesSearch("wanda"))
         assertTrue(conversation.matchesSearch("hello"))
     }
+
+    @Test
+    fun `legacy postgres nested conversation contract remains readable during rollout`() {
+        val conversation = Gson().fromJson(
+            """{
+              "partnerId": 821,
+              "user": {
+                "userId": 821,
+                "username": "leon_yash",
+                "displayName": "Yash",
+                "profileImageUrl": "https://cdn.nexa.social/leon.png"
+              },
+              "lastMessage": "hi",
+              "lastMessageAt": "2026-08-23T13:05:21.829Z",
+              "unreadCount": 1
+            }""".trimIndent(),
+            Conversation::class.java
+        )
+
+        assertEquals(821, conversation.otherUserId)
+        assertEquals("leon_yash", conversation.resolvedUsername())
+        assertEquals("Yash", conversation.resolvedDisplayName())
+        assertEquals("https://cdn.nexa.social/leon.png", conversation.resolvedProfileImageUrl())
+        assertTrue(conversation.matchesSearch("Yash"))
+    }
 }

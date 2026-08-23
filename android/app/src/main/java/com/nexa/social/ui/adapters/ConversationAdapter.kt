@@ -39,7 +39,7 @@ class ConversationAdapter(
                 binding.unreadBadge.visibility = View.GONE
             }
 
-            val avatarUrl = conversation.profileImageUrl?.let {
+            val avatarUrl = conversation.resolvedProfileImageUrl()?.let {
                 if (it.startsWith("http")) it else "${NexaApiClient.BASE_URL.removeSuffix("api/")}${it.removePrefix("/")}"
             }
             binding.ivAvatar.load(avatarUrl) {

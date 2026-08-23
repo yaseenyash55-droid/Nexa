@@ -1,6 +1,6 @@
 import { executePostgresSql } from '../../db/postgres.pool.js';
 import { IMessageRepository } from '../types.js';
-import { Message } from '../../types/index.js';
+import { ConversationSummary, Message } from '../../types/index.js';
 
 interface RawMessageRow {
   message_id: number | string;
@@ -122,7 +122,7 @@ export class PostgresMessageRepository implements IMessageRepository {
     };
   }
 
-  async getConversations(userId: number): Promise<any[]> {
+  async getConversations(userId: number): Promise<ConversationSummary[]> {
     const sql = `
       WITH ranked_messages AS (
         SELECT m.message_id, m.sender_id, m.receiver_id, m.content, m.read_at, m.created_at,
@@ -145,16 +145,12 @@ export class PostgresMessageRepository implements IMessageRepository {
     `;
     const res = await executePostgresSql<any>(sql, [userId]);
     return (res.rows || []).map((row) => ({
-      partnerId: Number(row.partner_id),
-      user: {
-        userId: Number(row.partner_id),
-        username: row.username,
-        displayName: row.display_name,
-        profileImageUrl: row.profile_image_url ?? undefined
-      },
+      otherUserId: Number(row.partner_id),
+      username: row.username,
+      displayName: row.display_name,
+      profileImageUrl: row.profile_image_url ?? null,
       lastMessage: row.last_message,
-      lastMessageAt: new Date(row.last_message_at).toISOString(),
-      lastMessageSenderId: Number(row.last_message_sender_id),
+      lastMessageAt: row.last_message_at ? new Date(row.last_message_at).toISOString() : null,
       unreadCount: Number(row.unread_count || 0)
     }));
   }

@@ -160,7 +160,7 @@ class MessagesFragment : Fragment() {
                         binding.progressBar.visibility = View.GONE
                         binding.swipeRefresh.isRefreshing = false
                         binding.tvError.visibility = View.GONE
-                        allConversations = state.conversations
+                        allConversations = state.conversations.filter { it.otherUserId > 0 }
                         applySearch(binding.etSearch.text?.toString().orEmpty())
                     }
                     is MessagesUiState.Error -> {
