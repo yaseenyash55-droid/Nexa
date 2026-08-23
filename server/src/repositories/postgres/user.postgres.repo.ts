@@ -167,6 +167,20 @@ export class PostgresUserRepository implements IUserRepository {
     return { userId: Number(res.rows[0].user_id), passwordHash: res.rows[0].password_hash };
   }
 
+  async updatePasswordHash(userId: number, passwordHash: string): Promise<void> {
+    const result = await executePostgresSql(
+      `UPDATE users
+       SET password_hash = $1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $2`,
+      [passwordHash, userId]
+    );
+
+    if (result.rowCount !== 1) {
+      throw { statusCode: 404, code: 'USER_NOT_FOUND', message: 'User not found' };
+    }
+  }
+
   async findById(userId: number, currentUserId?: number): Promise<User | null> {
     const sql = `
       SELECT u.user_id, u.username, u.email, u.display_name, u.bio, u.profile_image_url,

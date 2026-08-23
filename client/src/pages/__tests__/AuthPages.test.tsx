@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import { LoginPage } from '../LoginPage.js';
 import { RegisterPage } from '../RegisterPage.js';
+import { ResetPasswordPage } from '../ResetPasswordPage.js';
 import { AuthProvider } from '../../contexts/AuthContext.js';
 import { setAccessToken, getAccessToken, clearAuthSession } from '../../api/client.js';
 
@@ -15,7 +16,8 @@ vi.mock('../../api/auth.api.js', () => ({
     refresh: vi.fn(),
     logout: vi.fn(),
     me: vi.fn(),
-    forgotPassword: vi.fn().mockResolvedValue({ message: 'Password reset link sent' })
+    forgotPassword: vi.fn().mockResolvedValue({ message: 'Password reset link sent' }),
+    resetPassword: vi.fn().mockResolvedValue({ message: 'Password reset successful' })
   }
 }));
 
@@ -123,6 +125,28 @@ describe('Web Authentication and Accessibility Suite', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Password reset link sent/i)).toBeDefined();
+      });
+    });
+  });
+
+  describe('ResetPasswordPage', () => {
+    it('submits a matching strong password from a valid email link', async () => {
+      render(
+        <MemoryRouter initialEntries={['/reset-password?token=test-reset-token']}>
+          <ResetPasswordPage />
+        </MemoryRouter>
+      );
+
+      fireEvent.change(screen.getByLabelText(/^New Password$/i), {
+        target: { value: 'NewPassword1' }
+      });
+      fireEvent.change(screen.getByLabelText(/^Confirm Password$/i), {
+        target: { value: 'NewPassword1' }
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Save New Password/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Password changed successfully/i)).toBeDefined();
       });
     });
   });

@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { checkDatabaseHealth } from '../db/index.js';
-import { env } from '../config/env.js';
 import { sendSuccess } from '../utils/response.js';
 
 const router = Router();

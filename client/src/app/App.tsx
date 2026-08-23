@@ -15,6 +15,7 @@ import { MessagesPage } from '../pages/MessagesPage.js';
 import { UserManualPage } from '../pages/UserManualPage.js';
 import { LoginPage } from '../pages/LoginPage.js';
 import { RegisterPage } from '../pages/RegisterPage.js';
+import { ResetPasswordPage } from '../pages/ResetPasswordPage.js';
 import { NotFoundPage } from '../pages/NotFoundPage.js';
 import { initializeLiveUpdates } from '../utils/capacitorLiveUpdates.js';
 
@@ -67,6 +68,7 @@ export const App: React.FC = () => {
               <Route path="/tutorial" element={<UserManualPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
 
               <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
               <Route path="/bookmarks" element={<ProtectedRoute><Navigate to="/settings?tab=bookmarks" replace /></ProtectedRoute>} />

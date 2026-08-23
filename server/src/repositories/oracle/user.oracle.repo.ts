@@ -197,6 +197,20 @@ export class OracleUserRepository implements IUserRepository {
     return { userId: res.rows[0].USER_ID, passwordHash: res.rows[0].PASSWORD_HASH };
   }
 
+  async updatePasswordHash(userId: number, passwordHash: string): Promise<void> {
+    const result = await executeSql(
+      `UPDATE USERS
+       SET PASSWORD_HASH = :passwordHash,
+           UPDATED_AT = SYSTIMESTAMP
+       WHERE USER_ID = :userId`,
+      { userId, passwordHash }
+    );
+
+    if ((result.rowsAffected || 0) !== 1) {
+      throw { statusCode: 404, code: 'USER_NOT_FOUND', message: 'User not found' };
+    }
+  }
+
   async findById(userId: number, currentUserId?: number): Promise<User | null> {
     const sql = `
       SELECT u.USER_ID, u.USERNAME, u.EMAIL, u.DISPLAY_NAME, u.BIO, u.PROFILE_IMAGE_URL,

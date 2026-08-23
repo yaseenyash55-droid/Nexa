@@ -4,7 +4,7 @@ import { app } from '../src/app.js';
 import { getRefreshTokenCookieOptions, getClearRefreshTokenCookieOptions } from '../src/controllers/auth.controller.js';
 import { AuthService } from '../src/services/auth.service.js';
 import { signRefreshToken, signAccessToken } from '../src/utils/jwt.js';
-import { hashToken } from '../src/utils/hash.js';
+import { comparePassword, hashToken } from '../src/utils/hash.js';
 import * as poolModule from '../src/db/pool.js';
 
 describe('Auth Cookies, Token Rotation, Replay Protection, and Logout', () => {
@@ -104,6 +104,42 @@ describe('Auth Cookies, Token Rotation, Replay Protection, and Logout', () => {
 
       await authService.logout(testToken);
       expect(revokeSpy).toHaveBeenCalledWith(testHash);
+    });
+  });
+
+  describe('Password Reset', () => {
+    it('updates the existing credential instead of attempting to create a duplicate user', async () => {
+      const authService = new AuthService();
+      const user = {
+        userId: 321,
+        username: 'resetuser',
+        email: 'reset@example.com',
+        displayName: 'Reset User',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const authRepoMock = (authService as any).authRepo;
+      const userRepoMock = (authService as any).userRepo;
+
+      vi.spyOn(authRepoMock, 'findPasswordResetToken').mockResolvedValue({
+        userId: user.userId,
+        expiresAt: new Date(Date.now() + 60_000),
+        usedAt: null
+      });
+      vi.spyOn(userRepoMock, 'findById').mockResolvedValue(user);
+      const updatePasswordHash = vi.spyOn(userRepoMock, 'updatePasswordHash').mockResolvedValue(undefined);
+      const createUser = vi.spyOn(userRepoMock, 'createUser').mockResolvedValue(user);
+      vi.spyOn(authRepoMock, 'markPasswordResetTokenUsed').mockResolvedValue(undefined);
+      vi.spyOn(authRepoMock, 'revokeAllUserTokens').mockResolvedValue(undefined);
+      vi.spyOn(userRepoMock, 'resetLockoutState').mockResolvedValue(undefined);
+
+      await authService.resetPassword('valid-reset-token', 'NewPassword1');
+
+      expect(updatePasswordHash).toHaveBeenCalledOnce();
+      expect(updatePasswordHash).toHaveBeenCalledWith(user.userId, expect.any(String));
+      expect(await comparePassword('NewPassword1', updatePasswordHash.mock.calls[0][1])).toBe(true);
+      expect(createUser).not.toHaveBeenCalled();
     });
   });
 

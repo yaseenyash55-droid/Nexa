@@ -301,11 +301,13 @@ export class AuthService {
 
     await this.authRepo.savePasswordResetToken(user.userId, tokenHash, expiresAt);
 
+    const clientOrigin = env.CLIENT_ORIGIN.replace(/\/+$/, '');
+    const resetUrl = `${clientOrigin}/reset-password?token=${encodeURIComponent(rawToken)}`;
     const emailProvider = getEmailProvider();
     await emailProvider.sendEmail({
       to: user.email,
       subject: 'Nexa Social Password Reset Request',
-      body: `You requested a password reset. Use this reset token (valid for 15 minutes): ${rawToken}`
+      body: `You requested a password reset. Open this link within 15 minutes: ${resetUrl}`
     });
 
     return { message: 'If an account with that email exists, password reset instructions have been sent.' };
@@ -331,13 +333,7 @@ export class AuthService {
       throw { statusCode: 404, code: 'USER_NOT_FOUND', message: 'User associated with token no longer exists' };
     }
 
-    // Reuse createUser / updateUser credentials mapping
-    await (this.userRepo as any).createUser?.({
-      username: user.username,
-      email: user.email,
-      passwordHash: newPasswordHash,
-      displayName: user.displayName
-    });
+    await this.userRepo.updatePasswordHash(user.userId, newPasswordHash);
 
     await this.authRepo.markPasswordResetTokenUsed(tokenHash);
     await this.authRepo.revokeAllUserTokens(user.userId);
@@ -395,4 +391,3 @@ export class AuthService {
     return { message: 'Email verified successfully.' };
   }
 }
-

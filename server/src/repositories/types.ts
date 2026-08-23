@@ -23,6 +23,7 @@ export interface IUserRepository {
   findByUsername(username: string): Promise<User | null>;
   findByEmail(email: string): Promise<User | null>;
   findCredentialById(userId: number): Promise<{ userId: number; passwordHash: string } | null>;
+  updatePasswordHash(userId: number, passwordHash: string): Promise<void>;
   findById(userId: number, currentUserId?: number): Promise<User | null>;
   updateUser(userId: number, updates: {
     displayName?: string;
@@ -222,4 +223,3 @@ export interface IRepositoryManager {
   fcmTokens: IFcmTokenRepository;
   privacy: IPrivacyRepository;
 }
-
