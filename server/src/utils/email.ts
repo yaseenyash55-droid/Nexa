@@ -20,6 +20,53 @@ export class FakeEmailProvider implements IEmailProvider {
   }
 }
 
+export class BrevoEmailProvider implements IEmailProvider {
+  private readonly apiKey: string;
+  private readonly senderEmail: string;
+  private readonly senderName: string;
+
+  constructor() {
+    this.apiKey = process.env.BREVO_API_KEY?.trim() || '';
+    this.senderEmail = process.env.BREVO_SENDER_EMAIL?.trim() || '';
+    this.senderName = process.env.BREVO_SENDER_NAME?.trim() || 'Nexa';
+
+    if (!this.apiKey || !this.senderEmail) {
+      throw new Error('Brevo configuration is incomplete. Required: BREVO_API_KEY and BREVO_SENDER_EMAIL.');
+    }
+  }
+
+  async sendEmail(message: EmailMessage): Promise<boolean> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'api-key': this.apiKey,
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: this.senderName, email: this.senderEmail },
+          to: [{ email: message.to }],
+          subject: message.subject,
+          textContent: message.body
+        }),
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`Brevo email API request failed with status ${response.status}`);
+      }
+
+      return true;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
+
 export class ProductionEmailProvider implements IEmailProvider {
   private readonly transporter: Transporter;
   private readonly fromAddress: string;
@@ -82,17 +129,13 @@ export class ProductionEmailProvider implements IEmailProvider {
 }
 
 export function getEmailProvider(): IEmailProvider {
-  const hasSmtp = Boolean(
-    (process.env.SMTP_HOST && process.env.SMTP_USER && (process.env.SMTP_PASSWORD || process.env.SMTP_PASS)) ||
-    (process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL)
-  );
-
-  if (env.NODE_ENV === 'test') {
-    return new FakeEmailProvider();
+  if (process.env.BREVO_API_KEY) {
+    return new BrevoEmailProvider();
   }
 
-  if (env.NODE_ENV === 'development') {
-    if (hasSmtp) {
+  const hasSmtpPass = Boolean(process.env.SMTP_PASSWORD || process.env.SMTP_PASS);
+  if (env.NODE_ENV === 'test' || env.NODE_ENV === 'development') {
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && hasSmtpPass) {
       try {
         return new ProductionEmailProvider();
       } catch {
