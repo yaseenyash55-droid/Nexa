@@ -47,7 +47,11 @@ class MessagesFragment : Fragment() {
 
     private fun setupRecyclerView() {
         conversationAdapter = ConversationAdapter { conversation ->
-            openDirectChat(conversation.otherUserId, conversation.username, conversation.displayName)
+            openDirectChat(
+                conversation.otherUserId,
+                conversation.resolvedUsername(),
+                conversation.resolvedDisplayName()
+            )
         }
         userAdapter = UserAdapter { user -> openDirectChat(user.userId, user.username, user.displayName) }
         binding.rvConversations.adapter = conversationAdapter
@@ -77,9 +81,7 @@ class MessagesFragment : Fragment() {
         }
 
         val matchingConversations = allConversations.filter { conversation ->
-            conversation.displayName.contains(query, ignoreCase = true) ||
-                conversation.username.contains(query, ignoreCase = true) ||
-                conversation.lastMessage.contains(query, ignoreCase = true)
+            conversation.matchesSearch(query)
         }
 
         if (matchingConversations.isNotEmpty()) {

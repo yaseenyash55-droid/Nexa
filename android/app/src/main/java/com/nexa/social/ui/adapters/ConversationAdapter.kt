@@ -28,9 +28,9 @@ class ConversationAdapter(
 
     inner class ConversationViewHolder(private val binding: ItemConversationBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(conversation: Conversation) {
-            binding.tvDisplayName.text = conversation.displayName
-            binding.tvLastMessage.text = conversation.lastMessage
-            binding.tvTimestamp.text = conversation.lastMessageAt
+            binding.tvDisplayName.text = conversation.resolvedDisplayName()
+            binding.tvLastMessage.text = conversation.messagePreview()
+            binding.tvTimestamp.text = conversation.lastMessageAt.orEmpty()
 
             if (conversation.unreadCount > 0) {
                 binding.unreadBadge.visibility = View.VISIBLE

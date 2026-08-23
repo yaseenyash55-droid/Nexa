@@ -148,13 +148,30 @@ data class MarkReadResponse(
 
 data class Conversation(
     @SerializedName("otherUserId") val otherUserId: Int,
-    @SerializedName("username") val username: String,
-    @SerializedName("displayName") val displayName: String,
-    @SerializedName("profileImageUrl") val profileImageUrl: String?,
-    @SerializedName("lastMessage") val lastMessage: String,
-    @SerializedName("lastMessageAt") val lastMessageAt: String,
-    @SerializedName("unreadCount") val unreadCount: Int
-)
+    @SerializedName("username") val username: String? = null,
+    @SerializedName("displayName") val displayName: String? = null,
+    @SerializedName("profileImageUrl") val profileImageUrl: String? = null,
+    @SerializedName("lastMessage") val lastMessage: String? = null,
+    @SerializedName("lastMessageAt") val lastMessageAt: String? = null,
+    @SerializedName("unreadCount") val unreadCount: Int = 0
+) {
+    fun resolvedUsername(): String =
+        username?.trim()?.takeIf { it.isNotEmpty() } ?: "user_$otherUserId"
+
+    fun resolvedDisplayName(): String =
+        displayName?.trim()?.takeIf { it.isNotEmpty() } ?: resolvedUsername()
+
+    fun messagePreview(): String =
+        lastMessage?.trim()?.takeIf { it.isNotEmpty() } ?: "Start a conversation"
+
+    fun matchesSearch(query: String): Boolean {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isEmpty()) return true
+        return resolvedDisplayName().contains(normalizedQuery, ignoreCase = true) ||
+            resolvedUsername().contains(normalizedQuery, ignoreCase = true) ||
+            lastMessage.orEmpty().contains(normalizedQuery, ignoreCase = true)
+    }
+}
 
 data class Group(
     @SerializedName("groupId") val groupId: Int,
