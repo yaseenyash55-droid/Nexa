@@ -138,7 +138,7 @@ export const authApi = {
   me: () => api.get('/auth/me'),
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
   resetPassword: (data: { token: string; newPassword: string }) => api.post('/auth/reset-password', data),
-  verifyEmail: (token: string) => api.post('/auth/verify-email', { token }),
+  verifyEmail: (email: string, code: string) => api.post('/auth/verify-email', { email, code }),
   resendVerification: (email?: string) => api.post('/auth/resend-verification', { email })
 };
 

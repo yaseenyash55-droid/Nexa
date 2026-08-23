@@ -293,7 +293,7 @@ class ApiContractTest {
                 .setBody(mockResponseBody)
         )
 
-        val response = authApi.verifyEmail(VerifyEmailRequest(token = "valid_token_123"))
+        val response = authApi.verifyEmail(VerifyEmailRequest(email = "user@example.com", code = "123456"))
 
         val recordedRequest = mockServer.takeRequest()
         assertEquals("POST", recordedRequest.method)

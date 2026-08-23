@@ -48,7 +48,8 @@ data class ForgotPasswordRequest(
 )
 
 data class VerifyEmailRequest(
-    @SerializedName("token") val token: String
+    @SerializedName("email") val email: String,
+    @SerializedName("code") val code: String
 )
 
 data class ResetPasswordRequest(

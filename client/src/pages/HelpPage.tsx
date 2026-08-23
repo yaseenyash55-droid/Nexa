@@ -6,7 +6,6 @@ import {
   UserPlus, 
   Edit3, 
   MessageSquare, 
-  ShieldCheck, 
   ShieldAlert,
   BookOpen,
   Settings,

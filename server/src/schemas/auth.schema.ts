@@ -40,11 +40,18 @@ export const resetPasswordSchema = z.object({
     .regex(/[0-9]/, 'Password must contain at least one number')
 });
 
-export const verifyEmailSchema = z.object({
-  token: z.string().min(1, 'Verification token is required')
-});
+export const verifyEmailSchema = z.union([
+  z.object({
+    email: z.string().email('Please enter a valid email address'),
+    code: z.string().regex(/^\d{6}$/, 'Enter the six-digit verification code')
+  }),
+  // Retained temporarily so verification links/tokens issued by older clients
+  // continue to work during the Android rollout.
+  z.object({
+    token: z.string().min(1, 'Verification token is required')
+  })
+]);
 
 export const resendVerificationSchema = z.object({
   email: z.string().email('Please enter a valid email address').optional()
 });
-

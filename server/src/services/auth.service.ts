@@ -360,9 +360,11 @@ export class AuthService {
       throw { statusCode: 404, code: 'USER_NOT_FOUND', message: 'User for verification not found' };
     }
 
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = hashToken(rawToken);
-    const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours TTL
+    const verificationCode = crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
+    // Scope the hash to the user so identical six-digit codes for two accounts
+    // cannot verify the wrong account.
+    const tokenHash = hashToken(`${user.userId}:${verificationCode}`);
+    const VERIFICATION_TOKEN_TTL_MS = 10 * 60 * 1000;
     const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
 
     await this.authRepo.saveEmailVerificationToken(user.userId, tokenHash, expiresAt);
@@ -371,22 +373,40 @@ export class AuthService {
     await emailProvider.sendEmail({
       to: recipientEmail,
       subject: 'Verify your Nexa Social Account',
-      body: `Welcome to Nexa! Please verify your email using this token (valid for 24 hours): ${rawToken}`
+      body: `Welcome to Nexa! Your six-digit verification code is ${verificationCode}. It expires in 10 minutes. If you did not create this account, you can ignore this email.`
     });
 
-    return { message: 'Verification email has been sent.' };
+    return { message: 'A six-digit verification code has been sent to your email.' };
+  }
+
+  async verifyEmailCode(email: string, code: string): Promise<{ message: string }> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.userRepo.findByEmail(normalizedEmail);
+    if (!user) {
+      throw { statusCode: 400, code: 'INVALID_VERIFICATION_CODE', message: 'Verification code is invalid or has expired' };
+    }
+
+    const tokenHash = hashToken(`${user.userId}:${code}`);
+    return this.consumeEmailVerificationToken(tokenHash);
   }
 
   async verifyEmailToken(token: string): Promise<{ message: string }> {
+    if (!token) {
+      throw { statusCode: 400, code: 'INVALID_VERIFICATION_TOKEN', message: 'Verification token is required' };
+    }
     const tokenHash = hashToken(token);
+    return this.consumeEmailVerificationToken(tokenHash);
+  }
+
+  private async consumeEmailVerificationToken(tokenHash: string): Promise<{ message: string }> {
     const record = await this.authRepo.findEmailVerificationToken(tokenHash);
 
     if (!record || record.usedAt) {
-      throw { statusCode: 400, code: 'INVALID_VERIFICATION_TOKEN', message: 'Email verification token is invalid or has already been used' };
+      throw { statusCode: 400, code: 'INVALID_VERIFICATION_CODE', message: 'Verification code is invalid or has already been used' };
     }
 
     if (new Date(record.expiresAt).getTime() <= Date.now()) {
-      throw { statusCode: 400, code: 'EXPIRED_VERIFICATION_TOKEN', message: 'Email verification token has expired' };
+      throw { statusCode: 400, code: 'EXPIRED_VERIFICATION_CODE', message: 'Verification code has expired. Request a new code.' };
     }
 
     await this.securityRepo.updateSecuritySettings(record.userId, { emailVerifiedAt: new Date() });

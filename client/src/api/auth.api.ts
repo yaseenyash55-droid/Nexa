@@ -58,8 +58,8 @@ export const authApi = {
     return res.data.data;
   },
 
-  async verifyEmail(token: string): Promise<{ success: boolean; message: string }> {
-    const res = await api.post<ApiResponse<{ success: boolean; message: string }>>('/auth/verify-email', { token });
+  async verifyEmail(email: string, code: string): Promise<{ success: boolean; message: string }> {
+    const res = await api.post<ApiResponse<{ success: boolean; message: string }>>('/auth/verify-email', { email, code });
     return res.data.data;
   },
 

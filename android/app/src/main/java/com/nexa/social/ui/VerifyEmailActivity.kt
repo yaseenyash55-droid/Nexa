@@ -14,6 +14,7 @@ class VerifyEmailActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityVerifyEmailBinding
     private lateinit var authRepository: AuthRepository
+    private lateinit var email: String
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,10 +38,10 @@ class VerifyEmailActivity : AppCompatActivity() {
             performEmailVerification()
         }
 
-        val email = intent.getStringExtra("email")
+        email = intent.getStringExtra("email")?.trim()?.lowercase().orEmpty()
 
         binding.tvResend.setOnClickListener {
-            if (!email.isNullOrBlank()) {
+            if (email.isNotBlank()) {
                 setLoading(true)
                 lifecycleScope.launch {
                     val result = authRepository.resendVerification(email)
@@ -58,16 +59,21 @@ class VerifyEmailActivity : AppCompatActivity() {
     }
 
     private fun performEmailVerification() {
-        val token = binding.etToken.text.toString().trim()
+        val code = binding.etToken.text.toString().trim()
 
-        if (token.isEmpty()) {
-            binding.tilToken.error = "Token is required"
+        if (!code.matches(Regex("^\\d{6}$"))) {
+            binding.tilToken.error = "Enter the six-digit verification code"
             return
         }
+        if (email.isBlank()) {
+            Toast.makeText(this, "Email address is missing. Please register again.", Toast.LENGTH_LONG).show()
+            return
+        }
+        binding.tilToken.error = null
 
         setLoading(true)
         lifecycleScope.launch {
-            val result = authRepository.verifyEmail(token)
+            val result = authRepository.verifyEmail(email, code)
             setLoading(false)
             result.onSuccess { message ->
                 Toast.makeText(this@VerifyEmailActivity, message, Toast.LENGTH_LONG).show()

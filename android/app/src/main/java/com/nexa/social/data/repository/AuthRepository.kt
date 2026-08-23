@@ -86,8 +86,8 @@ class AuthRepository(private val tokenManager: TokenManager) {
         else Result.failure(Exception(extractErrorMessage(response, "Failed to request password reset")))
     } catch (e: Exception) { Result.failure(e) }
 
-    suspend fun verifyEmail(token: String): Result<String> = try {
-        val response = NexaApiClient.authApi.verifyEmail(VerifyEmailRequest(token))
+    suspend fun verifyEmail(email: String, code: String): Result<String> = try {
+        val response = NexaApiClient.authApi.verifyEmail(VerifyEmailRequest(email, code))
         if (response.isSuccessful) Result.success(response.body()?.message ?: "Email verified")
         else Result.failure(Exception(extractErrorMessage(response, "Verification failed")))
     } catch (e: Exception) { Result.failure(e) }
