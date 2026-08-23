@@ -4,6 +4,7 @@ import { Home, Compass, Film, MessageSquare, Bell, User as UserIcon, Settings as
 import { useAuth } from '../../contexts/AuthContext.js';
 import { Avatar } from '../ui/Avatar.js';
 import { DrDoomOrbLogo } from '../ui/DrDoomOrbLogo.js';
+import { ANDROID_RELEASE } from '../../config/androidRelease.js';
 
 interface SidebarNavigationProps {
   onOpenComposer?: () => void;
@@ -39,8 +40,8 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onOpenComp
 
         {/* Download Android APK Badge Button */}
         <a
-          href="/nexa-social-app.apk"
-          download="nexa-social-app.apk"
+          href={ANDROID_RELEASE.downloadUrl}
+          download={ANDROID_RELEASE.fileName}
           className="mx-1 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all flex items-center justify-between group shadow-sm"
           title="Download NEXA Android App (.apk)"
         >
@@ -55,7 +56,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onOpenComp
               <p className="text-[9px] text-emerald-400/80">Download APK</p>
             </div>
           </div>
-          <span className="text-[10px] font-semibold bg-emerald-500/20 px-2 py-0.5 rounded-full text-emerald-300">v1.0</span>
+          <span className="text-[10px] font-semibold bg-emerald-500/20 px-2 py-0.5 rounded-full text-emerald-300">{ANDROID_RELEASE.versionLabel}</span>
         </a>
 
         {/* Navigation Items */}

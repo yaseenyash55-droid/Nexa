@@ -7,10 +7,14 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-val keyPropertiesFile = rootProject.file("key.properties")
+val keyPropertiesFile = sequenceOf(
+    rootProject.file("key.properties"),
+    project.file("key.properties")
+).firstOrNull { it.exists() }
+
 val keyProperties = Properties()
-if (keyPropertiesFile.exists()) {
-    keyProperties.load(FileInputStream(keyPropertiesFile))
+keyPropertiesFile?.let { file ->
+    file.inputStream().use { keyProperties.load(it) }
 }
 
 android {
@@ -21,8 +25,8 @@ android {
         applicationId = "com.nexa.social"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -33,13 +37,21 @@ android {
 
     signingConfigs {
         create("release") {
-            val storeFilePath = System.getenv("KEYSTORE_FILE") ?: keyProperties.getProperty("storeFile")
-            val storePasswordProp = System.getenv("KEYSTORE_PASSWORD") ?: keyProperties.getProperty("storePassword")
-            val keyAliasProp = System.getenv("KEY_ALIAS") ?: keyProperties.getProperty("keyAlias")
-            val keyPasswordProp = System.getenv("KEY_PASSWORD") ?: keyProperties.getProperty("keyPassword")
+            val storeFilePath = System.getenv("KEYSTORE_FILE") ?: keyProperties.getProperty("storeFile") ?: "nexa-release.jks"
+            val storePasswordProp = System.getenv("KEYSTORE_PASSWORD") ?: keyProperties.getProperty("storePassword") ?: "nexa2026release"
+            val keyAliasProp = System.getenv("KEY_ALIAS") ?: keyProperties.getProperty("keyAlias") ?: "nexa"
+            val keyPasswordProp = System.getenv("KEY_PASSWORD") ?: keyProperties.getProperty("keyPassword") ?: "nexa2026release"
 
-            if (storeFilePath != null && file(storeFilePath).exists()) {
-                storeFile = file(storeFilePath)
+            val foundKeystore = listOf(
+                file(storeFilePath),
+                rootProject.file(storeFilePath),
+                project.file(storeFilePath),
+                rootProject.file("nexa-release.jks"),
+                project.file("nexa-release.jks")
+            ).firstOrNull { it.exists() }
+
+            if (foundKeystore != null) {
+                storeFile = foundKeystore
                 storePassword = storePasswordProp
                 keyAlias = keyAliasProp
                 keyPassword = keyPasswordProp
@@ -62,10 +74,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            val releaseSigning = signingConfigs.getByName("release")
-            if (releaseSigning.storeFile != null) {
-                signingConfig = releaseSigning
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

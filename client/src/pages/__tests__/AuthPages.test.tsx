@@ -42,6 +42,20 @@ describe('Web Authentication and Accessibility Suite', () => {
   });
 
   describe('LoginPage Accessibility & Interaction', () => {
+    it('links the website download control to the cache-busted Android APK', () => {
+      render(
+        <AuthProvider>
+          <BrowserRouter>
+            <LoginPage />
+          </BrowserRouter>
+        </AuthProvider>
+      );
+
+      const downloadLink = screen.getByRole('link', { name: /Download Android App/i });
+      expect(downloadLink.getAttribute('href')).toBe('/nexa-social-app.apk?v=latest');
+      expect(downloadLink.getAttribute('download')).toBe('nexa-social-app.apk');
+    });
+
     it('associates form labels with input elements via id and htmlFor', () => {
       render(
         <AuthProvider>

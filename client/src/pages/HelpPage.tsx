@@ -7,6 +7,9 @@ import {
   Edit3, 
   MessageSquare, 
   ShieldCheck, 
+  ShieldAlert,
+  BookOpen,
+  Settings,
   Smartphone,
   ArrowRight,
   Users,
@@ -14,6 +17,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ANDROID_RELEASE } from '../config/androidRelease.js';
 
 export const HelpPage: React.FC = () => {
   const navigate = useNavigate();
@@ -112,17 +116,49 @@ export const HelpPage: React.FC = () => {
     {
       id: 'privacy-explained',
       category: 'security',
-      title: 'How Privacy & Security Work in Nexa',
-      icon: ShieldCheck,
-      color: 'text-emerald-400',
-      bg: 'bg-emerald-500/10 border-emerald-500/20',
+      title: 'Protection Center & Security Logs',
+      icon: ShieldAlert,
+      color: 'text-amber-400',
+      bg: 'bg-amber-500/10 border-amber-500/20',
       steps: [
-        'All communication between client apps and backend APIs is protected by TLS 1.3 encryption in transit.',
-        'Authentication uses short-lived in-memory access tokens and secure HTTP-only cookies.',
-        'Account privacy controls allow you to switch to a private profile, restrict messaging, and manage hidden words.',
-        'All application state is securely stored and audited in enterprise Oracle Database tables.'
+        'Visit the Protection Center to review active sessions, login history, and device IPs.',
+        'Enable 2FA and download backup recovery codes for secure emergency access.',
+        'Revoke compromised sessions instantly with one click.',
+        'Manage end-to-end encryption keys and rotate them when needed.'
       ],
-      actionText: 'Security Settings',
+      actionText: 'Protection Center',
+      actionTarget: '/protection'
+    },
+    {
+      id: 'user-manual-overview',
+      category: 'getting-started',
+      title: 'Interactive User Manual & Platform Guide',
+      icon: BookOpen,
+      color: 'text-cyan-400',
+      bg: 'bg-cyan-500/10 border-cyan-500/20',
+      steps: [
+        'Comprehensive guide covering feed algorithms, hashtag trends, and bookmarking.',
+        'Instructions for creating and broadcasting in Group Channels.',
+        'Guidelines for uploading HD reels, applying filters, and tagging users.',
+        'Detailed steps on privacy controls, block lists, and muted accounts.'
+      ],
+      actionText: 'View Manual',
+      actionTarget: '/user-manual'
+    },
+    {
+      id: 'settings-customization',
+      category: 'getting-started',
+      title: 'Account Settings & Themes',
+      icon: Settings,
+      color: 'text-rose-400',
+      bg: 'bg-rose-500/10 border-rose-500/20',
+      steps: [
+        'Toggle between Neon Cyberpunk, Sleek Midnight, and Emerald Dark themes.',
+        'Update your avatar, bio, location, website URL, and cover background.',
+        'Configure email notifications and alert preferences.',
+        'Export your personal data archive or delete your account.'
+      ],
+      actionText: 'Open Settings',
       actionTarget: '/settings'
     },
     {
@@ -139,7 +175,7 @@ export const HelpPage: React.FC = () => {
         'Explore reels, stories, and global trends on any Android device.'
       ],
       actionText: 'Download APK',
-      actionTarget: '/settings'
+      actionTarget: ANDROID_RELEASE.downloadUrl
     }
   ];
 

@@ -7,6 +7,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Input } from '../components/ui/Input.js';
 import { Button } from '../components/ui/Button.js';
 import { Sparkles, Lock, Mail, User as UserIcon, Smile, Eye, EyeOff } from 'lucide-react';
+import { ANDROID_RELEASE } from '../config/androidRelease.js';
 
 const registerSchema = z.object({
   username: z
@@ -147,14 +148,14 @@ export const RegisterPage: React.FC = () => {
           </div>
           <div>
             <a
-              href="/nexa-social-app.apk"
-              download="nexa-social-app.apk"
+              href={ANDROID_RELEASE.downloadUrl}
+              download={ANDROID_RELEASE.fileName}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-[11px] font-semibold transition-all focus:outline-none focus:ring-1 focus:ring-emerald-500"
             >
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5516 0 .9997.4482.9997.9993s-.4481.9997-.9997.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5516 0 .9997.4482.9997.9993s-.4481.9997-.9997.9997m11.4045-6.02l1.9973-3.4592c.1251-.2167.0506-.4928-.1661-.6178-.2161-.125-.4922-.0506-.6178.1661l-2.0224 3.5029c-1.5707-.7167-3.3444-1.1166-5.2285-1.1166s-3.6578.4-5.2285 1.1166l-2.0224-3.5029c-.1256-.2167-.4017-.2911-.6178-.1661-.2167.125-.2912.4011-.1661.6178l1.9973 3.4592c-3.149 1.7161-5.328 4.9082-5.7486 8.6534h22.9515c-.4206-3.7452-2.5996-6.9373-5.7486-8.6534" />
               </svg>
-              <span>Download Android App (.apk)</span>
+              <span>Download Android App ({ANDROID_RELEASE.versionLabel})</span>
             </a>
           </div>
         </div>

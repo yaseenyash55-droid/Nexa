@@ -3,6 +3,7 @@ import { AppShell } from '../components/layout/AppShell.js';
 import { DrDoomOrbLogo } from '../components/ui/DrDoomOrbLogo.js';
 import { BookOpen, Search, UserPlus, Edit3, MessageSquare, ShieldCheck, Smartphone, ChevronDown, ChevronUp, ArrowRight, Users, CheckCircle2, Camera, Video } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ANDROID_RELEASE } from '../config/androidRelease.js';
 
 interface ManualSection {
   id: string;
@@ -330,7 +331,7 @@ export const UserManualPage: React.FC = () => {
                         <button
                           onClick={() => {
                             if (sec.id === 'android-app-guide') {
-                              window.location.href = '/nexa-social-app.apk';
+                              window.location.href = ANDROID_RELEASE.downloadUrl;
                             } else {
                               navigate(sec.targetRoute);
                             }

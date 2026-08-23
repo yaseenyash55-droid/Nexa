@@ -2,6 +2,7 @@ import React from 'react';
 import { Sparkles, Search, Settings, ShieldCheck, LogIn } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.js';
+import { ANDROID_RELEASE } from '../../config/androidRelease.js';
 
 export const TopBar: React.FC = () => {
   const navigate = useNavigate();
@@ -17,8 +18,8 @@ export const TopBar: React.FC = () => {
       </div>
       <div className="flex items-center gap-2">
         <a
-          href="/nexa-social-app.apk"
-          download="nexa-social-app.apk"
+          href={ANDROID_RELEASE.downloadUrl}
+          download={ANDROID_RELEASE.fileName}
           className="p-2 text-emerald-400 hover:text-emerald-300 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-1 text-xs font-semibold"
           title="Download NEXA Android App (.apk)"
         >
