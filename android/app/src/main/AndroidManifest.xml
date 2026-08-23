@@ -91,6 +91,30 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- Native Reset Password Activity with Deep Link Support -->
+        <activity
+            android:name=".ui.ResetPasswordActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="nexa-social-app.surge.sh"
+                    android:pathPrefix="/reset-password" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="nexa"
+                    android:host="reset-password" />
+            </intent-filter>
+        </activity>
+
         <!-- Native Verify Email Activity -->
         <activity
             android:name=".ui.VerifyEmailActivity"
