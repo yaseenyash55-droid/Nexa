@@ -300,7 +300,8 @@ class ApiContractTest {
         assertEquals("/auth/verify-email", recordedRequest.path)
 
         val requestJson = JSONObject(recordedRequest.body.readUtf8())
-        assertEquals("valid_token_123", requestJson.getString("token"))
+        assertEquals("user@example.com", requestJson.getString("email"))
+        assertEquals("123456", requestJson.getString("code"))
 
         assertTrue(response.isSuccessful)
         assertEquals("Email verified successfully", response.body()?.message)
