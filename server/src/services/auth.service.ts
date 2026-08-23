@@ -303,12 +303,16 @@ export class AuthService {
 
     const clientOrigin = env.CLIENT_ORIGIN.replace(/\/+$/, '');
     const resetUrl = `${clientOrigin}/reset-password?token=${encodeURIComponent(rawToken)}`;
-    const emailProvider = getEmailProvider();
-    await emailProvider.sendEmail({
-      to: user.email,
-      subject: 'Nexa Social Password Reset Request',
-      body: `You requested a password reset. Open this link within 15 minutes: ${resetUrl}`
-    });
+    try {
+      const emailProvider = getEmailProvider();
+      await emailProvider.sendEmail({
+        to: user.email,
+        subject: 'Nexa Social Password Reset Request',
+        body: `You requested a password reset. Open this link within 15 minutes: ${resetUrl}`
+      });
+    } catch (emailErr) {
+      logger.error({ err: emailErr, userId: user.userId }, 'Failed to dispatch password reset email');
+    }
 
     return { message: 'If an account with that email exists, password reset instructions have been sent.' };
   }
