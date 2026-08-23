@@ -82,13 +82,26 @@ app.use('/api/groups', groupRouter);
 app.use('/api/broadcasts', broadcastRouter);
 app.use('/api', socialRouter);
 
-// Root API Welcome Endpoint
-app.get('/', (req, res) => {
+// Root & API Welcome Endpoints
+app.get(['/', '/api'], (req, res) => {
   res.json({
     status: 'online',
-    app: 'Nexa Social API 24/7',
+    app: 'Nexa Social API',
     version: '1.0.0',
-    health: '/api/health',
+    endpoints: {
+      health: '/api/health',
+      ready: '/api/health/ready',
+      auth: '/api/auth',
+      users: '/api/users',
+      posts: '/api/posts',
+      messages: '/api/messages',
+      notifications: '/api/notifications',
+      security: '/api/security',
+      privacy: '/api/privacy',
+      media: '/api/media',
+      groups: '/api/groups',
+      broadcasts: '/api/broadcasts'
+    },
     client: 'https://nexa-social-app.surge.sh'
   });
 });
