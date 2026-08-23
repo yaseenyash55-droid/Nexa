@@ -76,8 +76,59 @@ async function startServer() {
         }
       });
 
+      const acknowledge = (
+        callback: ((res: { success: boolean; error?: string }) => void) | undefined,
+        operation: () => void
+      ) => {
+        try {
+          operation();
+          callback?.({ success: true });
+        } catch (error) {
+          callback?.({
+            success: false,
+            error: error instanceof Error ? error.message : 'Call operation failed'
+          });
+        }
+      };
+
+      socket.on('call:invite', (data: any, callback?: (res: any) => void) => {
+        acknowledge(callback, () => realtimeServer.createCall(
+          user,
+          data?.callId,
+          Number(data?.targetUserId),
+          data?.callType
+        ));
+      });
+
+      socket.on('call:accept', (data: any, callback?: (res: any) => void) => {
+        acknowledge(callback, () => realtimeServer.acceptCall(user.userId, data?.callId));
+      });
+
+      socket.on('call:reject', (data: any, callback?: (res: any) => void) => {
+        acknowledge(callback, () => realtimeServer.rejectCall(user.userId, data?.callId, data?.reason));
+      });
+
+      socket.on('call:offer', (data: any, callback?: (res: any) => void) => {
+        acknowledge(callback, () => realtimeServer.relayCallSignal(user.userId, data?.callId, 'call:offer', data));
+      });
+
+      socket.on('call:answer', (data: any, callback?: (res: any) => void) => {
+        acknowledge(callback, () => realtimeServer.relayCallSignal(user.userId, data?.callId, 'call:answer', data));
+      });
+
+      socket.on('call:ice-candidate', (data: any, callback?: (res: any) => void) => {
+        acknowledge(callback, () => realtimeServer.relayCallSignal(user.userId, data?.callId, 'call:ice-candidate', data));
+      });
+
+      socket.on('call:end', (data: any, callback?: (res: any) => void) => {
+        acknowledge(callback, () => realtimeServer.endCall(user.userId, data?.callId, data?.reason));
+      });
+
       socket.on('disconnect', () => {
         realtimeServer.removeUserSocket(user.userId, socket.id);
+        if (!realtimeServer.isUserOnline(user.userId)) {
+          realtimeServer.handleUserOffline(user.userId);
+        }
       });
     });
 

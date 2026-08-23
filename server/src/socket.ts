@@ -7,8 +7,23 @@ export interface AuthenticatedSocketData {
   email: string;
 }
 
+export type CallType = 'audio' | 'video';
+export type CallSignalKind = 'call:offer' | 'call:answer' | 'call:ice-candidate';
+
+interface ActiveCall {
+  callId: string;
+  callerId: number;
+  calleeId: number;
+  callType: CallType;
+  state: 'ringing' | 'accepted';
+}
+
+const CALL_ID_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+
 export class NexaRealtimeServer {
   private activeConnections = new Map<number, Set<string>>();
+  private activeCalls = new Map<string, ActiveCall>();
+  private callTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
   public authenticateHandshakeToken(token: string): AuthenticatedSocketData | null {
     try {
@@ -56,6 +71,175 @@ export class NexaRealtimeServer {
   public emitToUser(userId: number, event: string, payload: any) {
     if (this.ioInstance) {
       this.ioInstance.to(`user:${userId}`).emit(event, payload);
+    }
+  }
+
+  private requireCall(callId: string, userId: number): ActiveCall {
+    const call = this.activeCalls.get(callId);
+    if (!call || (call.callerId !== userId && call.calleeId !== userId)) {
+      throw new Error('Call session not found');
+    }
+    return call;
+  }
+
+  private peerUserId(call: ActiveCall, userId: number): number {
+    return call.callerId === userId ? call.calleeId : call.callerId;
+  }
+
+  private assertCallId(callId: string): void {
+    if (!CALL_ID_PATTERN.test(callId || '')) {
+      throw new Error('Invalid call identifier');
+    }
+  }
+
+  private clearCallTimeout(callId: string): void {
+    const timer = this.callTimeouts.get(callId);
+    if (timer) clearTimeout(timer);
+    this.callTimeouts.delete(callId);
+  }
+
+  public createCall(
+    caller: AuthenticatedSocketData,
+    callId: string,
+    calleeId: number,
+    callType: CallType
+  ): ActiveCall {
+    this.assertCallId(callId);
+    if (!Number.isInteger(calleeId) || calleeId <= 0 || calleeId === caller.userId) {
+      throw new Error('Invalid call recipient');
+    }
+    if (callType !== 'audio' && callType !== 'video') {
+      throw new Error('Invalid call type');
+    }
+    if (!this.isUserOnline(calleeId)) {
+      throw new Error('User is offline');
+    }
+    if (this.activeCalls.has(callId)) {
+      throw new Error('Call identifier is already active');
+    }
+    const userIsBusy = [...this.activeCalls.values()].some((call) =>
+      call.callerId === caller.userId ||
+      call.calleeId === caller.userId ||
+      call.callerId === calleeId ||
+      call.calleeId === calleeId
+    );
+    if (userIsBusy) {
+      throw new Error('User is already in another call');
+    }
+
+    const call: ActiveCall = {
+      callId,
+      callerId: caller.userId,
+      calleeId,
+      callType,
+      state: 'ringing'
+    };
+    this.activeCalls.set(callId, call);
+    const callTimeout = setTimeout(() => {
+      if (this.activeCalls.get(callId)?.state !== 'ringing') return;
+      this.activeCalls.delete(callId);
+      this.callTimeouts.delete(callId);
+      const payload = { callId, reason: 'missed' };
+      this.emitToUser(caller.userId, 'call:ended', payload);
+      this.emitToUser(calleeId, 'call:ended', payload);
+    }, 45_000);
+    callTimeout.unref?.();
+    this.callTimeouts.set(callId, callTimeout);
+    this.emitToUser(calleeId, 'call:invite', {
+      callId,
+      callerId: caller.userId,
+      callerUsername: caller.username,
+      callType
+    });
+    return call;
+  }
+
+  public acceptCall(userId: number, callId: string): ActiveCall {
+    const call = this.requireCall(callId, userId);
+    if (call.calleeId !== userId || call.state !== 'ringing') {
+      throw new Error('Call cannot be accepted');
+    }
+    call.state = 'accepted';
+    this.clearCallTimeout(callId);
+    this.emitToUser(call.callerId, 'call:accepted', {
+      callId,
+      acceptedByUserId: userId
+    });
+    return call;
+  }
+
+  public rejectCall(userId: number, callId: string, reason = 'declined'): void {
+    const call = this.requireCall(callId, userId);
+    if (call.calleeId !== userId || call.state !== 'ringing') {
+      throw new Error('Call cannot be rejected');
+    }
+    this.activeCalls.delete(callId);
+    this.clearCallTimeout(callId);
+    this.emitToUser(call.callerId, 'call:rejected', {
+      callId,
+      rejectedByUserId: userId,
+      reason: reason.slice(0, 80)
+    });
+  }
+
+  public relayCallSignal(
+    senderId: number,
+    callId: string,
+    event: CallSignalKind,
+    payload: Record<string, unknown>
+  ): void {
+    const call = this.requireCall(callId, senderId);
+    if (call.state !== 'accepted') {
+      throw new Error('Call has not been accepted');
+    }
+    const targetUserId = this.peerUserId(call, senderId);
+
+    if (event === 'call:offer' || event === 'call:answer') {
+      const sdp = typeof payload.sdp === 'string' ? payload.sdp : '';
+      if (!sdp || sdp.length > 200_000) throw new Error('Invalid session description');
+      this.emitToUser(targetUserId, event, { callId, senderId, sdp });
+      return;
+    }
+
+    const candidate = payload.candidate as Record<string, unknown> | undefined;
+    const candidateText = typeof candidate?.candidate === 'string' ? candidate.candidate : '';
+    if (!candidateText || candidateText.length > 4096) throw new Error('Invalid ICE candidate');
+    this.emitToUser(targetUserId, event, {
+      callId,
+      senderId,
+      candidate: {
+        candidate: candidateText,
+        sdpMid: typeof candidate?.sdpMid === 'string' ? candidate.sdpMid.slice(0, 128) : null,
+        sdpMLineIndex: Number.isInteger(candidate?.sdpMLineIndex)
+          ? Number(candidate?.sdpMLineIndex)
+          : null
+      }
+    });
+  }
+
+  public endCall(userId: number, callId: string, reason = 'ended'): void {
+    const call = this.requireCall(callId, userId);
+    this.activeCalls.delete(callId);
+    this.clearCallTimeout(callId);
+    this.emitToUser(this.peerUserId(call, userId), 'call:ended', {
+      callId,
+      endedByUserId: userId,
+      reason: reason.slice(0, 80)
+    });
+  }
+
+  public handleUserOffline(userId: number): void {
+    const calls = [...this.activeCalls.values()].filter((call) =>
+      call.callerId === userId || call.calleeId === userId
+    );
+    for (const call of calls) {
+      this.activeCalls.delete(call.callId);
+      this.clearCallTimeout(call.callId);
+      this.emitToUser(this.peerUserId(call, userId), 'call:ended', {
+        callId: call.callId,
+        endedByUserId: userId,
+        reason: 'disconnected'
+      });
     }
   }
 

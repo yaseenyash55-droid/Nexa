@@ -242,6 +242,18 @@ data class FcmTokenRequest(
     @SerializedName("deviceId") val deviceId: String? = null
 )
 
+data class IceServerConfiguration(
+    @SerializedName("urls") val urls: List<String> = emptyList(),
+    @SerializedName("username") val username: String? = null,
+    @SerializedName("credential") val credential: String? = null
+)
+
+data class IceConfiguration(
+    @SerializedName("enabled") val enabled: Boolean = false,
+    @SerializedName("iceServers") val iceServers: List<IceServerConfiguration> = emptyList(),
+    @SerializedName("reason") val reason: String? = null
+)
+
 data class DisplayMessage(
     val id: Int,
     val senderId: Int,

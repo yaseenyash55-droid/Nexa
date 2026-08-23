@@ -20,6 +20,10 @@
 -keep class io.socket.client.** { *; }
 -keep class io.socket.engineio.client.** { *; }
 
+# WebRTC JNI and media pipeline
+-keep class org.webrtc.** { *; }
+-dontwarn org.webrtc.**
+
 # AndroidX Security Crypto & Tink
 -keep class androidx.security.crypto.** { *; }
 -dontwarn com.google.crypto.tink.**

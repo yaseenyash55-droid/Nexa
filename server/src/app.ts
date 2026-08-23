@@ -17,6 +17,7 @@ import { securityRouter } from './routes/security.routes.js';
 import { mediaRouter } from './routes/media.routes.js';
 import { groupRouter } from './routes/group.routes.js';
 import { broadcastRouter } from './routes/broadcast.routes.js';
+import { callRouter } from './routes/call.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { httpsEnforcementMiddleware, trafficMonitorMiddleware, botProtectionMiddleware } from './middleware/trafficMonitor.middleware.js';
 import { globalApiRateLimiter } from './middleware/rateLimit.middleware.js';
@@ -80,6 +81,7 @@ app.use('/api/music', musicRouter);
 app.use('/api/media', mediaRouter);
 app.use('/api/groups', groupRouter);
 app.use('/api/broadcasts', broadcastRouter);
+app.use('/api/calls', callRouter);
 app.use('/api', socialRouter);
 
 // Root & API Welcome Endpoints
@@ -100,7 +102,8 @@ app.get(['/', '/api'], (req, res) => {
       privacy: '/api/privacy',
       media: '/api/media',
       groups: '/api/groups',
-      broadcasts: '/api/broadcasts'
+      broadcasts: '/api/broadcasts',
+      calls: '/api/calls'
     },
     client: 'https://nexa-social-app.surge.sh'
   });

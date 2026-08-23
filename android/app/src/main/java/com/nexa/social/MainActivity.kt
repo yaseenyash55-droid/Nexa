@@ -201,9 +201,21 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         networkMonitor.startMonitoring()
+        SocketManager.registerIncomingCallListener { call ->
+            startActivity(
+                com.nexa.social.ui.CallActivity.incomingIntent(
+                    this,
+                    call.callId,
+                    call.callerId,
+                    call.callerUsername,
+                    call.callType
+                )
+            )
+        }
     }
 
     override fun onStop() {
+        SocketManager.unregisterIncomingCallListener()
         super.onStop()
         networkMonitor.stopMonitoring()
     }

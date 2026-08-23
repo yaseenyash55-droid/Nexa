@@ -10,8 +10,31 @@ import com.nexa.social.data.models.GroupMessage
 import com.nexa.social.data.models.Message
 import io.socket.client.IO
 import io.socket.client.Socket
+import io.socket.client.Ack
 import org.json.JSONObject
 import java.net.URISyntaxException
+
+data class IncomingCall(
+    val callId: String,
+    val callerId: Int,
+    val callerUsername: String,
+    val callType: String
+)
+
+data class RemoteIceCandidate(
+    val candidate: String,
+    val sdpMid: String?,
+    val sdpMLineIndex: Int
+)
+
+interface CallSignalListener {
+    fun onCallAccepted(callId: String) {}
+    fun onCallRejected(callId: String, reason: String) {}
+    fun onCallOffer(callId: String, sdp: String) {}
+    fun onCallAnswer(callId: String, sdp: String) {}
+    fun onIceCandidate(callId: String, candidate: RemoteIceCandidate) {}
+    fun onCallEnded(callId: String, reason: String) {}
+}
 
 object SocketManager {
 
@@ -27,6 +50,8 @@ object SocketManager {
     private var groupMessageListener: ((GroupMessage) -> Unit)? = null
     private var typingStartListener: ((userId: Int, username: String?) -> Unit)? = null
     private var typingStopListener: ((userId: Int) -> Unit)? = null
+    private var incomingCallListener: ((IncomingCall) -> Unit)? = null
+    private var callSignalListener: CallSignalListener? = null
 
     private var appContext: Context? = null
 
@@ -148,6 +173,80 @@ object SocketManager {
                 }
             }
 
+            socket?.on("call:invite") { args ->
+                parseObject(args)?.let { json ->
+                    val call = IncomingCall(
+                        callId = json.optString("callId"),
+                        callerId = json.optInt("callerId"),
+                        callerUsername = json.optString("callerUsername", "Nexa user"),
+                        callType = json.optString("callType", "audio")
+                    )
+                    if (call.callId.isNotBlank() && call.callerId > 0) {
+                        mainHandler.post { incomingCallListener?.invoke(call) }
+                    }
+                }
+            }
+
+            socket?.on("call:accepted") { args ->
+                parseObject(args)?.let { json ->
+                    mainHandler.post { callSignalListener?.onCallAccepted(json.optString("callId")) }
+                }
+            }
+
+            socket?.on("call:rejected") { args ->
+                parseObject(args)?.let { json ->
+                    mainHandler.post {
+                        callSignalListener?.onCallRejected(
+                            json.optString("callId"),
+                            json.optString("reason", "declined")
+                        )
+                    }
+                }
+            }
+
+            socket?.on("call:offer") { args ->
+                parseObject(args)?.let { json ->
+                    mainHandler.post {
+                        callSignalListener?.onCallOffer(json.optString("callId"), json.optString("sdp"))
+                    }
+                }
+            }
+
+            socket?.on("call:answer") { args ->
+                parseObject(args)?.let { json ->
+                    mainHandler.post {
+                        callSignalListener?.onCallAnswer(json.optString("callId"), json.optString("sdp"))
+                    }
+                }
+            }
+
+            socket?.on("call:ice-candidate") { args ->
+                parseObject(args)?.let { json ->
+                    val candidateJson = json.optJSONObject("candidate") ?: return@let
+                    val candidate = RemoteIceCandidate(
+                        candidate = candidateJson.optString("candidate"),
+                        sdpMid = candidateJson.optString("sdpMid").takeIf { it.isNotBlank() },
+                        sdpMLineIndex = candidateJson.optInt("sdpMLineIndex", 0)
+                    )
+                    if (candidate.candidate.isNotBlank()) {
+                        mainHandler.post {
+                            callSignalListener?.onIceCandidate(json.optString("callId"), candidate)
+                        }
+                    }
+                }
+            }
+
+            socket?.on("call:ended") { args ->
+                parseObject(args)?.let { json ->
+                    mainHandler.post {
+                        callSignalListener?.onCallEnded(
+                            json.optString("callId"),
+                            json.optString("reason", "ended")
+                        )
+                    }
+                }
+            }
+
             socket?.connect()
         } catch (e: URISyntaxException) {
             Log.e(TAG, "Invalid socket URI configuration: $SOCKET_SERVER_URL", e)
@@ -163,6 +262,8 @@ object SocketManager {
         groupMessageListener = null
         typingStartListener = null
         typingStopListener = null
+        incomingCallListener = null
+        callSignalListener = null
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Socket disconnected and listeners cleared")
         }
@@ -205,6 +306,97 @@ object SocketManager {
     fun removeTypingListeners() {
         typingStartListener = null
         typingStopListener = null
+    }
+
+    fun registerIncomingCallListener(listener: (IncomingCall) -> Unit) {
+        incomingCallListener = listener
+    }
+
+    fun unregisterIncomingCallListener() {
+        incomingCallListener = null
+    }
+
+    fun registerCallSignalListener(listener: CallSignalListener) {
+        callSignalListener = listener
+    }
+
+    fun unregisterCallSignalListener(listener: CallSignalListener) {
+        if (callSignalListener === listener) callSignalListener = null
+    }
+
+    fun emitCallInvite(callId: String, targetUserId: Int, callType: String, onResult: (Boolean, String?) -> Unit) {
+        emitCallEvent("call:invite", JSONObject().apply {
+            put("callId", callId)
+            put("targetUserId", targetUserId)
+            put("callType", callType)
+        }, onResult)
+    }
+
+    fun emitCallAccept(callId: String, onResult: (Boolean, String?) -> Unit) {
+        emitCallEvent("call:accept", JSONObject().put("callId", callId), onResult)
+    }
+
+    fun emitCallReject(callId: String, reason: String = "declined") {
+        emitCallEvent("call:reject", JSONObject().apply {
+            put("callId", callId)
+            put("reason", reason)
+        }) { _, _ -> }
+    }
+
+    fun emitCallOffer(callId: String, sdp: String) {
+        emitCallEvent("call:offer", JSONObject().apply {
+            put("callId", callId)
+            put("sdp", sdp)
+        }) { _, _ -> }
+    }
+
+    fun emitCallAnswer(callId: String, sdp: String) {
+        emitCallEvent("call:answer", JSONObject().apply {
+            put("callId", callId)
+            put("sdp", sdp)
+        }) { _, _ -> }
+    }
+
+    fun emitIceCandidate(callId: String, candidate: RemoteIceCandidate) {
+        emitCallEvent("call:ice-candidate", JSONObject().apply {
+            put("callId", callId)
+            put("candidate", JSONObject().apply {
+                put("candidate", candidate.candidate)
+                put("sdpMid", candidate.sdpMid)
+                put("sdpMLineIndex", candidate.sdpMLineIndex)
+            })
+        }) { _, _ -> }
+    }
+
+    fun emitCallEnd(callId: String, reason: String = "ended") {
+        emitCallEvent("call:end", JSONObject().apply {
+            put("callId", callId)
+            put("reason", reason)
+        }) { _, _ -> }
+    }
+
+    private fun emitCallEvent(event: String, payload: JSONObject, onResult: (Boolean, String?) -> Unit) {
+        val currentSocket = socket
+        if (currentSocket?.connected() != true) {
+            mainHandler.post { onResult(false, "Realtime connection is unavailable") }
+            return
+        }
+        currentSocket.emit(event, payload, Ack { args ->
+            val response = args.firstOrNull() as? JSONObject
+            val success = response?.optBoolean("success", false) == true
+            val error = response?.optString("error")?.takeIf { it.isNotBlank() }
+            mainHandler.post { onResult(success, error) }
+        })
+    }
+
+    private fun parseObject(args: Array<out Any>): JSONObject? {
+        if (args.isEmpty()) return null
+        return try {
+            if (args[0] is JSONObject) args[0] as JSONObject else JSONObject(args[0].toString())
+        } catch (e: Exception) {
+            if (BuildConfig.DEBUG) Log.e(TAG, "Failed to parse realtime event", e)
+            null
+        }
     }
 
     fun emitTypingStart(receiverId: Int) {

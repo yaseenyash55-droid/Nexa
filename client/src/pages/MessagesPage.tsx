@@ -37,12 +37,21 @@ export const MessagesPage: React.FC = () => {
 
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [callModalState, setCallModalState] = useState<{ isOpen: boolean; type: 'audio' | 'video' }>({ isOpen: false, type: 'audio' });
+  const [callModalState, setCallModalState] = useState<{
+    isOpen: boolean;
+    type: 'audio' | 'video';
+    direction: 'outgoing' | 'incoming';
+    callId?: string;
+    targetUser?: User;
+  }>({ isOpen: false, type: 'audio', direction: 'outgoing' });
 
   // Real-time Typing Indicator State
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsername, setTypingUsername] = useState('');
   const socketRef = useRef<Socket | null>(null);
+  const [realtimeSocket, setRealtimeSocket] = useState<Socket | null>(null);
+  const callModalOpenRef = useRef(false);
+  const selectedUserRef = useRef<User | null>(null);
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isEmittingTypingRef = useRef(false);
   const autoClearTypingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -52,6 +61,14 @@ export const MessagesPage: React.FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const readRequestsRef = useRef(new Set<number>());
+
+  useEffect(() => {
+    callModalOpenRef.current = callModalState.isOpen;
+  }, [callModalState.isOpen]);
+
+  useEffect(() => {
+    selectedUserRef.current = selectedUser;
+  }, [selectedUser]);
 
   // Fetch contacts (Direct Messages)
   const { data: suggestions = [] } = useQuery({
@@ -178,6 +195,7 @@ export const MessagesPage: React.FC = () => {
       transports: ['websocket', 'polling']
     });
     socketRef.current = socket;
+    setRealtimeSocket(socket);
 
     socket.on('message:created', (message: Message) => {
       const otherUserId = message.senderId === currentUser.userId ? message.receiverId : message.senderId;
@@ -199,9 +217,10 @@ export const MessagesPage: React.FC = () => {
     });
 
     socket.on('typing:start', ({ userId, username }: { userId: number; username: string }) => {
-      if (selectedUser && userId === selectedUser.userId) {
+      const activeUser = selectedUserRef.current;
+      if (activeUser && userId === activeUser.userId) {
         setIsTyping(true);
-        setTypingUsername(username || selectedUser.displayName);
+        setTypingUsername(username || activeUser.displayName);
 
         if (autoClearTypingTimerRef.current) {
           clearTimeout(autoClearTypingTimerRef.current);
@@ -213,7 +232,7 @@ export const MessagesPage: React.FC = () => {
     });
 
     socket.on('typing:stop', ({ userId }: { userId: number }) => {
-      if (selectedUser && userId === selectedUser.userId) {
+      if (selectedUserRef.current && userId === selectedUserRef.current.userId) {
         setIsTyping(false);
         if (autoClearTypingTimerRef.current) {
           clearTimeout(autoClearTypingTimerRef.current);
@@ -221,11 +240,42 @@ export const MessagesPage: React.FC = () => {
       }
     });
 
+    socket.on('call:invite', async ({
+      callId,
+      callerId,
+      callerUsername,
+      callType
+    }: {
+      callId: string;
+      callerId: number;
+      callerUsername: string;
+      callType: 'audio' | 'video';
+    }) => {
+      if (callModalOpenRef.current) {
+        socket.emit('call:reject', { callId, reason: 'busy' });
+        return;
+      }
+      try {
+        const caller = await usersApi.getById(callerId);
+        setCallModalState({
+          isOpen: true,
+          type: callType,
+          direction: 'incoming',
+          callId,
+          targetUser: caller
+        });
+      } catch {
+        socket.emit('call:reject', { callId, reason: 'unavailable' });
+        console.warn(`Unable to resolve incoming caller ${callerUsername}`);
+      }
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
+      setRealtimeSocket(null);
     };
-  }, [currentUser, queryClient, selectedUser]);
+  }, [currentUser, queryClient]);
 
   useEffect(() => {
     if (!currentUser || !selectedUser || chatType !== 'direct') return;
@@ -577,7 +627,7 @@ export const MessagesPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setCallModalState({ isOpen: true, type: 'audio' })}
+                    onClick={() => setCallModalState({ isOpen: true, type: 'audio', direction: 'outgoing', targetUser: selectedUser })}
                     title="Start Phone Voice Call"
                     className="px-3 py-1.5 text-emerald-400 hover:text-white bg-emerald-500/10 hover:bg-emerald-600 rounded-xl transition-all border border-emerald-500/20 shadow-sm flex items-center gap-1.5 text-xs font-semibold"
                   >
@@ -587,7 +637,7 @@ export const MessagesPage: React.FC = () => {
 
                   <button
                     type="button"
-                    onClick={() => setCallModalState({ isOpen: true, type: 'video' })}
+                    onClick={() => setCallModalState({ isOpen: true, type: 'video', direction: 'outgoing', targetUser: selectedUser })}
                     title="Start Video Call"
                     className="px-3 py-1.5 text-brand-300 hover:text-white bg-brand-600/20 hover:bg-brand-600 rounded-xl transition-all border border-brand-500/30 shadow-sm flex items-center gap-1.5 text-xs font-semibold"
                   >
@@ -831,12 +881,15 @@ export const MessagesPage: React.FC = () => {
       />
 
       {/* Audio Phone Call & Video Call Modal */}
-      {selectedUser && (
+      {(callModalState.targetUser || selectedUser) && (
         <CallModal
           isOpen={callModalState.isOpen}
           onClose={() => setCallModalState((prev) => ({ ...prev, isOpen: false }))}
-          targetUser={selectedUser}
+          targetUser={(callModalState.targetUser || selectedUser)!}
           callType={callModalState.type}
+          direction={callModalState.direction}
+          initialCallId={callModalState.callId}
+          socket={realtimeSocket}
         />
       )}
     </AppShell>

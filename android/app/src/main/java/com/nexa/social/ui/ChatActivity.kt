@@ -11,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.nexa.social.NexaApiClient
+import com.nexa.social.R
 import com.nexa.social.data.models.DisplayMessage
 import com.nexa.social.data.models.SendDirectMessageRequest
 import com.nexa.social.databinding.ActivityChatBinding
@@ -76,10 +77,46 @@ class ChatActivity : AppCompatActivity() {
         stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
     }
 
+    override fun onStart() {
+        super.onStart()
+        SocketManager.registerIncomingCallListener { call ->
+            startActivity(
+                CallActivity.incomingIntent(
+                    this,
+                    call.callId,
+                    call.callerId,
+                    call.callerUsername,
+                    call.callType
+                )
+            )
+        }
+    }
+
+    override fun onStop() {
+        SocketManager.unregisterIncomingCallListener()
+        super.onStop()
+    }
+
     private fun setupToolbar() {
         binding.toolbar.title = targetName
         binding.toolbar.subtitle = if (chatType == "direct") "Direct Conversation" else "Group Conversation"
         binding.toolbar.setNavigationOnClickListener { finish() }
+        if (chatType == "direct") {
+            binding.toolbar.inflateMenu(R.menu.chat_call_menu)
+            binding.toolbar.setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    R.id.action_voice_call -> {
+                        startActivity(CallActivity.outgoingIntent(this, targetId, targetName, "audio"))
+                        true
+                    }
+                    R.id.action_video_call -> {
+                        startActivity(CallActivity.outgoingIntent(this, targetId, targetName, "video"))
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
     }
 
     private fun setupRecyclerView() {

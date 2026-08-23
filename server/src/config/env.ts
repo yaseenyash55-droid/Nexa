@@ -41,6 +41,19 @@ export function getPositiveInteger(key: string, fallback: number): number {
   return value;
 }
 
+function getBoolean(key: string, fallback = false): boolean {
+  const value = process.env[key];
+  if (value === undefined) return fallback;
+  return value.trim().toLowerCase() === 'true';
+}
+
+function getCsv(key: string, fallback = ''): string[] {
+  return (process.env[key] || fallback)
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 export function validateProductionConnectString(connectString: string, enforceProd = isProduction): void {
   if (!enforceProd) {
     return;
@@ -213,6 +226,27 @@ const s3SecretAccessKey =
 
 const cdnBaseUrl = process.env.CDN_BASE_URL || '';
 
+const webRtcCallingRequested = getBoolean('WEBRTC_CALLING_ENABLED');
+const webRtcStunUrls = getCsv(
+  'WEBRTC_STUN_URLS',
+  'stun:stun.l.google.com:19302'
+);
+const webRtcTurnUrls = getCsv('WEBRTC_TURN_URLS');
+const webRtcTurnUsername = process.env.WEBRTC_TURN_USERNAME?.trim() || '';
+const webRtcTurnCredential = process.env.WEBRTC_TURN_CREDENTIAL?.trim() || '';
+const webRtcTurnSharedSecret = process.env.WEBRTC_TURN_SHARED_SECRET?.trim() || '';
+const webRtcTurnCredentialTtlSeconds = Math.min(
+  getPositiveInteger('WEBRTC_TURN_CREDENTIAL_TTL_SECONDS', 3600),
+  86_400
+);
+const webRtcCallingConfigured =
+  webRtcCallingRequested &&
+  webRtcTurnUrls.length > 0 &&
+  (
+    webRtcTurnSharedSecret.length > 0 ||
+    (webRtcTurnUsername.length > 0 && webRtcTurnCredential.length > 0)
+  );
+
 export const env = {
   NODE_ENV: nodeEnv,
   PORT: getPositiveInteger('PORT', 4000),
@@ -264,6 +298,15 @@ export const env = {
   S3_ACCESS_KEY_ID: s3AccessKeyId,
   S3_SECRET_ACCESS_KEY: s3SecretAccessKey,
   CDN_BASE_URL: cdnBaseUrl,
+
+  WEBRTC_CALLING_ENABLED: webRtcCallingConfigured,
+  WEBRTC_CALLING_REQUESTED: webRtcCallingRequested,
+  WEBRTC_STUN_URLS: webRtcStunUrls,
+  WEBRTC_TURN_URLS: webRtcTurnUrls,
+  WEBRTC_TURN_USERNAME: webRtcTurnUsername,
+  WEBRTC_TURN_CREDENTIAL: webRtcTurnCredential,
+  WEBRTC_TURN_SHARED_SECRET: webRtcTurnSharedSecret,
+  WEBRTC_TURN_CREDENTIAL_TTL_SECONDS: webRtcTurnCredentialTtlSeconds,
 
   DATA_SOURCE: databaseProvider,
   USE_MOCK_DATA: false

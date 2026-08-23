@@ -236,7 +236,7 @@ describe('Phase 5: Real Controls, APIs & Oracle Verification Suite', () => {
       expect(socketHost === 'http://localhost:4000' || socketHost === 'https://nexa-backend-in6s.onrender.com').toBe(true);
     });
 
-    it('renders CallModal with clear notice explaining unconfigured WebRTC signaling', () => {
+    it('fails closed when realtime signaling is not connected', () => {
       const handleClose = vi.fn();
       const targetUser = {
         userId: 2,
@@ -256,11 +256,10 @@ describe('Phase 5: Real Controls, APIs & Oracle Verification Suite', () => {
         />
       );
 
-      expect(screen.getByText(/Video Calling Unavailable/i)).toBeDefined();
-      expect(screen.getByText(/Real-time peer-to-peer calling requires dedicated STUN\/TURN/i)).toBeDefined();
+      expect(screen.getAllByText(/Realtime connection is not ready/i).length).toBeGreaterThan(0);
 
-      const understandBtn = screen.getByRole('button', { name: /Understood/i });
-      fireEvent.click(understandBtn);
+      const closeButton = screen.getByRole('button', { name: /Close call/i });
+      fireEvent.click(closeButton);
       expect(handleClose).toHaveBeenCalledTimes(1);
     });
   });

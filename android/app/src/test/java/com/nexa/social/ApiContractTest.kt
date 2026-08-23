@@ -2,6 +2,7 @@ package com.nexa.social
 
 import com.google.gson.Gson
 import com.nexa.social.data.api.AuthApi
+import com.nexa.social.data.api.CallApi
 import com.nexa.social.data.api.GroupApi
 import com.nexa.social.data.api.MessageApi
 import com.nexa.social.data.api.PostApi
@@ -36,6 +37,7 @@ class ApiContractTest {
 
     private lateinit var messageApi: MessageApi
     private lateinit var authApi: AuthApi
+    private lateinit var callApi: CallApi
     private lateinit var userApi: UserApi
     private lateinit var groupApi: GroupApi
     private lateinit var postApi: PostApi
@@ -55,6 +57,7 @@ class ApiContractTest {
 
         messageApi = retrofit.create(MessageApi::class.java)
         authApi = retrofit.create(AuthApi::class.java)
+        callApi = retrofit.create(CallApi::class.java)
         userApi = retrofit.create(UserApi::class.java)
         groupApi = retrofit.create(GroupApi::class.java)
         postApi = retrofit.create(PostApi::class.java)
@@ -341,5 +344,41 @@ class ApiContractTest {
 
         assertTrue(response.isSuccessful)
         assertEquals(2, response.body()?.data?.size)
+    }
+
+    @Test
+    fun `call ICE configuration contract matches authenticated calls endpoint`() = runBlocking {
+        mockServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(
+                    """
+                    {
+                        "data": {
+                            "enabled": true,
+                            "iceServers": [
+                                {"urls":["stun:stun.example.com:3478"]},
+                                {
+                                    "urls":["turn:turn.example.com:3478?transport=udp"],
+                                    "username":"temporary-user",
+                                    "credential":"temporary-credential"
+                                }
+                            ]
+                        }
+                    }
+                    """.trimIndent()
+                )
+        )
+
+        val response = callApi.getIceConfiguration()
+        val recordedRequest = mockServer.takeRequest()
+
+        assertEquals("GET", recordedRequest.method)
+        assertEquals("/calls/ice-config", recordedRequest.path)
+        assertTrue(response.isSuccessful)
+        assertEquals(true, response.body()?.data?.enabled)
+        assertEquals(2, response.body()?.data?.iceServers?.size)
+        assertEquals("temporary-user", response.body()?.data?.iceServers?.get(1)?.username)
     }
 }

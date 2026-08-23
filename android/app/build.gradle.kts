@@ -25,8 +25,8 @@ android {
         applicationId = "com.nexa.social"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.2.3"
+        versionCode = 7
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -100,6 +100,10 @@ android {
     }
 }
 
+tasks.withType<Test> {
+    jvmArgs("-XX:+EnableDynamicAgentLoading")
+}
+
 dependencies {
     // Core AndroidX & UI
     implementation("androidx.core:core-ktx:1.15.0")
@@ -133,6 +137,9 @@ dependencies {
     implementation("io.socket:socket.io-client:2.1.1") {
         exclude(group = "org.json", module = "json")
     }
+
+    // Native WebRTC audio/video calling
+    implementation("io.github.webrtc-sdk:android:144.7559.12")
 
     // Networking & Retrofit
     implementation("com.squareup.retrofit2:retrofit:2.11.0")

@@ -139,6 +139,12 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <activity
+            android:name=".ui.CallActivity"
+            android:configChanges="orientation|screenSize"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
         <!-- Native Create Group Activity -->
         <activity
             android:name=".ui.CreateGroupActivity"

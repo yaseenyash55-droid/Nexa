@@ -1,68 +1,362 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff, X } from 'lucide-react';
+import { Socket } from 'socket.io-client';
+import { callsApi, IceConfiguration } from '../../api/calls.api.js';
 import { User } from '../../types/index.js';
 import { Avatar } from '../ui/Avatar.js';
-import { Phone, Video, X } from 'lucide-react';
-import { Button } from '../ui/Button.js';
+
+type CallStatus = 'preparing' | 'ringing' | 'incoming' | 'connecting' | 'connected' | 'unavailable' | 'error';
 
 interface CallModalProps {
   isOpen: boolean;
   onClose: () => void;
   targetUser: User;
   callType: 'audio' | 'video';
+  direction?: 'outgoing' | 'incoming';
+  initialCallId?: string;
+  socket?: Socket | null;
+}
+
+interface AckResponse {
+  success: boolean;
+  error?: string;
+}
+
+interface CandidatePayload {
+  callId: string;
+  candidate: RTCIceCandidateInit;
+}
+
+function createCallId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 }
 
 export const CallModal: React.FC<CallModalProps> = ({
   isOpen,
   onClose,
   targetUser,
-  callType
+  callType,
+  direction = 'outgoing',
+  initialCallId,
+  socket
 }) => {
+  const [status, setStatus] = useState<CallStatus>(direction === 'incoming' ? 'incoming' : 'preparing');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [microphoneEnabled, setMicrophoneEnabled] = useState(true);
+  const [cameraEnabled, setCameraEnabled] = useState(callType === 'video');
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const peerRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const iceConfigurationRef = useRef<IceConfiguration | null>(null);
+  const callIdRef = useRef(initialCallId || createCallId());
+  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const acceptedRef = useRef(false);
+  const remoteEndedRef = useRef(false);
+
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+    if (remoteAudioRef.current && remoteStream) {
+      remoteAudioRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    callIdRef.current = initialCallId || createCallId();
+    acceptedRef.current = false;
+    remoteEndedRef.current = false;
+    pendingCandidatesRef.current = [];
+    setStatus(direction === 'incoming' ? 'incoming' : 'preparing');
+    setErrorMessage('');
+    setMicrophoneEnabled(true);
+    setCameraEnabled(callType === 'video');
+
+    if (!socket) {
+      setStatus('error');
+      setErrorMessage('Realtime connection is not ready. Please try again.');
+      return;
+    }
+
+    const callId = callIdRef.current;
+
+    const fail = (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Unable to start the call';
+      setStatus(message.toLowerCase().includes('configured') ? 'unavailable' : 'error');
+      setErrorMessage(message);
+    };
+
+    const getConfiguration = async (): Promise<IceConfiguration> => {
+      if (iceConfigurationRef.current) return iceConfigurationRef.current;
+      const configuration = await callsApi.getIceConfiguration();
+      if (!configuration.enabled || configuration.iceServers.length === 0) {
+        throw new Error(configuration.reason || 'Calling is not configured');
+      }
+      iceConfigurationRef.current = configuration;
+      return configuration;
+    };
+
+    const flushCandidates = async () => {
+      const peer = peerRef.current;
+      if (!peer?.remoteDescription) return;
+      const candidates = pendingCandidatesRef.current.splice(0);
+      for (const candidate of candidates) await peer.addIceCandidate(candidate);
+    };
+
+    const initializePeer = async (): Promise<RTCPeerConnection> => {
+      if (peerRef.current) return peerRef.current;
+      const configuration = await getConfiguration();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: callType === 'video'
+          ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+          : false
+      });
+      localStreamRef.current = stream;
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+
+      const peer = new RTCPeerConnection({ iceServers: configuration.iceServers });
+      stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+      peer.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit('call:ice-candidate', { callId, candidate: event.candidate.toJSON() });
+        }
+      };
+      peer.ontrack = (event) => {
+        setRemoteStream(event.streams[0] || new MediaStream([event.track]));
+      };
+      peer.onconnectionstatechange = () => {
+        if (peer.connectionState === 'connected') setStatus('connected');
+        if (peer.connectionState === 'failed' || peer.connectionState === 'disconnected') {
+          setStatus('error');
+          setErrorMessage('The call connection was interrupted.');
+        }
+      };
+      peerRef.current = peer;
+      return peer;
+    };
+
+    const startOutgoingCall = async () => {
+      try {
+        await initializePeer();
+        socket.emit('call:invite', {
+          callId,
+          targetUserId: targetUser.userId,
+          callType
+        }, (response: AckResponse) => {
+          if (response?.success) setStatus('ringing');
+          else fail(new Error(response?.error || 'The call could not be placed'));
+        });
+      } catch (error) {
+        fail(error);
+      }
+    };
+
+    const handleAccepted = async (payload: { callId: string }) => {
+      if (payload.callId !== callId) return;
+      try {
+        acceptedRef.current = true;
+        setStatus('connecting');
+        const peer = await initializePeer();
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+        socket.emit('call:offer', { callId, sdp: offer.sdp });
+      } catch (error) {
+        fail(error);
+      }
+    };
+
+    const handleOffer = async (payload: { callId: string; sdp: string }) => {
+      if (payload.callId !== callId) return;
+      try {
+        const peer = await initializePeer();
+        await peer.setRemoteDescription({ type: 'offer', sdp: payload.sdp });
+        await flushCandidates();
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        socket.emit('call:answer', { callId, sdp: answer.sdp });
+        setStatus('connecting');
+      } catch (error) {
+        fail(error);
+      }
+    };
+
+    const handleAnswer = async (payload: { callId: string; sdp: string }) => {
+      if (payload.callId !== callId || !peerRef.current) return;
+      try {
+        await peerRef.current.setRemoteDescription({ type: 'answer', sdp: payload.sdp });
+        await flushCandidates();
+      } catch (error) {
+        fail(error);
+      }
+    };
+
+    const handleCandidate = async (payload: CandidatePayload) => {
+      if (payload.callId !== callId || !payload.candidate) return;
+      try {
+        if (peerRef.current?.remoteDescription) await peerRef.current.addIceCandidate(payload.candidate);
+        else pendingCandidatesRef.current.push(payload.candidate);
+      } catch (error) {
+        fail(error);
+      }
+    };
+
+    const handleRejected = (payload: { callId: string; reason?: string }) => {
+      if (payload.callId !== callId) return;
+      remoteEndedRef.current = true;
+      setStatus('error');
+      setErrorMessage(payload.reason === 'busy' ? 'User is busy' : 'Call declined');
+    };
+
+    const handleEnded = (payload: { callId: string; reason?: string }) => {
+      if (payload.callId !== callId) return;
+      remoteEndedRef.current = true;
+      setStatus('error');
+      setErrorMessage(payload.reason === 'disconnected' ? 'User disconnected' : 'Call ended');
+    };
+
+    socket.on('call:accepted', handleAccepted);
+    socket.on('call:offer', handleOffer);
+    socket.on('call:answer', handleAnswer);
+    socket.on('call:ice-candidate', handleCandidate);
+    socket.on('call:rejected', handleRejected);
+    socket.on('call:ended', handleEnded);
+
+    if (direction === 'outgoing') void startOutgoingCall();
+
+    return () => {
+      socket.off('call:accepted', handleAccepted);
+      socket.off('call:offer', handleOffer);
+      socket.off('call:answer', handleAnswer);
+      socket.off('call:ice-candidate', handleCandidate);
+      socket.off('call:rejected', handleRejected);
+      socket.off('call:ended', handleEnded);
+      peerRef.current?.close();
+      peerRef.current = null;
+      localStreamRef.current?.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+      iceConfigurationRef.current = null;
+      setRemoteStream(null);
+    };
+  }, [callType, direction, initialCallId, isOpen, socket, targetUser.userId]);
+
+  const acceptIncoming = async () => {
+    if (!socket) return;
+    setStatus('preparing');
+    try {
+      const configuration = await callsApi.getIceConfiguration();
+      if (!configuration.enabled || configuration.iceServers.length === 0) {
+        throw new Error(configuration.reason || 'Calling is not configured');
+      }
+      iceConfigurationRef.current = configuration;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: callType === 'video' });
+      localStreamRef.current = stream;
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      const peer = new RTCPeerConnection({ iceServers: configuration.iceServers });
+      stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+      peer.onicecandidate = (event) => {
+        if (event.candidate) socket.emit('call:ice-candidate', {
+          callId: callIdRef.current,
+          candidate: event.candidate.toJSON()
+        });
+      };
+      peer.ontrack = (event) => setRemoteStream(event.streams[0] || new MediaStream([event.track]));
+      peer.onconnectionstatechange = () => {
+        if (peer.connectionState === 'connected') setStatus('connected');
+      };
+      peerRef.current = peer;
+      socket.emit('call:accept', { callId: callIdRef.current }, (response: AckResponse) => {
+        if (response?.success) {
+          acceptedRef.current = true;
+          setStatus('connecting');
+        } else {
+          setStatus('error');
+          setErrorMessage(response?.error || 'Unable to accept the call');
+        }
+      });
+    } catch (error) {
+      setStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to accept the call');
+    }
+  };
+
+  const closeCall = (decline = false) => {
+    if (socket && !remoteEndedRef.current) {
+      if (direction === 'incoming' && !acceptedRef.current) {
+        socket.emit('call:reject', { callId: callIdRef.current, reason: decline ? 'declined' : 'dismissed' });
+      } else {
+        socket.emit('call:end', { callId: callIdRef.current, reason: 'ended' });
+      }
+    }
+    onClose();
+  };
+
+  const toggleMicrophone = () => {
+    const next = !microphoneEnabled;
+    localStreamRef.current?.getAudioTracks().forEach((track) => { track.enabled = next; });
+    setMicrophoneEnabled(next);
+  };
+
+  const toggleCamera = () => {
+    const next = !cameraEnabled;
+    localStreamRef.current?.getVideoTracks().forEach((track) => { track.enabled = next; });
+    setCameraEnabled(next);
+  };
+
   if (!isOpen) return null;
 
+  const statusText: Record<CallStatus, string> = {
+    preparing: 'Preparing secure media…',
+    ringing: 'Ringing…',
+    incoming: `Incoming ${callType === 'video' ? 'video' : 'voice'} call`,
+    connecting: 'Connecting…',
+    connected: 'Connected',
+    unavailable: 'Calling unavailable',
+    error: errorMessage || 'Call failed'
+  };
+
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="call-modal-title"
-      className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4"
-    >
-      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 text-center">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close dialog"
-          className="absolute top-4 right-4 p-1 text-slate-400 hover:text-white rounded-lg transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <div className="flex flex-col items-center space-y-3 pt-2">
-          <div className="relative p-1 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-400">
-            <Avatar src={targetUser.profileImageUrl} name={targetUser.displayName} size="lg" />
-          </div>
-          <div>
-            <h3 id="call-modal-title" className="text-base font-bold text-white">
-              {targetUser.displayName}
-            </h3>
-            <p className="text-xs text-slate-400">@{targetUser.username}</p>
-          </div>
+    <div role="dialog" aria-modal="true" aria-labelledby="call-modal-title" className="fixed inset-0 z-50 bg-slate-950/95 flex items-center justify-center p-4">
+      <div className="relative w-full max-w-2xl overflow-hidden bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl">
+        {callType === 'audio' && <audio ref={remoteAudioRef} autoPlay />}
+        <button type="button" onClick={() => closeCall()} aria-label="Close call" className="absolute z-20 top-4 right-4 p-2 bg-slate-950/70 text-white rounded-full"><X className="w-5 h-5" /></button>
+        <div className="relative min-h-[360px] bg-slate-950 flex items-center justify-center">
+          {callType === 'video' && remoteStream ? (
+            <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="flex flex-col items-center gap-4">
+              <Avatar src={targetUser.profileImageUrl} name={targetUser.displayName} size="lg" />
+              <div className="text-center">
+                <h3 id="call-modal-title" className="text-xl font-bold text-white">{targetUser.displayName}</h3>
+                <p className="text-sm text-slate-400">@{targetUser.username}</p>
+              </div>
+            </div>
+          )}
+          {callType === 'video' && <video ref={localVideoRef} autoPlay muted playsInline className="absolute bottom-4 right-4 w-28 sm:w-40 aspect-video object-cover bg-slate-800 border border-slate-600 rounded-xl shadow-xl" />}
+          <div className="absolute left-4 top-4 rounded-full bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-white">{statusText[status]}</div>
         </div>
-
-        <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-2 text-xs text-slate-300 text-left">
-          <div className="flex items-center gap-2 text-brand-300 font-semibold">
-            {callType === 'video' ? <Video className="w-4 h-4 text-brand-400" /> : <Phone className="w-4 h-4 text-brand-400" />}
-            <span>{callType === 'video' ? 'Video' : 'Voice'} Calling Unavailable</span>
-          </div>
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            Real-time peer-to-peer calling requires dedicated STUN/TURN signaling servers which are not enabled in this deployment. Please use Direct Messages for communication.
-          </p>
+        <div className="p-5 flex items-center justify-center gap-3">
+          {direction === 'incoming' && status === 'incoming' ? (
+            <>
+              <button type="button" onClick={() => closeCall(true)} className="p-4 rounded-full bg-rose-600 text-white" aria-label="Decline call"><PhoneOff className="w-5 h-5" /></button>
+              <button type="button" onClick={() => void acceptIncoming()} className="p-4 rounded-full bg-emerald-500 text-white" aria-label="Accept call"><Phone className="w-5 h-5" /></button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={toggleMicrophone} disabled={!localStreamRef.current} className="p-3 rounded-full bg-slate-800 disabled:opacity-40 text-white" aria-label={microphoneEnabled ? 'Mute microphone' : 'Unmute microphone'}>{microphoneEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}</button>
+              {callType === 'video' && <button type="button" onClick={toggleCamera} disabled={!localStreamRef.current} className="p-3 rounded-full bg-slate-800 disabled:opacity-40 text-white" aria-label={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}>{cameraEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}</button>}
+              <button type="button" onClick={() => closeCall()} className="p-4 rounded-full bg-rose-600 text-white" aria-label="End call"><PhoneOff className="w-5 h-5" /></button>
+            </>
+          )}
         </div>
-
-        <div className="flex justify-end pt-1">
-          <Button size="sm" onClick={onClose} className="w-full">
-            Understood
-          </Button>
-        </div>
+        {(status === 'unavailable' || status === 'error') && <p className="px-6 pb-5 text-center text-sm text-rose-300">{errorMessage || statusText[status]}</p>}
       </div>
     </div>
   );

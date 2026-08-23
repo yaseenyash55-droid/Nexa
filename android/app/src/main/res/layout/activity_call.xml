@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#070B14">
+
+    <org.webrtc.SurfaceViewRenderer
+        android:id="@+id/remoteRenderer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:id="@+id/audioIdentity"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp">
+
+        <ImageView
+            android:layout_width="128dp"
+            android:layout_height="128dp"
+            android:background="#172033"
+            android:contentDescription="Caller avatar"
+            android:padding="24dp"
+            android:src="@drawable/ic_profile"
+            app:tint="#FFFFFF" />
+
+        <TextView
+            android:id="@+id/tvCallerName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Nexa user"
+            android:textColor="#FFFFFF"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvCallStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Preparing call…"
+            android:textColor="#94A3B8"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <org.webrtc.SurfaceViewRenderer
+        android:id="@+id/localRenderer"
+        android:layout_width="128dp"
+        android:layout_height="180dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="20dp"
+        android:background="#172033"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/incomingControls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:padding="32dp"
+        android:visibility="gone">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDecline"
+            android:layout_width="wrap_content"
+            android:layout_height="56dp"
+            android:layout_marginEnd="24dp"
+            android:text="Decline"
+            android:textColor="#FFFFFF"
+            app:backgroundTint="#E11D48"
+            app:cornerRadius="28dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnAccept"
+            android:layout_width="wrap_content"
+            android:layout_height="56dp"
+            android:text="Accept"
+            android:textColor="#FFFFFF"
+            app:backgroundTint="#10B981"
+            app:cornerRadius="28dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/activeControls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:padding="24dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnMute"
+            android:layout_width="wrap_content"
+            android:layout_height="52dp"
+            android:layout_margin="4dp"
+            android:text="Mute"
+            android:textColor="#FFFFFF"
+            app:backgroundTint="#334155"
+            app:cornerRadius="26dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnToggleVideo"
+            android:layout_width="wrap_content"
+            android:layout_height="52dp"
+            android:layout_margin="4dp"
+            android:text="Camera"
+            android:textColor="#FFFFFF"
+            app:backgroundTint="#334155"
+            app:cornerRadius="26dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSwitchCamera"
+            android:layout_width="wrap_content"
+            android:layout_height="52dp"
+            android:layout_margin="4dp"
+            android:text="Switch"
+            android:textColor="#FFFFFF"
+            app:backgroundTint="#334155"
+            app:cornerRadius="26dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnEndCall"
+            android:layout_width="wrap_content"
+            android:layout_height="52dp"
+            android:layout_margin="4dp"
+            android:text="End"
+            android:textColor="#FFFFFF"
+            app:backgroundTint="#E11D48"
+            app:cornerRadius="26dp" />
+    </LinearLayout>
+</FrameLayout>
