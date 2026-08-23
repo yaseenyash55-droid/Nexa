@@ -8,6 +8,7 @@ import { getEmailProvider } from '../utils/email.js';
 import { auditLogSecurityEvent } from '../utils/securityAuditLogger.js';
 import { withDatabaseTransaction as withTransaction } from '../db/index.js';
 import { EmailOtpService } from './email-otp.service.js';
+import { logger } from '../utils/logger.js';
 
 export class AuthService {
   private readonly emailOtpService = new EmailOtpService();
@@ -79,8 +80,10 @@ export class AuthService {
 
     const user = this.sanitizeUser(result.rawUser);
 
-    // Auto-trigger verification email dispatch (fire-and-forget, outside transaction)
-    await this.sendEmailVerification(user.userId, user.email).catch(() => {});
+    // Auto-trigger verification email dispatch (non-blocking, outside transaction)
+    void this.sendEmailVerification(user.userId, user.email).catch((error) => {
+      logger.error({ err: error }, 'Failed to send verification email');
+    });
 
     return {
       user,

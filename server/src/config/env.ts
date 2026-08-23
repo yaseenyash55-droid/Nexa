@@ -155,6 +155,11 @@ export function validateStorageConfiguration(
   provider: 's3' | 'local',
   enforceProd = isProduction
 ): void {
+  if (provider === 'local' && enforceProd) {
+    throw new Error(
+      '[FATAL CONFIGURATION ERROR] Local disk storage provider is not permitted in production. S3 or OCI Object Storage must be configured.'
+    );
+  }
   if (provider === 's3' && enforceProd) {
     const endpoint = process.env.S3_ENDPOINT || process.env.OCI_OBJECT_STORAGE_ENDPOINT;
     const bucket = process.env.S3_BUCKET || process.env.OCI_BUCKET_NAME || process.env.OCI_OBJECT_STORAGE_BUCKET;
