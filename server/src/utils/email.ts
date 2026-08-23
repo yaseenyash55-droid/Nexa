@@ -25,16 +25,28 @@ export class ProductionEmailProvider implements IEmailProvider {
   private readonly fromAddress: string;
 
   constructor() {
-    const host = process.env.SMTP_HOST?.trim();
-    const port = Number(process.env.SMTP_PORT || '465');
-    const secure = process.env.SMTP_SECURE !== 'false';
-    const user = process.env.SMTP_USER?.trim();
-    const password = process.env.SMTP_PASSWORD?.trim() || process.env.SMTP_PASS?.trim();
-    const from = process.env.SMTP_FROM?.trim() || user;
+    const brevoApiKey = process.env.BREVO_API_KEY?.trim();
+    const brevoSenderEmail = process.env.BREVO_SENDER_EMAIL?.trim();
+    const brevoSenderName = process.env.BREVO_SENDER_NAME?.trim();
+
+    const host = process.env.SMTP_HOST?.trim() || (brevoApiKey ? 'smtp-relay.brevo.com' : undefined);
+    const port = Number(process.env.SMTP_PORT || (brevoApiKey ? '587' : '465'));
+    const secure = process.env.SMTP_SECURE !== undefined
+      ? process.env.SMTP_SECURE === 'true'
+      : port === 465;
+    const user = process.env.SMTP_USER?.trim() || brevoSenderEmail;
+    const password = process.env.SMTP_PASSWORD?.trim() || process.env.SMTP_PASS?.trim() || brevoApiKey;
+    
+    let from = process.env.SMTP_FROM?.trim();
+    if (!from && brevoSenderEmail) {
+      from = brevoSenderName ? `"${brevoSenderName}" <${brevoSenderEmail}>` : brevoSenderEmail;
+    } else if (!from) {
+      from = user;
+    }
 
     if (!host || !user || !password || !from) {
       throw new Error(
-        'SMTP configuration is incomplete. Required: SMTP_HOST, SMTP_USER, (SMTP_PASSWORD or SMTP_PASS) and SMTP_FROM.'
+        'SMTP configuration is incomplete. Required: SMTP_HOST, SMTP_USER, (SMTP_PASSWORD or SMTP_PASS) and SMTP_FROM, or BREVO_API_KEY and BREVO_SENDER_EMAIL.'
       );
     }
 
@@ -70,9 +82,17 @@ export class ProductionEmailProvider implements IEmailProvider {
 }
 
 export function getEmailProvider(): IEmailProvider {
-  const hasSmtpPass = Boolean(process.env.SMTP_PASSWORD || process.env.SMTP_PASS);
-  if (env.NODE_ENV === 'test' || env.NODE_ENV === 'development') {
-    if (process.env.SMTP_HOST && process.env.SMTP_USER && hasSmtpPass) {
+  const hasSmtp = Boolean(
+    (process.env.SMTP_HOST && process.env.SMTP_USER && (process.env.SMTP_PASSWORD || process.env.SMTP_PASS)) ||
+    (process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL)
+  );
+
+  if (env.NODE_ENV === 'test') {
+    return new FakeEmailProvider();
+  }
+
+  if (env.NODE_ENV === 'development') {
+    if (hasSmtp) {
       try {
         return new ProductionEmailProvider();
       } catch {
@@ -81,5 +101,6 @@ export function getEmailProvider(): IEmailProvider {
     }
     return new FakeEmailProvider();
   }
+
   return new ProductionEmailProvider();
 }
