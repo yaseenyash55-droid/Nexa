@@ -2,6 +2,7 @@ package com.nexa.social.call
 
 import android.content.Context
 import android.media.AudioManager
+import android.util.Log
 import com.nexa.social.data.models.IceServerConfiguration
 import com.nexa.social.utils.RemoteIceCandidate
 import org.webrtc.AudioSource
@@ -71,16 +72,28 @@ class WebRtcCallManager(
         }
         override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) = Unit
         override fun onAddStream(stream: MediaStream?) {
-            stream?.videoTracks?.firstOrNull()?.addSink(remoteRenderer)
+            try {
+                stream?.videoTracks?.firstOrNull()?.addSink(remoteRenderer)
+            } catch (e: Exception) {
+                Log.w("WebRtcCallManager", "Error adding remote sink to stream", e)
+            }
         }
         override fun onRemoveStream(stream: MediaStream?) = Unit
         override fun onDataChannel(channel: DataChannel?) = Unit
         override fun onRenegotiationNeeded() = Unit
         override fun onAddTrack(receiver: RtpReceiver?, mediaStreams: Array<out MediaStream>?) {
-            (receiver?.track() as? VideoTrack)?.addSink(remoteRenderer)
+            try {
+                (receiver?.track() as? VideoTrack)?.addSink(remoteRenderer)
+            } catch (e: Exception) {
+                Log.w("WebRtcCallManager", "Error adding remote sink to track", e)
+            }
         }
         override fun onTrack(transceiver: RtpTransceiver?) {
-            (transceiver?.receiver?.track() as? VideoTrack)?.addSink(remoteRenderer)
+            try {
+                (transceiver?.receiver?.track() as? VideoTrack)?.addSink(remoteRenderer)
+            } catch (e: Exception) {
+                Log.w("WebRtcCallManager", "Error adding remote sink to transceiver", e)
+            }
         }
         override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
             newState?.let(listener::onConnectionStateChanged)
@@ -88,23 +101,47 @@ class WebRtcCallManager(
     }
 
     init {
-        PeerConnectionFactory.initialize(
-            PeerConnectionFactory.InitializationOptions.builder(appContext)
-                .setEnableInternalTracer(false)
-                .createInitializationOptions()
-        )
-        localRenderer.init(eglBase.eglBaseContext, null)
-        localRenderer.setMirror(true)
-        localRenderer.setEnableHardwareScaler(true)
-        remoteRenderer.init(eglBase.eglBaseContext, null)
-        remoteRenderer.setEnableHardwareScaler(true)
+        try {
+            PeerConnectionFactory.initialize(
+                PeerConnectionFactory.InitializationOptions.builder(appContext)
+                    .setEnableInternalTracer(false)
+                    .createInitializationOptions()
+            )
+        } catch (e: Exception) {
+            Log.w("WebRtcCallManager", "PeerConnectionFactory.initialize warning", e)
+        }
+
+        try {
+            localRenderer.init(eglBase.eglBaseContext, null)
+            localRenderer.setMirror(true)
+            localRenderer.setEnableHardwareScaler(true)
+        } catch (e: Exception) {
+            Log.w("WebRtcCallManager", "localRenderer init warning", e)
+        }
+
+        try {
+            remoteRenderer.init(eglBase.eglBaseContext, null)
+            remoteRenderer.setEnableHardwareScaler(true)
+        } catch (e: Exception) {
+            Log.w("WebRtcCallManager", "remoteRenderer init warning", e)
+        }
 
         factory = PeerConnectionFactory.builder()
             .setVideoEncoderFactory(DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, true))
             .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglBase.eglBaseContext))
             .createPeerConnectionFactory()
 
-        val iceServers = iceConfiguration.flatMap { server ->
+        val rawServers = if (iceConfiguration.isEmpty()) {
+            listOf(
+                IceServerConfiguration(urls = listOf("stun:stun.l.google.com:19302")),
+                IceServerConfiguration(urls = listOf("stun:stun1.l.google.com:19302")),
+                IceServerConfiguration(urls = listOf("stun:stun2.l.google.com:19302"))
+            )
+        } else {
+            iceConfiguration
+        }
+
+        val iceServers = rawServers.flatMap { server ->
             server.urls.map { url ->
                 val builder = PeerConnection.IceServer.builder(url)
                 server.username?.takeIf { it.isNotBlank() }?.let(builder::setUsername)
@@ -119,34 +156,47 @@ class WebRtcCallManager(
         peerConnection = factory.createPeerConnection(rtcConfiguration, peerObserver)
             ?: throw IllegalStateException("Unable to initialize WebRTC peer connection")
 
-        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-        audioManager.isSpeakerphoneOn = videoEnabled
+        try {
+            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            audioManager.isSpeakerphoneOn = videoEnabled
+        } catch (e: Exception) {
+            Log.w("WebRtcCallManager", "AudioManager mode warning", e)
+        }
     }
 
     fun startLocalMedia() {
         if (audioTrack != null) return
-        val createdAudioSource = factory.createAudioSource(MediaConstraints())
-        audioSource = createdAudioSource
-        val createdAudioTrack = factory.createAudioTrack("NEXA_AUDIO", createdAudioSource).apply { setEnabled(true) }
-        audioTrack = createdAudioTrack
-        peerConnection.addTrack(createdAudioTrack, listOf("NEXA_STREAM"))
+        try {
+            val createdAudioSource = factory.createAudioSource(MediaConstraints())
+            audioSource = createdAudioSource
+            val createdAudioTrack = factory.createAudioTrack("NEXA_AUDIO", createdAudioSource).apply { setEnabled(true) }
+            audioTrack = createdAudioTrack
+            peerConnection.addTrack(createdAudioTrack, listOf("NEXA_STREAM"))
+        } catch (e: Exception) {
+            Log.e("WebRtcCallManager", "Failed to start local audio", e)
+        }
 
         if (videoEnabled) {
-            val createdVideoCapturer = createCameraCapturer()
-                ?: throw IllegalStateException("No usable camera is available")
-            videoCapturer = createdVideoCapturer
-            val createdVideoSource = factory.createVideoSource(false)
-            videoSource = createdVideoSource
-            val createdSurfaceHelper = SurfaceTextureHelper.create("NexaCameraThread", eglBase.eglBaseContext)
-            surfaceTextureHelper = createdSurfaceHelper
-            createdVideoCapturer.initialize(createdSurfaceHelper, appContext, createdVideoSource.capturerObserver)
-            createdVideoCapturer.startCapture(1280, 720, 30)
-            val createdVideoTrack = factory.createVideoTrack("NEXA_VIDEO", createdVideoSource).apply {
-                setEnabled(true)
-                addSink(localRenderer)
+            try {
+                val createdVideoCapturer = createCameraCapturer()
+                if (createdVideoCapturer != null) {
+                    videoCapturer = createdVideoCapturer
+                    val createdVideoSource = factory.createVideoSource(false)
+                    videoSource = createdVideoSource
+                    val createdSurfaceHelper = SurfaceTextureHelper.create("NexaCameraThread", eglBase.eglBaseContext)
+                    surfaceTextureHelper = createdSurfaceHelper
+                    createdVideoCapturer.initialize(createdSurfaceHelper, appContext, createdVideoSource.capturerObserver)
+                    createdVideoCapturer.startCapture(1280, 720, 30)
+                    val createdVideoTrack = factory.createVideoTrack("NEXA_VIDEO", createdVideoSource).apply {
+                        setEnabled(true)
+                        addSink(localRenderer)
+                    }
+                    videoTrack = createdVideoTrack
+                    peerConnection.addTrack(createdVideoTrack, listOf("NEXA_STREAM"))
+                }
+            } catch (camErr: Exception) {
+                Log.w("WebRtcCallManager", "Camera capture initialization fallback to audio", camErr)
             }
-            videoTrack = createdVideoTrack
-            peerConnection.addTrack(createdVideoTrack, listOf("NEXA_STREAM"))
         }
     }
 
@@ -188,32 +238,34 @@ class WebRtcCallManager(
     }
 
     fun setMicrophoneEnabled(enabled: Boolean) {
-        audioTrack?.setEnabled(enabled)
+        try { audioTrack?.setEnabled(enabled) } catch (_: Exception) {}
     }
 
     fun setCameraEnabled(enabled: Boolean) {
-        videoTrack?.setEnabled(enabled)
+        try { videoTrack?.setEnabled(enabled) } catch (_: Exception) {}
     }
 
     fun switchCamera() {
-        (videoCapturer as? CameraVideoCapturer)?.switchCamera(null)
+        try { (videoCapturer as? CameraVideoCapturer)?.switchCamera(null) } catch (_: Exception) {}
     }
 
     fun release() {
-        try { videoCapturer?.stopCapture() } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
-        videoTrack?.removeSink(localRenderer)
-        videoCapturer?.dispose()
-        surfaceTextureHelper?.dispose()
-        videoSource?.dispose()
-        audioSource?.dispose()
-        peerConnection.close()
-        peerConnection.dispose()
-        factory.dispose()
-        localRenderer.release()
-        remoteRenderer.release()
-        eglBase.release()
-        audioManager.mode = previousAudioMode
-        audioManager.isSpeakerphoneOn = previousSpeakerphoneState
+        try { videoCapturer?.stopCapture() } catch (_: Exception) {}
+        try { videoTrack?.removeSink(localRenderer) } catch (_: Exception) {}
+        try { videoCapturer?.dispose() } catch (_: Exception) {}
+        try { surfaceTextureHelper?.dispose() } catch (_: Exception) {}
+        try { videoSource?.dispose() } catch (_: Exception) {}
+        try { audioSource?.dispose() } catch (_: Exception) {}
+        try { peerConnection.close() } catch (_: Exception) {}
+        try { peerConnection.dispose() } catch (_: Exception) {}
+        try { factory.dispose() } catch (_: Exception) {}
+        try { localRenderer.release() } catch (_: Exception) {}
+        try { remoteRenderer.release() } catch (_: Exception) {}
+        try { eglBase.release() } catch (_: Exception) {}
+        try {
+            audioManager.mode = previousAudioMode
+            audioManager.isSpeakerphoneOn = previousSpeakerphoneState
+        } catch (_: Exception) {}
     }
 
     private fun descriptionObserver(setLocalAndNotify: Boolean) = object : SimpleSdpObserver() {
@@ -240,17 +292,26 @@ class WebRtcCallManager(
     }
 
     private fun flushPendingCandidates() {
-        pendingCandidates.forEach(peerConnection::addIceCandidate)
-        pendingCandidates.clear()
+        try {
+            pendingCandidates.forEach(peerConnection::addIceCandidate)
+            pendingCandidates.clear()
+        } catch (e: Exception) {
+            Log.w("WebRtcCallManager", "Error flushing ICE candidates", e)
+        }
     }
 
     private fun createCameraCapturer(): VideoCapturer? {
-        val enumerator = Camera2Enumerator(appContext)
-        val frontCamera = enumerator.deviceNames.firstOrNull(enumerator::isFrontFacing)
-        val fallbackCamera = enumerator.deviceNames.firstOrNull()
-        return listOfNotNull(frontCamera, fallbackCamera)
-            .distinct()
-            .firstNotNullOfOrNull { enumerator.createCapturer(it, null) }
+        return try {
+            val enumerator = Camera2Enumerator(appContext)
+            val frontCamera = enumerator.deviceNames.firstOrNull(enumerator::isFrontFacing)
+            val fallbackCamera = enumerator.deviceNames.firstOrNull()
+            listOfNotNull(frontCamera, fallbackCamera)
+                .distinct()
+                .firstNotNullOfOrNull { enumerator.createCapturer(it, null) }
+        } catch (e: Exception) {
+            Log.w("WebRtcCallManager", "Failed to create camera capturer", e)
+            null
+        }
     }
 }
 

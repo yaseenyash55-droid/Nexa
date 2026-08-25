@@ -412,19 +412,31 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
         }
         binding.tvCallStatus.text = "Preparing secure media…"
         lifecycleScope.launch(Dispatchers.IO) {
-            try {
+            val fallbackIce = listOf(
+                IceServerConfiguration(urls = listOf("stun:stun.l.google.com:19302")),
+                IceServerConfiguration(urls = listOf("stun:stun1.l.google.com:19302")),
+                IceServerConfiguration(urls = listOf("stun:stun2.l.google.com:19302"))
+            )
+            val iceServers = try {
                 val response = NexaApiClient.callApi.getIceConfiguration()
                 val config = response.body()?.data
-                if (!response.isSuccessful || config?.enabled != true || config.iceServers.isEmpty()) {
-                    throw IllegalStateException(config?.reason ?: "Calling is not configured")
+                if (response.isSuccessful && config?.enabled == true && !config.iceServers.isNullOrEmpty()) {
+                    config.iceServers
+                } else {
+                    fallbackIce
                 }
-                withContext(Dispatchers.Main) {
-                    callManager = createManager(config.iceServers)
+            } catch (_: Exception) {
+                fallbackIce
+            }
+
+            withContext(Dispatchers.Main) {
+                try {
+                    callManager = createManager(iceServers)
                     callManager?.startLocalMedia()
                     onReady()
+                } catch (error: Exception) {
+                    showFailure(error.message ?: "Unable to prepare call")
                 }
-            } catch (error: Exception) {
-                withContext(Dispatchers.Main) { showFailure(error.message ?: "Unable to prepare call") }
             }
         }
     }

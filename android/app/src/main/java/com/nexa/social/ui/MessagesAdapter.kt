@@ -7,13 +7,20 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.nexa.social.R
 import com.nexa.social.data.models.DisplayMessage
+import com.nexa.social.utils.ChatTheme
 
 class MessagesAdapter(
     private val currentUserId: Int,
+    private var chatTheme: ChatTheme = ChatTheme.INDIGO_DEFAULT,
     private val onMarkAsReadClick: ((DisplayMessage) -> Unit)? = null
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val messages = mutableListOf<DisplayMessage>()
+
+    fun setChatTheme(newTheme: ChatTheme) {
+        this.chatTheme = newTheme
+        notifyDataSetChanged()
+    }
 
     fun submitList(newMessages: List<DisplayMessage>) {
         messages.clear()
@@ -68,9 +75,9 @@ class MessagesAdapter(
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val msg = messages[position]
         if (holder is SentViewHolder) {
-            holder.bind(msg)
+            holder.bind(msg, chatTheme)
         } else if (holder is ReceivedViewHolder) {
-            holder.bind(msg)
+            holder.bind(msg, chatTheme)
         }
     }
 
@@ -80,14 +87,18 @@ class MessagesAdapter(
         private val tvContent: TextView = itemView.findViewById(R.id.tvContent)
         private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
         private val tvReadStatus: TextView? = itemView.findViewById(R.id.tvReadStatus)
+        private val bubbleLayout: View? = itemView.findViewById(R.id.bubbleLayout)
 
-        fun bind(msg: DisplayMessage) {
+        fun bind(msg: DisplayMessage, theme: ChatTheme) {
+            bubbleLayout?.background = theme.createSentBubbleDrawable()
+            tvContent.setTextColor(theme.sentTextColor)
             tvContent.text = msg.content
             val time = formatTimestamp(msg.timestamp) ?: "Sent"
             tvTime.text = time
             if (msg.isRead) {
                 tvReadStatus?.visibility = View.VISIBLE
                 tvReadStatus?.text = "✓✓ Read"
+                tvReadStatus?.setTextColor(theme.readReceiptColor)
             } else {
                 tvReadStatus?.visibility = View.GONE
             }
@@ -105,7 +116,9 @@ class MessagesAdapter(
         private val tvReadStatus: TextView? = itemView.findViewById(R.id.tvReadStatus)
         private val bubbleLayout: View? = itemView.findViewById(R.id.bubbleLayout)
 
-        fun bind(msg: DisplayMessage) {
+        fun bind(msg: DisplayMessage, theme: ChatTheme) {
+            bubbleLayout?.background = theme.createReceivedBubbleDrawable()
+            tvContent.setTextColor(theme.receivedTextColor)
             if (!msg.senderName.isNullOrEmpty()) {
                 tvSenderName.text = msg.senderName
                 tvSenderName.visibility = View.VISIBLE
@@ -119,8 +132,11 @@ class MessagesAdapter(
             if (msg.isRead) {
                 btnMarkRead?.visibility = View.GONE
                 tvReadStatus?.visibility = View.VISIBLE
+                tvReadStatus?.setTextColor(theme.readReceiptColor)
             } else {
                 btnMarkRead?.visibility = View.VISIBLE
+                btnMarkRead?.background = theme.createMarkReadButtonDrawable()
+                btnMarkRead?.setTextColor(theme.markReadTextColor)
                 tvReadStatus?.visibility = View.GONE
                 btnMarkRead?.setOnClickListener {
                     onMarkAsReadClick?.invoke(msg)

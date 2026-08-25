@@ -77,6 +77,11 @@ class ProfileFragment : Fragment() {
     }
 
     private fun setupLogoutButton() {
+        binding.btnSettings.setOnClickListener {
+            val intent = Intent(requireContext(), com.nexa.social.ui.SettingsActivity::class.java)
+            startActivity(intent)
+        }
+
         binding.btnLogout.setOnClickListener {
             androidx.appcompat.app.AlertDialog.Builder(requireContext())
                 .setTitle("Account Settings & Logout")

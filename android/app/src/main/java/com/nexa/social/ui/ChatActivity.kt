@@ -33,6 +33,7 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var binding: ActivityChatBinding
     private lateinit var prefManager: PreferenceManager
     private lateinit var localChatStorage: LocalChatStorage
+    private lateinit var themeManager: com.nexa.social.utils.ChatThemeManager
     private lateinit var adapter: MessagesAdapter
 
     private var chatType: String = "direct"
@@ -50,6 +51,7 @@ class ChatActivity : AppCompatActivity() {
 
         prefManager = PreferenceManager(this)
         localChatStorage = LocalChatStorage.getInstance(this)
+        themeManager = com.nexa.social.utils.ChatThemeManager.getInstance(this)
 
         chatType = intent.getStringExtra(EXTRA_CHAT_TYPE) ?: "direct"
         targetId = intent.getIntExtra(EXTRA_TARGET_ID, 0)
@@ -119,6 +121,10 @@ class ChatActivity : AppCompatActivity() {
                     startActivity(CallActivity.outgoingIntent(this, targetId, targetName, "video"))
                     true
                 }
+                R.id.action_change_theme -> {
+                    showThemePickerDialog()
+                    true
+                }
                 R.id.action_mark_all_read -> {
                     markAllMessagesAsRead()
                     true
@@ -128,10 +134,31 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
+    private fun showThemePickerDialog() {
+        val themes = com.nexa.social.utils.ChatTheme.values()
+        val themeNames = themes.map { it.displayName }.toTypedArray()
+        val currentTheme = themeManager.getThemeForChat(targetId, chatType)
+        val selectedIndex = themes.indexOf(currentTheme).coerceAtLeast(0)
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Select Chat Theme 🎨")
+            .setSingleChoiceItems(themeNames, selectedIndex) { dialog, which ->
+                val selectedTheme = themes[which]
+                themeManager.setThemeForChat(targetId, chatType, selectedTheme)
+                adapter.setChatTheme(selectedTheme)
+                Toast.makeText(this, "Applied: ${selectedTheme.displayName}", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun setupRecyclerView() {
         val currentUserId = prefManager.userId
+        val currentTheme = themeManager.getThemeForChat(targetId, chatType)
         adapter = MessagesAdapter(
             currentUserId = currentUserId,
+            chatTheme = currentTheme,
             onMarkAsReadClick = { msg ->
                 markSingleMessageAsRead(msg)
             }

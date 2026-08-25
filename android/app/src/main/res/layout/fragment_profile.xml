@@ -80,12 +80,25 @@
             app:strokeColor="@color/border_dark" />
 
         <ImageButton
+            android:id="@+id/btnSettings"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Settings"
+            android:src="@drawable/ic_settings"
+            app:layout_constraintEnd_toStartOf="@id/btnLogout"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="@color/text_white" />
+
+        <ImageButton
             android:id="@+id/btnLogout"
             android:layout_width="36dp"
             android:layout_height="36dp"
             android:layout_margin="12dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Settings and Logout"
+            android:contentDescription="Logout"
             android:src="@drawable/ic_logout"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
