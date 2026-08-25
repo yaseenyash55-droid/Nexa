@@ -335,34 +335,41 @@ object SocketManager {
         }, onResult)
     }
 
-    fun emitCallAccept(callId: String, onResult: (Boolean, String?) -> Unit) {
-        emitCallEvent("call:accept", JSONObject().put("callId", callId), onResult)
+    fun emitCallAccept(callId: String, targetUserId: Int = 0, onResult: (Boolean, String?) -> Unit) {
+        emitCallEvent("call:accept", JSONObject().apply {
+            put("callId", callId)
+            if (targetUserId > 0) put("targetUserId", targetUserId)
+        }, onResult)
     }
 
-    fun emitCallReject(callId: String, reason: String = "declined") {
+    fun emitCallReject(callId: String, targetUserId: Int = 0, reason: String = "declined") {
         emitCallEvent("call:reject", JSONObject().apply {
             put("callId", callId)
             put("reason", reason)
+            if (targetUserId > 0) put("targetUserId", targetUserId)
         }) { _, _ -> }
     }
 
-    fun emitCallOffer(callId: String, sdp: String) {
+    fun emitCallOffer(callId: String, targetUserId: Int = 0, sdp: String) {
         emitCallEvent("call:offer", JSONObject().apply {
             put("callId", callId)
             put("sdp", sdp)
+            if (targetUserId > 0) put("targetUserId", targetUserId)
         }) { _, _ -> }
     }
 
-    fun emitCallAnswer(callId: String, sdp: String) {
+    fun emitCallAnswer(callId: String, targetUserId: Int = 0, sdp: String) {
         emitCallEvent("call:answer", JSONObject().apply {
             put("callId", callId)
             put("sdp", sdp)
+            if (targetUserId > 0) put("targetUserId", targetUserId)
         }) { _, _ -> }
     }
 
-    fun emitIceCandidate(callId: String, candidate: RemoteIceCandidate) {
+    fun emitIceCandidate(callId: String, targetUserId: Int = 0, candidate: RemoteIceCandidate) {
         emitCallEvent("call:ice-candidate", JSONObject().apply {
             put("callId", callId)
+            if (targetUserId > 0) put("targetUserId", targetUserId)
             put("candidate", JSONObject().apply {
                 put("candidate", candidate.candidate)
                 put("sdpMid", candidate.sdpMid)
@@ -371,10 +378,11 @@ object SocketManager {
         }) { _, _ -> }
     }
 
-    fun emitCallEnd(callId: String, reason: String = "ended") {
+    fun emitCallEnd(callId: String, targetUserId: Int = 0, reason: String = "ended") {
         emitCallEvent("call:end", JSONObject().apply {
             put("callId", callId)
             put("reason", reason)
+            if (targetUserId > 0) put("targetUserId", targetUserId)
         }) { _, _ -> }
     }
 

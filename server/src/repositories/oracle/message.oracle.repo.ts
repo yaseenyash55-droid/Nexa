@@ -55,8 +55,8 @@ export class OracleMessageRepository implements IMessageRepository {
         RETURNING MESSAGE_ID, CREATED_AT INTO :messageId, :createdAt
       `;
       const binds = {
-        senderId: msg.senderId,
-        receiverId: msg.receiverId,
+        senderId: Number(msg.senderId),
+        receiverId: Number(msg.receiverId),
         content: msg.content.trim(),
         messageId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT },
         createdAt: { type: oracledb.DATE, dir: oracledb.BIND_OUT }
@@ -65,18 +65,41 @@ export class OracleMessageRepository implements IMessageRepository {
       const res = await conn.execute(sql, binds);
       const outBinds = res.outBinds as any;
 
+      const createdVal = outBinds?.createdAt?.[0];
+      const createdAtStr = createdVal instanceof Date
+        ? createdVal.toISOString()
+        : (typeof createdVal === 'string' ? createdVal : new Date().toISOString());
+
+      let senderUsername = 'user';
+      let senderDisplayName = 'User';
+      let senderProfileImage: string | undefined;
+
+      try {
+        const userRes = await conn.execute<any>(
+          'SELECT USERNAME, DISPLAY_NAME, PROFILE_IMAGE_URL FROM USERS WHERE USER_ID = :senderId',
+          { senderId: Number(msg.senderId) }
+        );
+        const userRow = userRes.rows?.[0];
+        if (userRow) {
+          senderUsername = userRow.USERNAME || userRow[0] || 'user';
+          senderDisplayName = userRow.DISPLAY_NAME || userRow[1] || 'User';
+          senderProfileImage = userRow.PROFILE_IMAGE_URL || userRow[2] || undefined;
+        }
+      } catch {}
+
       return {
-        messageId: outBinds.messageId[0],
-        senderId: msg.senderId,
-        receiverId: msg.receiverId,
+        messageId: Number(outBinds?.messageId?.[0]),
+        senderId: Number(msg.senderId),
+        receiverId: Number(msg.receiverId),
         sender: {
-          userId: msg.senderId,
-          username: 'sender',
-          displayName: 'Sender'
+          userId: Number(msg.senderId),
+          username: senderUsername,
+          displayName: senderDisplayName,
+          profileImageUrl: senderProfileImage
         },
         content: msg.content.trim(),
         isRead: false,
-        createdAt: outBinds.createdAt[0].toISOString()
+        createdAt: createdAtStr
       };
     });
   }

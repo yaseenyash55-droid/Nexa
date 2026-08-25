@@ -251,7 +251,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
             requestMediaPermissions { prepareAndAcceptCall() }
         }
         binding.btnDecline.setOnClickListener {
-            SocketManager.emitCallReject(callId)
+            SocketManager.emitCallReject(callId, targetId, "declined")
             ended = true
             finish()
         }
@@ -453,7 +453,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
         stopRinging()
         binding.btnAccept.isEnabled = false
         prepareManager {
-            SocketManager.emitCallAccept(callId) { success, error ->
+            SocketManager.emitCallAccept(callId, targetId) { success, error ->
                 if (success) {
                     accepted = true
                     binding.incomingControls.visibility = View.GONE
@@ -510,12 +510,12 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     }
 
     override fun onLocalDescription(type: SessionDescription.Type, sdp: String) {
-        if (type == SessionDescription.Type.OFFER) SocketManager.emitCallOffer(callId, sdp)
-        else if (type == SessionDescription.Type.ANSWER) SocketManager.emitCallAnswer(callId, sdp)
+        if (type == SessionDescription.Type.OFFER) SocketManager.emitCallOffer(callId, targetId, sdp)
+        else if (type == SessionDescription.Type.ANSWER) SocketManager.emitCallAnswer(callId, targetId, sdp)
     }
 
     override fun onLocalIceCandidate(candidate: RemoteIceCandidate) {
-        SocketManager.emitIceCandidate(callId, candidate)
+        SocketManager.emitIceCandidate(callId, targetId, candidate)
     }
 
     override fun onConnectionStateChanged(state: PeerConnection.PeerConnectionState) {
@@ -541,8 +541,8 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
         proximitySensorManager?.release()
         proximitySensorManager = null
         if (!ended) {
-            if (direction == "incoming" && !accepted) SocketManager.emitCallReject(callId, "declined")
-            else SocketManager.emitCallEnd(callId, reason)
+            if (direction == "incoming" && !accepted) SocketManager.emitCallReject(callId, targetId, "declined")
+            else SocketManager.emitCallEnd(callId, targetId, reason)
             ended = true
             updatePipParams()
         }
@@ -581,8 +581,8 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
         }
         SocketManager.unregisterCallSignalListener(this)
         if (!ended) {
-            if (direction == "incoming" && !accepted) SocketManager.emitCallReject(callId, "dismissed")
-            else SocketManager.emitCallEnd(callId, "ended")
+            if (direction == "incoming" && !accepted) SocketManager.emitCallReject(callId, targetId, "dismissed")
+            else SocketManager.emitCallEnd(callId, targetId, "ended")
         }
         callManager?.release()
         callManager = null

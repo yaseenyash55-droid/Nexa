@@ -35,7 +35,7 @@ class CallActionReceiver : BroadcastReceiver() {
         when (intent.action) {
             ACTION_DECLINE_CALL -> {
                 if (callId.isNotBlank()) {
-                    SocketManager.emitCallReject(callId, "declined")
+                    SocketManager.emitCallReject(callId, callerId, "declined")
                 }
             }
             ACTION_ACCEPT_CALL -> {

@@ -209,15 +209,16 @@ socialRouter.get('/messages/:otherUserId', requireAuth, async (req: any, res, ne
 socialRouter.post('/messages', requireAuth, async (req: any, res, next) => {
   try {
     const { receiverId, content } = req.body;
-    if (!receiverId || !content) {
+    const parsedReceiverId = parseInt(String(receiverId), 10);
+    if (!parsedReceiverId || !content || !String(content).trim()) {
       return sendError(res, 'INVALID_INPUT', 'Receiver ID and content are required', 400);
     }
     const msg = await getMessageRepository().sendMessage({
       senderId: req.user.userId,
-      receiverId,
-      content
+      receiverId: parsedReceiverId,
+      content: String(content).trim()
     });
-    realtimeServer.emitToUser(receiverId, 'message:created', msg);
+    realtimeServer.emitToUser(parsedReceiverId, 'message:created', msg);
     return sendSuccess(res, msg, 'Message sent', undefined, 201);
   } catch (err) {
     next(err);
