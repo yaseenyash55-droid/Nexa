@@ -91,7 +91,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     private var pendingAction: (() -> Unit)? = null
     private var isReceiverRegistered = false
     private var proximitySensorManager: ProximitySensorManager? = null
-    private var ringtone: Ringtone? = null
+    private var incomingRingtone: Ringtone? = null
 
     private val pipActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -169,11 +169,11 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
         } else if (intent.getBooleanExtra("extra_auto_accept", false)) {
             requestMediaPermissions { prepareAndAcceptCall() }
         } else {
-            startIncomingRingtone()
+            startRinging()
         }
     }
 
-    private fun startIncomingRingtone() {
+    private fun startRinging() {
         if (direction != "incoming" || accepted || ended) return
         try {
             val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -192,21 +192,17 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
             if (ringerMode == AudioManager.RINGER_MODE_NORMAL) {
                 r?.play()
             }
-            ringtone = r
+            incomingRingtone = r
         } catch (e: Exception) {
             Log.w("CallActivity", "Failed to start incoming ringtone", e)
         }
     }
 
-    private fun stopIncomingRingtone() {
+    private fun stopRinging() {
         try {
-            ringtone?.let {
-                if (it.isPlaying) {
-                    it.stop()
-                }
-            }
+            incomingRingtone?.takeIf { it.isPlaying }?.stop()
         } catch (_: Exception) {}
-        ringtone = null
+        incomingRingtone = null
     }
 
     private fun registerPipReceiver() {
@@ -429,7 +425,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     }
 
     private fun prepareAndAcceptCall() {
-        stopIncomingRingtone()
+        stopRinging()
         binding.btnAccept.isEnabled = false
         prepareManager {
             SocketManager.emitCallAccept(callId) { success, error ->
@@ -449,7 +445,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
 
     override fun onCallAccepted(callId: String) {
         if (callId != this.callId) return
-        stopIncomingRingtone()
+        stopRinging()
         accepted = true
         binding.tvCallStatus.text = "Connecting…"
         proximitySensorManager?.start(allowScreenOff = callType == "audio" || !cameraEnabled)
@@ -459,7 +455,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
 
     override fun onCallRejected(callId: String, reason: String) {
         if (callId != this.callId) return
-        stopIncomingRingtone()
+        stopRinging()
         ended = true
         proximitySensorManager?.stop()
         updatePipParams()
@@ -480,7 +476,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
 
     override fun onCallEnded(callId: String, reason: String) {
         if (callId != this.callId) return
-        stopIncomingRingtone()
+        stopRinging()
         ended = true
         proximitySensorManager?.stop()
         updatePipParams()
@@ -516,7 +512,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     }
 
     private fun endCall(reason: String) {
-        stopIncomingRingtone()
+        stopRinging()
         proximitySensorManager?.release()
         proximitySensorManager = null
         if (!ended) {
@@ -547,7 +543,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     }
 
     override fun onDestroy() {
-        stopIncomingRingtone()
+        stopRinging()
         proximitySensorManager?.release()
         proximitySensorManager = null
         if (isReceiverRegistered) {
