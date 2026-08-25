@@ -209,7 +209,61 @@ export class AuthService {
 
     const sanitizedUser = this.sanitizeUser(user);
 
+    // Dispatch security login notification email asynchronously
+    if (user.email) {
+      void this.dispatchLoginNotificationEmail(user, {
+        userAgent: credentials.userAgent,
+        ipAddress: credentials.ipAddress
+      });
+    }
+
     return { user: sanitizedUser, tokens: { accessToken, refreshToken }, accessToken, refreshToken };
+  }
+
+  private async dispatchLoginNotificationEmail(user: User, clientInfo?: { userAgent?: string; ipAddress?: string }) {
+    if (!user.email) return;
+    try {
+      const emailProvider = getEmailProvider();
+      const userAgent = clientInfo?.userAgent || '';
+      const isAndroid = userAgent.includes('Android') || userAgent.includes('NexaMobile') || userAgent.includes('okhttp');
+      const clientLabel = isAndroid ? 'Android Application (Nexa App)' : 'Web Browser';
+      const formattedDate = new Date().toUTCString();
+
+      const html = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0f19; color: #f1f5f9; padding: 32px 16px;">
+          <div style="max-width: 520px; margin: 0 auto; background-color: #151e2e; border: 1px solid #334155; border-radius: 16px; padding: 28px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+            <div style="margin-bottom: 20px;">
+              <span style="font-size: 22px; font-weight: bold; color: #6366f1;">NEXA SOCIAL</span>
+              <span style="font-size: 12px; color: #94a3b8; margin-left: 8px;">Security Alert</span>
+            </div>
+            <h2 style="font-size: 18px; color: #ffffff; margin-top: 0; margin-bottom: 12px;">New Sign-In Detected</h2>
+            <p style="color: #cbd5e1; font-size: 14px; line-height: 1.5; margin-bottom: 16px;">
+              Hi <strong>${user.displayName || user.username}</strong> (@${user.username}),
+            </p>
+            <p style="color: #cbd5e1; font-size: 14px; line-height: 1.5; margin-bottom: 20px;">
+              We detected a successful sign-in to your Nexa account:
+            </p>
+            <div style="background-color: #0b0f19; border: 1px solid #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+              <p style="margin: 4px 0; font-size: 13px; color: #94a3b8;"><strong style="color: #e2e8f0;">Device / Client:</strong> ${clientLabel}</p>
+              <p style="margin: 4px 0; font-size: 13px; color: #94a3b8;"><strong style="color: #e2e8f0;">Date & Time:</strong> ${formattedDate}</p>
+              ${clientInfo?.ipAddress ? `<p style="margin: 4px 0; font-size: 13px; color: #94a3b8;"><strong style="color: #e2e8f0;">IP Address:</strong> ${clientInfo.ipAddress}</p>` : ''}
+            </div>
+            <p style="color: #94a3b8; font-size: 13px; line-height: 1.4; margin-bottom: 0;">
+              If this was you, no action is required. If you did not sign in, please reset your password immediately in your account settings.
+            </p>
+          </div>
+        </div>
+      `;
+
+      await emailProvider.sendEmail({
+        to: user.email,
+        subject: `🔐 New sign-in to your NEXA account (@${user.username})`,
+        body: `Hi ${user.displayName || user.username}, a new sign-in to your Nexa account was detected on ${clientLabel} at ${formattedDate}. If this was not you, please reset your password immediately.`,
+        html
+      });
+    } catch (emailErr) {
+      logger.warn({ err: emailErr, userId: user.userId }, 'Failed to dispatch login security notification email');
+    }
   }
 
   async verifyLoginOtp(challengeId: string, code: string) {

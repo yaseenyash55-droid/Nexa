@@ -46,7 +46,11 @@ export class AuthController {
 
   async login(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await authService.login(req.body);
+      const result = await authService.login({
+        ...req.body,
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip
+      });
       if (result.mfaRequired) return sendSuccess(res, result, 'Verification code sent');
 
       res.cookie('nexa_refresh_token', result.refreshToken, getRefreshTokenCookieOptions());

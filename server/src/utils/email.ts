@@ -1,10 +1,12 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import { env } from '../config/env.js';
+import { logger } from './logger.js';
 
 export interface EmailMessage {
   to: string;
   subject: string;
   body: string;
+  html?: string;
 }
 
 export interface IEmailProvider {
@@ -16,6 +18,7 @@ export class FakeEmailProvider implements IEmailProvider {
 
   async sendEmail(message: EmailMessage): Promise<boolean> {
     this.sentEmails.push(message);
+    logger.info({ to: message.to, subject: message.subject }, '[FakeEmailProvider] Simulated email dispatched');
     return true;
   }
 }
@@ -55,8 +58,8 @@ export class BrevoEmailProvider implements IEmailProvider {
 
   constructor() {
     this.apiKey = normalizeBrevoApiKey(process.env.BREVO_API_KEY);
-    this.senderEmail = process.env.BREVO_SENDER_EMAIL?.trim() || '';
-    this.senderName = process.env.BREVO_SENDER_NAME?.trim() || 'Nexa';
+    this.senderEmail = process.env.BREVO_SENDER_EMAIL?.trim() || process.env.SMTP_USER?.trim() || 'nexadoomsorb@gmail.com';
+    this.senderName = process.env.BREVO_SENDER_NAME?.trim() || 'Nexa Social';
 
     if (!this.apiKey || !this.senderEmail) {
       throw new Error('Brevo configuration is incomplete. Required: BREVO_API_KEY and BREVO_SENDER_EMAIL.');
@@ -68,6 +71,17 @@ export class BrevoEmailProvider implements IEmailProvider {
     const timeout = setTimeout(() => controller.abort(), 15000);
 
     try {
+      const payload: Record<string, any> = {
+        sender: { name: this.senderName, email: this.senderEmail },
+        to: [{ email: message.to }],
+        subject: message.subject,
+        textContent: message.body
+      };
+
+      if (message.html) {
+        payload.htmlContent = message.html;
+      }
+
       const response = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: {
@@ -75,12 +89,7 @@ export class BrevoEmailProvider implements IEmailProvider {
           'api-key': this.apiKey,
           'content-type': 'application/json'
         },
-        body: JSON.stringify({
-          sender: { name: this.senderName, email: this.senderEmail },
-          to: [{ email: message.to }],
-          subject: message.subject,
-          textContent: message.body
-        }),
+        body: JSON.stringify(payload),
         signal: controller.signal
       });
 
@@ -88,6 +97,7 @@ export class BrevoEmailProvider implements IEmailProvider {
         throw new Error(`Brevo email API request failed with status ${response.status}`);
       }
 
+      logger.info({ to: message.to, subject: message.subject }, '[BrevoEmailProvider] Email delivered successfully');
       return true;
     } finally {
       clearTimeout(timeout);
@@ -104,17 +114,22 @@ export class ProductionEmailProvider implements IEmailProvider {
     const brevoSenderEmail = process.env.BREVO_SENDER_EMAIL?.trim();
     const brevoSenderName = process.env.BREVO_SENDER_NAME?.trim();
 
-    const host = process.env.SMTP_HOST?.trim() || (brevoApiKey ? 'smtp-relay.brevo.com' : undefined);
-    const port = Number(process.env.SMTP_PORT || (brevoApiKey ? '587' : '465'));
+    const user = process.env.SMTP_USER?.trim() || brevoSenderEmail || 'nexadoomsorb@gmail.com';
+    const isGmail = user.toLowerCase().endsWith('@gmail.com');
+
+    const host = process.env.SMTP_HOST?.trim() || (isGmail ? 'smtp.gmail.com' : brevoApiKey ? 'smtp-relay.brevo.com' : undefined);
+    const port = Number(process.env.SMTP_PORT || (isGmail ? '465' : brevoApiKey ? '587' : '465'));
     const secure = process.env.SMTP_SECURE !== undefined
       ? process.env.SMTP_SECURE === 'true'
       : port === 465;
-    const user = process.env.SMTP_USER?.trim() || brevoSenderEmail;
+    
     const password = process.env.SMTP_PASSWORD?.trim() || process.env.SMTP_PASS?.trim() || brevoApiKey;
     
     let from = process.env.SMTP_FROM?.trim();
     if (!from && brevoSenderEmail) {
       from = brevoSenderName ? `"${brevoSenderName}" <${brevoSenderEmail}>` : brevoSenderEmail;
+    } else if (!from && isGmail) {
+      from = `"Nexa Security" <${user}>`;
     } else if (!from) {
       from = user;
     }
@@ -145,25 +160,44 @@ export class ProductionEmailProvider implements IEmailProvider {
   }
 
   async sendEmail(message: EmailMessage): Promise<boolean> {
-    const result = await this.transporter.sendMail({
-      from: this.fromAddress,
-      to: message.to,
-      subject: message.subject,
-      text: message.body
-    });
+    try {
+      const result = await this.transporter.sendMail({
+        from: this.fromAddress,
+        to: message.to,
+        subject: message.subject,
+        text: message.body,
+        html: message.html || undefined
+      });
 
-    return result.accepted.length > 0;
+      const accepted = result.accepted.length > 0;
+      if (accepted) {
+        logger.info({ to: message.to, subject: message.subject }, '[ProductionEmailProvider] SMTP email delivered');
+      } else {
+        logger.warn({ to: message.to, subject: message.subject, result }, '[ProductionEmailProvider] SMTP email rejected');
+      }
+      return accepted;
+    } catch (err) {
+      logger.error({ err, to: message.to, subject: message.subject }, '[ProductionEmailProvider] Failed to dispatch SMTP email');
+      throw err;
+    }
   }
 }
 
 export function getEmailProvider(): IEmailProvider {
   if (process.env.BREVO_API_KEY) {
-    return new BrevoEmailProvider();
+    try {
+      return new BrevoEmailProvider();
+    } catch (err) {
+      logger.warn({ err }, 'Failed to initialize BrevoEmailProvider, falling back to SMTP/Fake');
+    }
   }
 
   const hasSmtpPass = Boolean(process.env.SMTP_PASSWORD || process.env.SMTP_PASS);
+  const user = process.env.SMTP_USER?.trim();
+  const isConfigured = Boolean((process.env.SMTP_HOST || user?.endsWith('@gmail.com')) && user && hasSmtpPass);
+
   if (env.NODE_ENV === 'test' || env.NODE_ENV === 'development') {
-    if (process.env.SMTP_HOST && process.env.SMTP_USER && hasSmtpPass) {
+    if (isConfigured) {
       try {
         return new ProductionEmailProvider();
       } catch {
@@ -173,5 +207,14 @@ export function getEmailProvider(): IEmailProvider {
     return new FakeEmailProvider();
   }
 
-  return new ProductionEmailProvider();
+  if (isConfigured) {
+    try {
+      return new ProductionEmailProvider();
+    } catch (err) {
+      logger.error({ err }, 'Failed to initialize ProductionEmailProvider');
+      return new FakeEmailProvider();
+    }
+  }
+
+  return new FakeEmailProvider();
 }

@@ -246,6 +246,9 @@ export class NexaRealtimeServer {
     let targetUserId = 0;
     const call = this.activeCalls.get(callId);
     if (call) {
+      if (call.callerId !== senderId && call.calleeId !== senderId) {
+        throw new Error('Call session not found');
+      }
       targetUserId = this.peerUserId(call, senderId);
     } else if (payload.targetUserId && Number.isInteger(Number(payload.targetUserId))) {
       targetUserId = Number(payload.targetUserId);
