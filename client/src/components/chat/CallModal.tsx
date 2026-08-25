@@ -138,11 +138,45 @@ export const CallModal: React.FC<CallModalProps> = ({
       peer.ontrack = (event) => {
         setRemoteStream(event.streams[0] || new MediaStream([event.track]));
       };
+      const isRestartingIceRef = { current: false };
+
+      const handleIceRestart = async () => {
+        if (isRestartingIceRef.current || !peer || peer.connectionState === 'closed') return;
+        isRestartingIceRef.current = true;
+        setStatus('connecting');
+        try {
+          if (typeof peer.restartIce === 'function') {
+            peer.restartIce();
+          }
+          if (direction === 'outgoing' || acceptedRef.current) {
+            const offer = await peer.createOffer({ iceRestart: true });
+            await peer.setLocalDescription(offer);
+            socket.emit('call:offer', { callId, sdp: offer.sdp });
+          }
+        } catch (iceErr) {
+          console.warn('[WebRTC] ICE restart attempt failed:', iceErr);
+        } finally {
+          setTimeout(() => {
+            isRestartingIceRef.current = false;
+          }, 3000);
+        }
+      };
+
+      peer.oniceconnectionstatechange = () => {
+        if (peer.iceConnectionState === 'connected' || peer.iceConnectionState === 'completed') {
+          setStatus('connected');
+        } else if (peer.iceConnectionState === 'disconnected' || peer.iceConnectionState === 'failed') {
+          void handleIceRestart();
+        }
+      };
+
       peer.onconnectionstatechange = () => {
-        if (peer.connectionState === 'connected') setStatus('connected');
-        if (peer.connectionState === 'failed' || peer.connectionState === 'disconnected') {
-          setStatus('error');
-          setErrorMessage('The call connection was interrupted.');
+        if (peer.connectionState === 'connected') {
+          setStatus('connected');
+        } else if (peer.connectionState === 'failed') {
+          void handleIceRestart();
+        } else if (peer.connectionState === 'disconnected') {
+          setStatus('connecting');
         }
       };
       peerRef.current = peer;
@@ -280,8 +314,24 @@ export const CallModal: React.FC<CallModalProps> = ({
         });
       };
       peer.ontrack = (event) => setRemoteStream(event.streams[0] || new MediaStream([event.track]));
+      
+      peer.oniceconnectionstatechange = () => {
+        if (peer.iceConnectionState === 'connected' || peer.iceConnectionState === 'completed') {
+          setStatus('connected');
+        } else if (peer.iceConnectionState === 'disconnected' || peer.iceConnectionState === 'failed') {
+          if (typeof peer.restartIce === 'function') {
+            peer.restartIce();
+          }
+          setStatus('connecting');
+        }
+      };
+
       peer.onconnectionstatechange = () => {
         if (peer.connectionState === 'connected') setStatus('connected');
+        else if (peer.connectionState === 'failed') {
+          if (typeof peer.restartIce === 'function') peer.restartIce();
+          setStatus('connecting');
+        }
       };
       peerRef.current = peer;
       socket.emit('call:accept', { callId: callIdRef.current }, (response: AckResponse) => {
