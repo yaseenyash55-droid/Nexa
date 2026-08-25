@@ -15,6 +15,7 @@ import com.nexa.social.R
 import com.nexa.social.data.models.DisplayMessage
 import com.nexa.social.data.models.SendDirectMessageRequest
 import com.nexa.social.databinding.ActivityChatBinding
+import com.nexa.social.utils.LocalChatStorage
 import com.nexa.social.utils.PreferenceManager
 import com.nexa.social.utils.SocketManager
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,7 @@ class ChatActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityChatBinding
     private lateinit var prefManager: PreferenceManager
+    private lateinit var localChatStorage: LocalChatStorage
     private lateinit var adapter: MessagesAdapter
 
     private var chatType: String = "direct"
@@ -47,6 +49,7 @@ class ChatActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         prefManager = PreferenceManager(this)
+        localChatStorage = LocalChatStorage.getInstance(this)
 
         chatType = intent.getStringExtra(EXTRA_CHAT_TYPE) ?: "direct"
         targetId = intent.getIntExtra(EXTRA_TARGET_ID, 0)
@@ -65,6 +68,10 @@ class ChatActivity : AppCompatActivity() {
         setupRealtimeMessageListeners()
         setupTextWatcher()
 
+        // Immediate offline storage load
+        loadCachedMessages()
+
+        // Network sync
         loadMessages()
     }
 
@@ -101,27 +108,34 @@ class ChatActivity : AppCompatActivity() {
         binding.toolbar.title = targetName
         binding.toolbar.subtitle = if (chatType == "direct") "Direct Conversation" else "Group Conversation"
         binding.toolbar.setNavigationOnClickListener { finish() }
-        if (chatType == "direct") {
-            binding.toolbar.inflateMenu(R.menu.chat_call_menu)
-            binding.toolbar.setOnMenuItemClickListener { item ->
-                when (item.itemId) {
-                    R.id.action_voice_call -> {
-                        startActivity(CallActivity.outgoingIntent(this, targetId, targetName, "audio"))
-                        true
-                    }
-                    R.id.action_video_call -> {
-                        startActivity(CallActivity.outgoingIntent(this, targetId, targetName, "video"))
-                        true
-                    }
-                    else -> false
+        binding.toolbar.inflateMenu(R.menu.chat_call_menu)
+        binding.toolbar.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.action_voice_call -> {
+                    startActivity(CallActivity.outgoingIntent(this, targetId, targetName, "audio"))
+                    true
                 }
+                R.id.action_video_call -> {
+                    startActivity(CallActivity.outgoingIntent(this, targetId, targetName, "video"))
+                    true
+                }
+                R.id.action_mark_all_read -> {
+                    markAllMessagesAsRead()
+                    true
+                }
+                else -> false
             }
         }
     }
 
     private fun setupRecyclerView() {
         val currentUserId = prefManager.userId
-        adapter = MessagesAdapter(currentUserId = currentUserId)
+        adapter = MessagesAdapter(
+            currentUserId = currentUserId,
+            onMarkAsReadClick = { msg ->
+                markSingleMessageAsRead(msg)
+            }
+        )
 
         binding.rvMessages.layoutManager = LinearLayoutManager(this).apply {
             stackFromEnd = true
@@ -129,9 +143,20 @@ class ChatActivity : AppCompatActivity() {
         binding.rvMessages.adapter = adapter
     }
 
+    private fun loadCachedMessages() {
+        val currentUserId = prefManager.userId
+        val cached = localChatStorage.getMessages(currentUserId, targetId, chatType)
+        if (cached.isNotEmpty()) {
+            adapter.submitList(cached)
+            binding.rvMessages.scrollToPosition(cached.size - 1)
+        }
+    }
+
     private fun setupRealtimeMessageListeners() {
+        val currentUserId = prefManager.userId
         SocketManager.registerMessageReadListener { messageId, _ ->
             adapter.markMessageRead(messageId)
+            localChatStorage.markMessageRead(currentUserId, targetId, chatType, messageId)
         }
         if (chatType == "direct") {
             SocketManager.registerMessageListener { message ->
@@ -142,9 +167,11 @@ class ChatActivity : AppCompatActivity() {
                         senderName = targetName,
                         content = message.content,
                         isSelf = false,
-                        timestamp = message.createdAt
+                        timestamp = message.createdAt,
+                        isRead = false
                     )
                     adapter.addMessage(displayMsg)
+                    localChatStorage.addMessage(currentUserId, targetId, chatType, displayMsg)
                     binding.rvMessages.smoothScrollToPosition(adapter.itemCount - 1)
 
                     // Automatically acknowledge read receipt
@@ -164,9 +191,11 @@ class ChatActivity : AppCompatActivity() {
                         senderName = groupMsg.sender.displayName,
                         content = groupMsg.content,
                         isSelf = false,
-                        timestamp = groupMsg.createdAt
+                        timestamp = groupMsg.createdAt,
+                        isRead = false
                     )
                     adapter.addMessage(displayMsg)
+                    localChatStorage.addMessage(currentUserId, targetId, chatType, displayMsg)
                     binding.rvMessages.smoothScrollToPosition(adapter.itemCount - 1)
                 }
             }
@@ -245,9 +274,11 @@ class ChatActivity : AppCompatActivity() {
                             senderName = if (m.senderId == currentUserId) null else targetName,
                             content = m.content,
                             isSelf = m.senderId == currentUserId,
-                            timestamp = m.createdAt
+                            timestamp = m.createdAt,
+                            isRead = m.isRead
                         )
                     }
+                    localChatStorage.saveMessages(currentUserId, targetId, chatType, displayList)
                     withContext(Dispatchers.Main) {
                         adapter.submitList(displayList)
                         if (displayList.isNotEmpty()) {
@@ -269,9 +300,11 @@ class ChatActivity : AppCompatActivity() {
                             senderName = m.sender.displayName,
                             content = m.content,
                             isSelf = m.senderId == currentUserId,
-                            timestamp = m.createdAt
+                            timestamp = m.createdAt,
+                            isRead = false
                         )
                     }
+                    localChatStorage.saveMessages(currentUserId, targetId, chatType, displayList)
                     withContext(Dispatchers.Main) {
                         adapter.submitList(displayList)
                         if (displayList.isNotEmpty()) {
@@ -281,8 +314,38 @@ class ChatActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@ChatActivity, "Failed to load messages: ${e.message}", Toast.LENGTH_SHORT).show()
+                    if (adapter.itemCount == 0) {
+                        Toast.makeText(this@ChatActivity, "Failed to load messages: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
                 }
+            }
+        }
+    }
+
+    private fun markSingleMessageAsRead(msg: DisplayMessage) {
+        if (msg.isRead) return
+        val currentUserId = prefManager.userId
+        adapter.markMessageRead(msg.id)
+        localChatStorage.markMessageRead(currentUserId, targetId, chatType, msg.id)
+        Toast.makeText(this, "Message marked as read", Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                NexaApiClient.messageApi.markMessageRead(msg.id)
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun markAllMessagesAsRead() {
+        val currentUserId = prefManager.userId
+        adapter.markAllRead()
+        localChatStorage.markAllRead(currentUserId, targetId, chatType)
+        Toast.makeText(this, "All messages marked as read", Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val unreadItems = adapter.getItems().filter { !it.isSelf && it.id > 0 }
+            for (item in unreadItems) {
+                try {
+                    NexaApiClient.messageApi.markMessageRead(item.id)
+                } catch (_: Exception) {}
             }
         }
     }
@@ -315,8 +378,10 @@ class ChatActivity : AppCompatActivity() {
                         senderName = null,
                         content = msg.content,
                         isSelf = true,
-                        timestamp = msg.createdAt
+                        timestamp = msg.createdAt,
+                        isRead = false
                     )
+                    localChatStorage.addMessage(currentUserId, targetId, chatType, displayMsg)
                     withContext(Dispatchers.Main) {
                         if (binding.etMessage.text.toString().trim() == content) {
                             binding.etMessage.setText("")
@@ -339,8 +404,10 @@ class ChatActivity : AppCompatActivity() {
                         senderName = msg.sender.displayName,
                         content = msg.content,
                         isSelf = true,
-                        timestamp = msg.createdAt
+                        timestamp = msg.createdAt,
+                        isRead = false
                     )
+                    localChatStorage.addMessage(currentUserId, targetId, chatType, displayMsg)
                     withContext(Dispatchers.Main) {
                         if (binding.etMessage.text.toString().trim() == content) {
                             binding.etMessage.setText("")

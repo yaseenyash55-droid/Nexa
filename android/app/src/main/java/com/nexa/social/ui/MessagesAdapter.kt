@@ -9,7 +9,8 @@ import com.nexa.social.R
 import com.nexa.social.data.models.DisplayMessage
 
 class MessagesAdapter(
-    private val currentUserId: Int
+    private val currentUserId: Int,
+    private val onMarkAsReadClick: ((DisplayMessage) -> Unit)? = null
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val messages = mutableListOf<DisplayMessage>()
@@ -21,17 +22,34 @@ class MessagesAdapter(
     }
 
     fun addMessage(message: DisplayMessage) {
-        messages.add(message)
-        notifyItemInserted(messages.size - 1)
+        val existingIndex = messages.indexOfFirst { it.id == message.id }
+        if (existingIndex >= 0) {
+            messages[existingIndex] = message
+            notifyItemChanged(existingIndex)
+        } else {
+            messages.add(message)
+            notifyItemInserted(messages.size - 1)
+        }
     }
 
     fun markMessageRead(messageId: Int) {
         val index = messages.indexOfFirst { it.id == messageId }
-        if (index >= 0 && messages[index].isSelf) {
+        if (index >= 0) {
             messages[index] = messages[index].copy(isRead = true)
             notifyItemChanged(index)
         }
     }
+
+    fun markAllRead() {
+        for (i in messages.indices) {
+            if (!messages[i].isRead) {
+                messages[i] = messages[i].copy(isRead = true)
+            }
+        }
+        notifyDataSetChanged()
+    }
+
+    fun getItems(): List<DisplayMessage> = messages.toList()
 
     override fun getItemViewType(position: Int): Int {
         return if (messages[position].isSelf) TYPE_SENT else TYPE_RECEIVED
@@ -43,7 +61,7 @@ class MessagesAdapter(
             SentViewHolder(view)
         } else {
             val view = LayoutInflater.from(parent.context).inflate(R.layout.item_message_received, parent, false)
-            ReceivedViewHolder(view)
+            ReceivedViewHolder(view, onMarkAsReadClick)
         }
     }
 
@@ -61,18 +79,31 @@ class MessagesAdapter(
     class SentViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvContent: TextView = itemView.findViewById(R.id.tvContent)
         private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
+        private val tvReadStatus: TextView? = itemView.findViewById(R.id.tvReadStatus)
 
         fun bind(msg: DisplayMessage) {
             tvContent.text = msg.content
             val time = formatTimestamp(msg.timestamp) ?: "Sent"
-            tvTime.text = if (msg.isRead) "$time â€¢ Read" else time
+            tvTime.text = time
+            if (msg.isRead) {
+                tvReadStatus?.visibility = View.VISIBLE
+                tvReadStatus?.text = "✓✓ Read"
+            } else {
+                tvReadStatus?.visibility = View.GONE
+            }
         }
     }
 
-    class ReceivedViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    class ReceivedViewHolder(
+        itemView: View,
+        private val onMarkAsReadClick: ((DisplayMessage) -> Unit)?
+    ) : RecyclerView.ViewHolder(itemView) {
         private val tvSenderName: TextView = itemView.findViewById(R.id.tvSenderName)
         private val tvContent: TextView = itemView.findViewById(R.id.tvContent)
         private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
+        private val btnMarkRead: TextView? = itemView.findViewById(R.id.btnMarkRead)
+        private val tvReadStatus: TextView? = itemView.findViewById(R.id.tvReadStatus)
+        private val bubbleLayout: View? = itemView.findViewById(R.id.bubbleLayout)
 
         fun bind(msg: DisplayMessage) {
             if (!msg.senderName.isNullOrEmpty()) {
@@ -84,6 +115,24 @@ class MessagesAdapter(
 
             tvContent.text = msg.content
             tvTime.text = formatTimestamp(msg.timestamp) ?: "Received"
+
+            if (msg.isRead) {
+                btnMarkRead?.visibility = View.GONE
+                tvReadStatus?.visibility = View.VISIBLE
+            } else {
+                btnMarkRead?.visibility = View.VISIBLE
+                tvReadStatus?.visibility = View.GONE
+                btnMarkRead?.setOnClickListener {
+                    onMarkAsReadClick?.invoke(msg)
+                }
+            }
+
+            bubbleLayout?.setOnLongClickListener {
+                if (!msg.isRead) {
+                    onMarkAsReadClick?.invoke(msg)
+                }
+                true
+            }
         }
     }
 

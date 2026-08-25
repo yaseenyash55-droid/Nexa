@@ -11,4 +11,8 @@
         android:icon="@drawable/ic_video_call"
         android:title="Video call"
         app:showAsAction="always" />
+    <item
+        android:id="@+id/action_mark_all_read"
+        android:title="Mark all as read"
+        app:showAsAction="never" />
 </menu>

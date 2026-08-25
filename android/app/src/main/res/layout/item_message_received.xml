@@ -4,12 +4,14 @@
     android:layout_height="wrap_content"
     android:gravity="start"
     android:orientation="vertical"
-    android:paddingVertical="4dp">
+    android:paddingVertical="4dp"
+    android:paddingHorizontal="8dp">
 
     <LinearLayout
+        android:id="@+id/bubbleLayout"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="64dp"
+        android:layout_marginEnd="56dp"
         android:background="#1E293B"
         android:orientation="vertical"
         android:paddingHorizontal="14dp"
@@ -34,14 +36,46 @@
             android:textColor="#F8FAFC"
             android:textSize="14sp" />
 
-        <TextView
-            android:id="@+id/tvTime"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end"
-            android:layout_marginTop="4dp"
-            android:text="Just now"
-            android:textColor="#94A3B8"
-            android:textSize="10sp" />
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnMarkRead"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:background="#312E81"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:text="✓ Mark Read"
+                android:textColor="#A5B4FC"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvReadStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="✓ Read"
+                android:textColor="#34D399"
+                android:textSize="10sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Just now"
+                android:textColor="#94A3B8"
+                android:textSize="10sp" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>
