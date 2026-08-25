@@ -109,4 +109,23 @@ export class UserController {
       next(err);
     }
   }
+
+  async updateFcmToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      const { token, platform, deviceId } = req.body;
+      if (!token) {
+        return res.status(400).json({ error: 'FCM token is required' });
+      }
+      const notifController = new (await import('./notification.controller.js')).NotificationController();
+      return notifController.registerFcmToken(req, res, next);
+    } catch (err) {
+      next(err);
+    }
+  }
+}
+
+export async function updateFcmToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  const controller = new UserController();
+  return controller.updateFcmToken(req, res, next);
 }
