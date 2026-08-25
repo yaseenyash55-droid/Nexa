@@ -1,0 +1,44 @@
+config:
+  target: "https://nexa-backend-in6s.onrender.com"
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      rampTo: 100
+      name: "Phase 1: Warm up the Redis Cluster"
+    - duration: 120
+      arrivalRate: 100
+      name: "Phase 2: High Concurrency Signaling Burst"
+  
+  engines:
+    socketio-v3: {} # Binds the custom Socket.io v3/v4 engine
+    
+  socketio:
+    transports: ["websocket"] # Bypasses HTTP polling to prevent sticky-session drops
+    query: "auth_token=load_test_bypass"
+
+scenarios:
+  - name: "WebRTC Call Signaling Simulation"
+    engine: socketio-v3
+    flow:
+      # 1. Connect and wait for the room to initialize
+      - think: 2
+      
+      # 2. Emit a signaling event simulating a call invitation
+      - emit:
+          channel: "call:invite"
+          data:
+            calleeId: "target_user_99"
+            roomId: "load_test_room_1"
+            callType: "video"
+            callerData: 
+              name: "Artillery Virtual User"
+              id: "virtual_user_1"
+              
+      # 3. Simulate the user waiting for the call to ring/connect
+      - think: 15
+      
+      # 4. Tear down the socket connection
+      - emit:
+          channel: "call:ended"
+          data: 
+            roomId: "load_test_room_1"
