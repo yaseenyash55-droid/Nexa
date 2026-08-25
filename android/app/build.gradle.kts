@@ -22,11 +22,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.nexa.social"
-        minSdk = 26
-        targetSdk = 36
-        versionCode = 7
-        versionName = "1.3.0"
+        applicationId = "com.yash.nexa.social"
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
