@@ -1,15 +1,27 @@
 package com.nexa.social.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.LayoutInflater
 import android.view.View
+import android.widget.GridLayout
+import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.nexa.social.NexaApiClient
 import com.nexa.social.R
 import com.nexa.social.data.models.DisplayMessage
@@ -21,6 +33,14 @@ import com.nexa.social.utils.SocketManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
 
 class ChatActivity : AppCompatActivity() {
 
@@ -43,6 +63,43 @@ class ChatActivity : AppCompatActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var stopTypingRunnable: Runnable? = null
     private var isEmittingTyping = false
+    private var cameraTempFile: File? = null
+
+    // Attachment Launchers
+    private val filePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            uploadAndSendAttachment(uri, "file")
+        }
+    }
+
+    private val galleryPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            uploadAndSendAttachment(uri, "photo")
+        }
+    }
+
+    private val cameraLauncher = registerForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success: Boolean ->
+        if (success && cameraTempFile != null && cameraTempFile!!.exists() && cameraTempFile!!.length() > 0) {
+            val uri = Uri.fromFile(cameraTempFile)
+            uploadAndSendAttachment(uri, "photo")
+        }
+    }
+
+    private val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            launchCameraCapture()
+        } else {
+            Toast.makeText(this, "Camera permission required to capture photos", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,6 +123,7 @@ class ChatActivity : AppCompatActivity() {
         setupToolbar()
         setupRecyclerView()
         setupSendButton()
+        setupAttachmentButton()
         setupTypingListeners()
         setupRealtimeMessageListeners()
         setupTextWatcher()
@@ -84,6 +142,7 @@ class ChatActivity : AppCompatActivity() {
         SocketManager.unregisterMessageReadListener()
         SocketManager.unregisterGroupMessageListener()
         stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
+        try { cameraTempFile?.delete() } catch (_: Exception) {}
     }
 
     override fun onStart() {
@@ -140,7 +199,7 @@ class ChatActivity : AppCompatActivity() {
         val currentTheme = themeManager.getThemeForChat(targetId, chatType)
         val selectedIndex = themes.indexOf(currentTheme).coerceAtLeast(0)
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        AlertDialog.Builder(this)
             .setTitle("Select Chat Theme 🎨")
             .setSingleChoiceItems(themeNames, selectedIndex) { dialog, which ->
                 val selectedTheme = themes[which]
@@ -230,15 +289,16 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun setupTypingListeners() {
+        if (chatType != "direct") return
         SocketManager.setTypingListeners(
             onStart = { userId, username ->
-                if (chatType == "direct" && userId == targetId) {
-                    binding.tvTypingIndicator.text = "${username ?: targetName} is typing..."
+                if (userId == targetId) {
+                    binding.tvTypingIndicator.text = "${username ?: targetName} is typing…"
                     binding.tvTypingIndicator.visibility = View.VISIBLE
                 }
             },
             onStop = { userId ->
-                if (chatType == "direct" && userId == targetId) {
+                if (userId == targetId) {
                     binding.tvTypingIndicator.visibility = View.GONE
                 }
             }
@@ -246,23 +306,20 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun setupTextWatcher() {
+        if (chatType != "direct") return
         binding.etMessage.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                if (chatType != "direct" || targetId == 0) return
-
-                if (!s.isNullOrEmpty()) {
+                if (!s.isNullOrBlank()) {
                     if (!isEmittingTyping) {
-                        isEmittingTyping = true
                         SocketManager.emitTypingStart(targetId)
+                        isEmittingTyping = true
                     }
-
                     stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
                     stopTypingRunnable = Runnable {
                         SocketManager.emitTypingStop(targetId)
                         isEmittingTyping = false
-                    }
-                    mainHandler.postDelayed(stopTypingRunnable!!, 2000)
+                    }.also { mainHandler.postDelayed(it, 3000) }
                 } else {
                     stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
                     SocketManager.emitTypingStop(targetId)
@@ -278,6 +335,169 @@ class ChatActivity : AppCompatActivity() {
             val text = binding.etMessage.text.toString().trim()
             if (text.isNotEmpty()) {
                 sendMessage(text)
+            }
+        }
+    }
+
+    private fun setupAttachmentButton() {
+        binding.btnAddAttachment.setOnClickListener {
+            showAttachmentBottomSheet()
+        }
+    }
+
+    private fun showAttachmentBottomSheet() {
+        val bottomSheet = BottomSheetDialog(this)
+        val sheetView = LayoutInflater.from(this).inflate(R.layout.dialog_chat_attachments, null)
+        bottomSheet.setContentView(sheetView)
+
+        // 1. Files / Storage
+        sheetView.findViewById<View>(R.id.btnAttachFile).setOnClickListener {
+            bottomSheet.dismiss()
+            filePickerLauncher.launch("*/*")
+        }
+
+        // 2. Photos / Gallery
+        sheetView.findViewById<View>(R.id.btnAttachGallery).setOnClickListener {
+            bottomSheet.dismiss()
+            galleryPickerLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+            )
+        }
+
+        // 3. Camera
+        sheetView.findViewById<View>(R.id.btnAttachCamera).setOnClickListener {
+            bottomSheet.dismiss()
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                launchCameraCapture()
+            } else {
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+
+        // 4. Stickers
+        sheetView.findViewById<View>(R.id.btnAttachStickers).setOnClickListener {
+            bottomSheet.dismiss()
+            showStickerPickerDialog()
+        }
+
+        // 5. GIFs
+        sheetView.findViewById<View>(R.id.btnAttachGif).setOnClickListener {
+            bottomSheet.dismiss()
+            showGifPickerDialog()
+        }
+
+        bottomSheet.show()
+    }
+
+    private fun showStickerPickerDialog() {
+        val stickers = arrayOf(
+            "🔥", "❤️", "😂", "🎉", "🚀", "💯", "👍", "👏",
+            "🥳", "✨", "🤩", "💡", "💎", "🦾", "🌟", "🍕",
+            "☕", "🎮", "😎", "🙌", "🎯", "⚡", "🏆", "💖"
+        )
+
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_chat_attachments, null)
+        val grid = GridLayout(this).apply {
+            columnCount = 4
+            alignmentMode = GridLayout.ALIGN_BOUNDS
+            setPadding(24, 24, 24, 24)
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Send a Sticker ✨")
+            .setView(grid)
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        for (sticker in stickers) {
+            val tv = TextView(this).apply {
+                text = sticker
+                textSize = 34f
+                setPadding(20, 20, 20, 20)
+                gravity = android.view.Gravity.CENTER
+                setBackgroundResource(android.R.drawable.list_selector_background)
+                setOnClickListener {
+                    sendMessage(sticker)
+                    dialog.dismiss()
+                }
+            }
+            grid.addView(tv)
+        }
+
+        dialog.show()
+    }
+
+    private fun showGifPickerDialog() {
+        val gifOptions = arrayOf(
+            "🎉 Party Celebration! 🥳",
+            "🔥 Mind Blown! 🤯",
+            "😂 Rolling On The Floor Laughing! 🤣",
+            "👏 Standing Ovation & Applause! 🙌",
+            "🚀 To The Moon / Nexa Hype! 🌌",
+            "🤝 Deal Done / Handshake! 💼",
+            "😎 Cool Vibe / Super Smooth! ✨",
+            "🦾 Let's Go / Maximum Power! ⚡",
+            "💖 Sending Big Love! 🥰",
+            "☕ Relax & Grab Some Coffee ☕"
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("Send GIF / Animated Reaction 🎬")
+            .setItems(gifOptions) { _, which ->
+                val selected = gifOptions[which]
+                sendMessage("[GIF: $selected]")
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun launchCameraCapture() {
+        try {
+            val tempFile = File.createTempFile("chat_camera_", ".jpg", cacheDir)
+            cameraTempFile = tempFile
+            val photoUri = FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.fileprovider",
+                tempFile
+            )
+            cameraLauncher.launch(photoUri)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Failed to initialize camera: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun uploadAndSendAttachment(uri: Uri, kind: String) {
+        Toast.makeText(this, "Uploading attachment…", Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val inputStream: InputStream = contentResolver.openInputStream(uri) ?: return@launch
+                val tempFile = File.createTempFile("chat_upload_", ".tmp", cacheDir)
+                val outputStream = FileOutputStream(tempFile)
+                inputStream.copyTo(outputStream)
+                inputStream.close()
+                outputStream.flush()
+                outputStream.close()
+
+                val mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
+                val requestFile: RequestBody = tempFile.asRequestBody(mimeType.toMediaTypeOrNull())
+                val filePart = MultipartBody.Part.createFormData("file", tempFile.name, requestFile)
+                val kindPart = kind.toRequestBody("text/plain".toMediaTypeOrNull())
+
+                val res = NexaApiClient.postApi.uploadMedia(filePart, kindPart)
+                withContext(Dispatchers.Main) {
+                    tempFile.delete()
+                    if (res.isSuccessful && res.body()?.data?.publicUrl != null) {
+                        val publicUrl = res.body()!!.data!!.publicUrl!!
+                        val messageText = if (kind == "photo") "📷 [Photo] $publicUrl" else "📁 [File] $publicUrl"
+                        sendMessage(messageText)
+                    } else {
+                        Toast.makeText(this@ChatActivity, "Failed to upload attachment", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@ChatActivity, "Upload error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -398,23 +618,23 @@ class ChatActivity : AppCompatActivity() {
                         )
                     }
                     val msg = res.body()?.data
-                        ?: throw IllegalStateException("Server returned an empty message response")
-                    val displayMsg = DisplayMessage(
-                        id = msg.messageId,
-                        senderId = msg.senderId,
-                        senderName = null,
-                        content = msg.content,
-                        isSelf = true,
-                        timestamp = msg.createdAt,
-                        isRead = false
-                    )
-                    localChatStorage.addMessage(currentUserId, targetId, chatType, displayMsg)
                     withContext(Dispatchers.Main) {
-                        if (binding.etMessage.text.toString().trim() == content) {
-                            binding.etMessage.setText("")
+                        binding.btnSend.isEnabled = true
+                        binding.etMessage.setText("")
+                        if (msg != null) {
+                            val displayMsg = DisplayMessage(
+                                id = msg.messageId,
+                                senderId = currentUserId,
+                                senderName = null,
+                                content = msg.content,
+                                isSelf = true,
+                                timestamp = msg.createdAt,
+                                isRead = false
+                            )
+                            adapter.addMessage(displayMsg)
+                            localChatStorage.addMessage(currentUserId, targetId, chatType, displayMsg)
+                            binding.rvMessages.smoothScrollToPosition(adapter.itemCount - 1)
                         }
-                        adapter.addMessage(displayMsg)
-                        binding.rvMessages.smoothScrollToPosition(adapter.itemCount - 1)
                     }
                 } else {
                     val res = NexaApiClient.groupApi.sendGroupMessage(targetId, mapOf("content" to content))
@@ -424,32 +644,29 @@ class ChatActivity : AppCompatActivity() {
                         )
                     }
                     val msg = res.body()?.data
-                        ?: throw IllegalStateException("Server returned an empty group message response")
-                    val displayMsg = DisplayMessage(
-                        id = msg.messageId,
-                        senderId = msg.senderId,
-                        senderName = msg.sender.displayName,
-                        content = msg.content,
-                        isSelf = true,
-                        timestamp = msg.createdAt,
-                        isRead = false
-                    )
-                    localChatStorage.addMessage(currentUserId, targetId, chatType, displayMsg)
                     withContext(Dispatchers.Main) {
-                        if (binding.etMessage.text.toString().trim() == content) {
-                            binding.etMessage.setText("")
+                        binding.btnSend.isEnabled = true
+                        binding.etMessage.setText("")
+                        if (msg != null) {
+                            val displayMsg = DisplayMessage(
+                                id = msg.messageId,
+                                senderId = currentUserId,
+                                senderName = null,
+                                content = msg.content,
+                                isSelf = true,
+                                timestamp = msg.createdAt,
+                                isRead = false
+                            )
+                            adapter.addMessage(displayMsg)
+                            localChatStorage.addMessage(currentUserId, targetId, chatType, displayMsg)
+                            binding.rvMessages.smoothScrollToPosition(adapter.itemCount - 1)
                         }
-                        adapter.addMessage(displayMsg)
-                        binding.rvMessages.smoothScrollToPosition(adapter.itemCount - 1)
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@ChatActivity, "Failed to send: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            } finally {
-                withContext(Dispatchers.Main) {
                     binding.btnSend.isEnabled = true
+                    Toast.makeText(this@ChatActivity, "Failed to send: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }

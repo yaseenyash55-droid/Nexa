@@ -65,9 +65,10 @@ object NexaApiClient {
 
     val retrofit: Retrofit by lazy {
         val okHttpClientBuilder = OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(300, TimeUnit.SECONDS)
+            .writeTimeout(300, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
             .addInterceptor(createLoggingInterceptor())
 
         tokenManager?.let { tm ->
