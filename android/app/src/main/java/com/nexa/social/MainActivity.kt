@@ -158,6 +158,10 @@ class MainActivity : AppCompatActivity() {
                         navController.navigate(R.id.navigation_home)
                     }
                 }
+                NotificationDestination.CALL,
+                NotificationDestination.CALL_INVITE -> {
+                    navController.navigate(R.id.navigation_messages)
+                }
             }
         }
     }

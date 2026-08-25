@@ -11,8 +11,12 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.drawable.Icon
+import android.media.AudioManager
+import android.media.Ringtone
+import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.util.Rational
 import android.view.View
 import android.widget.Toast
@@ -27,6 +31,7 @@ import com.nexa.social.call.WebRtcCallManager
 import com.nexa.social.data.models.IceServerConfiguration
 import com.nexa.social.databinding.ActivityCallBinding
 import com.nexa.social.utils.CallSignalListener
+import com.nexa.social.utils.NotificationHelper
 import com.nexa.social.utils.ProximitySensorManager
 import com.nexa.social.utils.RemoteIceCandidate
 import com.nexa.social.utils.SocketManager
@@ -549,7 +554,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
         if (isReceiverRegistered) {
             try {
                 unregisterReceiver(pipActionReceiver)
-            } catch {
+            } catch (e: Exception) {
                 // Ignore
             }
             isReceiverRegistered = false

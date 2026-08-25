@@ -9,6 +9,25 @@
       "client_info": {
         "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890",
         "android_client_info": {
+          "package_name": "com.yash.nexa.social"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDummyApiKeyForNexaPushNotifications"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:123456789012:android:abcdef1234567891",
+        "android_client_info": {
           "package_name": "com.nexa.social"
         }
       },
