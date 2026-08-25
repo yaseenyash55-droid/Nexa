@@ -197,10 +197,21 @@ export class NexaRealtimeServer {
     return call;
   }
 
-  public acceptCall(userId: number, callId: string): ActiveCall {
-    const call = this.requireCall(callId, userId);
-    if (call.calleeId !== userId || call.state !== 'ringing') {
-      throw new Error('Call cannot be accepted');
+  public acceptCall(userId: number, callId: string, explicitTargetUserId?: number): ActiveCall {
+    let call = this.activeCalls.get(callId);
+    if (!call) {
+      if (explicitTargetUserId && Number.isInteger(explicitTargetUserId)) {
+        call = {
+          callId,
+          callerId: explicitTargetUserId,
+          calleeId: userId,
+          callType: 'video',
+          state: 'accepted'
+        };
+        this.activeCalls.set(callId, call);
+      } else {
+        throw new Error('Call session not found');
+      }
     }
     call.state = 'accepted';
     this.clearCallTimeout(callId);
@@ -211,14 +222,15 @@ export class NexaRealtimeServer {
     return call;
   }
 
-  public rejectCall(userId: number, callId: string, reason = 'declined'): void {
-    const call = this.requireCall(callId, userId);
-    if (call.calleeId !== userId || call.state !== 'ringing') {
-      throw new Error('Call cannot be rejected');
+  public rejectCall(userId: number, callId: string, reason = 'declined', explicitTargetUserId?: number): void {
+    const call = this.activeCalls.get(callId);
+    const targetUserId = call ? call.callerId : explicitTargetUserId;
+    if (!targetUserId) {
+      throw new Error('Call session not found');
     }
     this.activeCalls.delete(callId);
     this.clearCallTimeout(callId);
-    this.emitToUser(call.callerId, 'call:rejected', {
+    this.emitToUser(targetUserId, 'call:rejected', {
       callId,
       rejectedByUserId: userId,
       reason: reason.slice(0, 80)
@@ -231,11 +243,17 @@ export class NexaRealtimeServer {
     event: CallSignalKind,
     payload: Record<string, unknown>
   ): void {
-    const call = this.requireCall(callId, senderId);
-    if (call.state !== 'accepted') {
-      throw new Error('Call has not been accepted');
+    let targetUserId = 0;
+    const call = this.activeCalls.get(callId);
+    if (call) {
+      targetUserId = this.peerUserId(call, senderId);
+    } else if (payload.targetUserId && Number.isInteger(Number(payload.targetUserId))) {
+      targetUserId = Number(payload.targetUserId);
+    } else if (payload.targetId && Number.isInteger(Number(payload.targetId))) {
+      targetUserId = Number(payload.targetId);
+    } else {
+      throw new Error('Call session not found');
     }
-    const targetUserId = this.peerUserId(call, senderId);
 
     if (event === 'call:offer' || event === 'call:answer') {
       const sdp = typeof payload.sdp === 'string' ? payload.sdp : '';
@@ -260,15 +278,18 @@ export class NexaRealtimeServer {
     });
   }
 
-  public endCall(userId: number, callId: string, reason = 'ended'): void {
-    const call = this.requireCall(callId, userId);
+  public endCall(userId: number, callId: string, reason = 'ended', explicitTargetUserId?: number): void {
+    const call = this.activeCalls.get(callId);
+    const targetUserId = call ? this.peerUserId(call, userId) : explicitTargetUserId;
     this.activeCalls.delete(callId);
     this.clearCallTimeout(callId);
-    this.emitToUser(this.peerUserId(call, userId), 'call:ended', {
-      callId,
-      endedByUserId: userId,
-      reason: reason.slice(0, 80)
-    });
+    if (targetUserId) {
+      this.emitToUser(targetUserId, 'call:ended', {
+        callId,
+        endedByUserId: userId,
+        reason: reason.slice(0, 80)
+      });
+    }
   }
 
   public handleUserOffline(userId: number): void {

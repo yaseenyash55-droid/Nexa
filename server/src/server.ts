@@ -106,11 +106,11 @@ async function startServer() {
       });
 
       socket.on('call:accept', (data: any, callback?: (res: any) => void) => {
-        acknowledge(callback, () => realtimeServer.acceptCall(user.userId, data?.callId));
+        acknowledge(callback, () => realtimeServer.acceptCall(user.userId, data?.callId, Number(data?.targetUserId || data?.targetId)));
       });
 
       socket.on('call:reject', (data: any, callback?: (res: any) => void) => {
-        acknowledge(callback, () => realtimeServer.rejectCall(user.userId, data?.callId, data?.reason));
+        acknowledge(callback, () => realtimeServer.rejectCall(user.userId, data?.callId, data?.reason, Number(data?.targetUserId || data?.targetId)));
       });
 
       socket.on('call:offer', (data: any, callback?: (res: any) => void) => {
@@ -126,7 +126,7 @@ async function startServer() {
       });
 
       socket.on('call:end', (data: any, callback?: (res: any) => void) => {
-        acknowledge(callback, () => realtimeServer.endCall(user.userId, data?.callId, data?.reason));
+        acknowledge(callback, () => realtimeServer.endCall(user.userId, data?.callId, data?.reason, Number(data?.targetUserId || data?.targetId)));
       });
 
       socket.on('disconnect', () => {
