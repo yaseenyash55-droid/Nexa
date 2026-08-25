@@ -158,3 +158,33 @@ html.light nav {
   animation-delay: 1.6s;
 }
 
+/* Avatar Pulse Radar Animation */
+.avatar-container {
+  position: relative;
+  display: inline-block;
+}
+
+.avatar-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(45, 212, 191, 0.45); /* Nexa Cyan / Teal Accent */
+  z-index: 0;
+  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+

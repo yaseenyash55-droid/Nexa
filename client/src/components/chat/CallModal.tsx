@@ -498,8 +498,9 @@ export const CallModal: React.FC<CallModalProps> = ({
                 </div>
               )}
               
-              <div className="relative z-10">
-                <Avatar src={targetUser.profileImageUrl} name={targetUser.displayName} size="xl" className="ring-4 ring-slate-800 shadow-2xl" />
+              <div className="avatar-container relative z-10">
+                {status !== 'connected' && <div className="avatar-pulse" />}
+                <Avatar src={targetUser.profileImageUrl} name={targetUser.displayName} size="xl" className="ring-4 ring-slate-800 shadow-2xl relative z-10" />
               </div>
               <div className="relative z-10 text-center mt-4">
                 <h3 id="call-modal-title" className="text-xl font-bold text-white">{targetUser.displayName}</h3>
