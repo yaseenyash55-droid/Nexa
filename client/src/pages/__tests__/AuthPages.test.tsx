@@ -7,6 +7,7 @@ import { RegisterPage } from '../RegisterPage.js';
 import { ResetPasswordPage } from '../ResetPasswordPage.js';
 import { AuthProvider } from '../../contexts/AuthContext.js';
 import { setAccessToken, getAccessToken, clearAuthSession } from '../../api/client.js';
+import { ANDROID_RELEASE } from '../../config/androidRelease.js';
 
 // Mock authApi
 vi.mock('../../api/auth.api.js', () => ({
@@ -52,8 +53,8 @@ describe('Web Authentication and Accessibility Suite', () => {
       );
 
       const downloadLink = screen.getByRole('link', { name: /Download Android App/i });
-      expect(downloadLink.getAttribute('href')).toBe('/nexa-social-app.apk?v=latest');
-      expect(downloadLink.getAttribute('download')).toBe('nexa-social-app.apk');
+      expect(downloadLink.getAttribute('href')).toBe(ANDROID_RELEASE.downloadUrl);
+      expect(downloadLink.getAttribute('download')).toBe(ANDROID_RELEASE.fileName);
     });
 
     it('associates form labels with input elements via id and htmlFor', () => {

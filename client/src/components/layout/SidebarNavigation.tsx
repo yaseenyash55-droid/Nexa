@@ -39,10 +39,15 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onOpenComp
         </div>
 
         {/* Download Android APK Badge Button */}
-        <a
-          href={ANDROID_RELEASE.downloadUrl}
-          download={ANDROID_RELEASE.fileName}
-          className="mx-1 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all flex items-center justify-between group shadow-sm"
+        <NavLink
+          to="/download"
+          className={({ isActive }) =>
+            `mx-1 px-3 py-2 rounded-xl border transition-all flex items-center justify-between group shadow-sm ${
+              isActive
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+            }`
+          }
           title="Download NEXA Android App (.apk)"
         >
           <div className="flex items-center gap-2.5">
@@ -57,7 +62,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onOpenComp
             </div>
           </div>
           <span className="text-[10px] font-semibold bg-emerald-500/20 px-2 py-0.5 rounded-full text-emerald-300">{ANDROID_RELEASE.versionLabel}</span>
-        </a>
+        </NavLink>
 
         {/* Navigation Items */}
         <nav className="space-y-0.5">

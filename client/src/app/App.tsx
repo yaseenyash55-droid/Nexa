@@ -13,6 +13,7 @@ import { SettingsPage } from '../pages/SettingsPage.js';
 import { ReelsPage } from '../pages/ReelsPage.js';
 import { MessagesPage } from '../pages/MessagesPage.js';
 import { UserManualPage } from '../pages/UserManualPage.js';
+import { DownloadPage } from '../pages/DownloadPage.js';
 import { LoginPage } from '../pages/LoginPage.js';
 import { RegisterPage } from '../pages/RegisterPage.js';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage.js';
@@ -84,6 +85,10 @@ export const App: React.FC = () => {
               <Route path="/user-manual" element={<UserManualPage />} />
               <Route path="/help" element={<UserManualPage />} />
               <Route path="/tutorial" element={<UserManualPage />} />
+              <Route path="/download" element={<DownloadPage />} />
+              <Route path="/apk" element={<DownloadPage />} />
+              <Route path="/get-app" element={<DownloadPage />} />
+              <Route path="/install" element={<DownloadPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
