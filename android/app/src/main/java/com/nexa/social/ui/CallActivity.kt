@@ -12,8 +12,10 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.drawable.Icon
 import android.media.AudioManager
+import android.media.MediaPlayer
 import android.media.Ringtone
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -96,7 +98,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     private var pendingAction: (() -> Unit)? = null
     private var isReceiverRegistered = false
     private var proximitySensorManager: ProximitySensorManager? = null
-    private var incomingRingtone: Ringtone? = null
+    private var mediaPlayer: MediaPlayer? = null
 
     private val pipActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -189,30 +191,43 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
                 return
             }
 
-            val ringtoneUri = try {
-                android.net.Uri.parse("android.resource://$packageName/${com.nexa.social.R.raw.ringtone}")
-            } catch (e: Exception) {
-                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            val customRingtoneUri = Uri.parse("android.resource://$packageName/${R.raw.ringtone}")
+
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(applicationContext, customRingtoneUri)
+                isLooping = true // Ensure it keeps ringing until answered
+                prepare()
+                if (ringerMode == AudioManager.RINGER_MODE_NORMAL) {
+                    start()
+                }
             }
-            val r = RingtoneManager.getRingtone(applicationContext, ringtoneUri)
-                ?: RingtoneManager.getRingtone(applicationContext, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE))
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                r?.isLooping = true
-            }
-            if (ringerMode == AudioManager.RINGER_MODE_NORMAL) {
-                r?.play()
-            }
-            incomingRingtone = r
         } catch (e: Exception) {
-            Log.w("CallActivity", "Failed to start incoming ringtone", e)
+            Log.w("CallActivity", "Failed to start custom ringtone MediaPlayer", e)
+            try {
+                val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                val r = RingtoneManager.getRingtone(applicationContext, ringtoneUri)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    r?.isLooping = true
+                }
+                r?.play()
+            } catch (fallbackError: Exception) {
+                Log.w("CallActivity", "Failed to start fallback ringtone", fallbackError)
+            }
         }
     }
 
     private fun stopRinging() {
         try {
-            incomingRingtone?.takeIf { it.isPlaying }?.stop()
-        } catch (_: Exception) {}
-        incomingRingtone = null
+            mediaPlayer?.let {
+                if (it.isPlaying) {
+                    it.stop()
+                }
+                it.release()
+            }
+        } catch (e: Exception) {
+            Log.w("CallActivity", "Error stopping MediaPlayer ringtone", e)
+        }
+        mediaPlayer = null
     }
 
     private fun registerPipReceiver() {
