@@ -4,6 +4,7 @@ import { Socket } from 'socket.io-client';
 import { callsApi, IceConfiguration } from '../../api/calls.api.js';
 import { startScreenSharing, ScreenShareController } from '../../utils/screenShare.js';
 import { enableBackgroundBlur, BackgroundBlurController } from '../../utils/backgroundBlur.js';
+import { ringtoneAudio } from '../../utils/ringtoneAudio.js';
 import { User } from '../../types/index.js';
 import { Avatar } from '../ui/Avatar.js';
 
@@ -455,6 +456,17 @@ export const CallModal: React.FC<CallModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (isOpen && (status === 'ringing' || status === 'incoming')) {
+      ringtoneAudio.play();
+    } else {
+      ringtoneAudio.stop();
+    }
+    return () => {
+      ringtoneAudio.stop();
+    };
+  }, [isOpen, status]);
+
   if (!isOpen) return null;
 
   const statusText: Record<CallStatus, string> = {
@@ -472,13 +484,24 @@ export const CallModal: React.FC<CallModalProps> = ({
       <div className="relative w-full max-w-2xl overflow-hidden bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl">
         {callType === 'audio' && <audio ref={remoteAudioRef} autoPlay />}
         <button type="button" onClick={() => closeCall()} aria-label="Close call" className="absolute z-20 top-4 right-4 p-2 bg-slate-950/70 text-white rounded-full"><X className="w-5 h-5" /></button>
-        <div className="relative min-h-[360px] bg-slate-950 flex items-center justify-center">
+        <div className="relative min-h-[360px] bg-slate-950 flex items-center justify-center overflow-hidden">
           {callType === 'video' && remoteStream ? (
             <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
           ) : (
-            <div className="flex flex-col items-center gap-4">
-              <Avatar src={targetUser.profileImageUrl} name={targetUser.displayName} size="lg" />
-              <div className="text-center">
+            <div className="relative flex flex-col items-center justify-center p-8">
+              {/* Glowing Radar Pulse Wave Rings */}
+              {status !== 'connected' && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="absolute w-28 h-28 rounded-full border border-teal-400/40 bg-teal-400/10 animate-radar-pulse-1" />
+                  <div className="absolute w-28 h-28 rounded-full border border-indigo-500/40 bg-indigo-500/10 animate-radar-pulse-2" />
+                  <div className="absolute w-28 h-28 rounded-full border border-indigo-400/30 bg-indigo-400/5 animate-radar-pulse-3" />
+                </div>
+              )}
+              
+              <div className="relative z-10">
+                <Avatar src={targetUser.profileImageUrl} name={targetUser.displayName} size="xl" className="ring-4 ring-slate-800 shadow-2xl" />
+              </div>
+              <div className="relative z-10 text-center mt-4">
                 <h3 id="call-modal-title" className="text-xl font-bold text-white">{targetUser.displayName}</h3>
                 <p className="text-sm text-slate-400">@{targetUser.username}</p>
               </div>
@@ -494,8 +517,8 @@ export const CallModal: React.FC<CallModalProps> = ({
         <div className="p-5 flex items-center justify-center gap-3">
           {direction === 'incoming' && status === 'incoming' ? (
             <>
-              <button type="button" onClick={() => closeCall(true)} className="p-4 rounded-full bg-rose-600 text-white" aria-label="Decline call"><PhoneOff className="w-5 h-5" /></button>
-              <button type="button" onClick={() => void acceptIncoming()} className="p-4 rounded-full bg-emerald-500 text-white" aria-label="Accept call"><Phone className="w-5 h-5" /></button>
+              <button type="button" onClick={() => closeCall(true)} className="p-4 rounded-full bg-rose-600 text-white shadow-lg" aria-label="Decline call"><PhoneOff className="w-5 h-5" /></button>
+              <button type="button" onClick={() => void acceptIncoming()} className="p-4 rounded-full bg-emerald-500 text-white shadow-lg ring-4 ring-emerald-500/30" aria-label="Accept call"><Phone className="w-5 h-5" /></button>
             </>
           ) : (
             <>

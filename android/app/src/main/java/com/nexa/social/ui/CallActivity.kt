@@ -91,6 +91,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     private var pendingAction: (() -> Unit)? = null
     private var isReceiverRegistered = false
     private var proximitySensorManager: ProximitySensorManager? = null
+    private var ringtone: Ringtone? = null
 
     private val pipActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -167,7 +168,45 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
             requestMediaPermissions { prepareAndPlaceCall() }
         } else if (intent.getBooleanExtra("extra_auto_accept", false)) {
             requestMediaPermissions { prepareAndAcceptCall() }
+        } else {
+            startIncomingRingtone()
         }
+    }
+
+    private fun startIncomingRingtone() {
+        if (direction != "incoming" || accepted || ended) return
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            val ringerMode = audioManager?.ringerMode ?: AudioManager.RINGER_MODE_NORMAL
+
+            // Respect device hardware silent switch
+            if (ringerMode == AudioManager.RINGER_MODE_SILENT) {
+                return
+            }
+
+            val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            val r = RingtoneManager.getRingtone(applicationContext, ringtoneUri)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                r?.isLooping = true
+            }
+            if (ringerMode == AudioManager.RINGER_MODE_NORMAL) {
+                r?.play()
+            }
+            ringtone = r
+        } catch (e: Exception) {
+            Log.w("CallActivity", "Failed to start incoming ringtone", e)
+        }
+    }
+
+    private fun stopIncomingRingtone() {
+        try {
+            ringtone?.let {
+                if (it.isPlaying) {
+                    it.stop()
+                }
+            }
+        } catch (_: Exception) {}
+        ringtone = null
     }
 
     private fun registerPipReceiver() {
@@ -390,6 +429,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     }
 
     private fun prepareAndAcceptCall() {
+        stopIncomingRingtone()
         binding.btnAccept.isEnabled = false
         prepareManager {
             SocketManager.emitCallAccept(callId) { success, error ->
@@ -409,6 +449,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
 
     override fun onCallAccepted(callId: String) {
         if (callId != this.callId) return
+        stopIncomingRingtone()
         accepted = true
         binding.tvCallStatus.text = "Connecting…"
         proximitySensorManager?.start(allowScreenOff = callType == "audio" || !cameraEnabled)
@@ -418,6 +459,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
 
     override fun onCallRejected(callId: String, reason: String) {
         if (callId != this.callId) return
+        stopIncomingRingtone()
         ended = true
         proximitySensorManager?.stop()
         updatePipParams()
@@ -438,6 +480,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
 
     override fun onCallEnded(callId: String, reason: String) {
         if (callId != this.callId) return
+        stopIncomingRingtone()
         ended = true
         proximitySensorManager?.stop()
         updatePipParams()
@@ -473,6 +516,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     }
 
     private fun endCall(reason: String) {
+        stopIncomingRingtone()
         proximitySensorManager?.release()
         proximitySensorManager = null
         if (!ended) {
@@ -503,6 +547,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     }
 
     override fun onDestroy() {
+        stopIncomingRingtone()
         proximitySensorManager?.release()
         proximitySensorManager = null
         if (isReceiverRegistered) {
