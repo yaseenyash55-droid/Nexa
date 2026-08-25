@@ -6,7 +6,6 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.media.AudioAttributes
-import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
@@ -17,7 +16,7 @@ import android.util.Log
  * Nexa Proximity Sensor & Modern VoIP Audio Router (API 31+ Standard)
  *
  * Manages device proximity detection and modern dynamic audio routing:
- * - On Android 12+ (API 31+): Uses AudioManager.setCommunicationDevice() for zero-dropout earpiece/speaker switching.
+ * - On Android 12+ (API 31+): Uses AudioRouteManager / AudioManager.setCommunicationDevice() for zero-dropout earpiece/speaker switching.
  * - On Android < 12: Uses graceful fallback with MODE_IN_COMMUNICATION.
  * - Acquires PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK when held to the ear.
  */
@@ -37,6 +36,7 @@ class ProximitySensorManager(
     private val powerManager = appContext.getSystemService(Context.POWER_SERVICE) as? PowerManager
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     private val proximitySensor: Sensor? = sensorManager?.getDefaultSensor(Sensor.TYPE_PROXIMITY)
+    private val audioRouteManager = AudioRouteManager(appContext)
 
     private var proximityWakeLock: PowerManager.WakeLock? = null
     private var isListening = false
@@ -90,12 +90,12 @@ class ProximitySensorManager(
         this.isEnabled = allowScreenOff
         if (!allowScreenOff) {
             releaseWakeLock()
-            routeAudioToSpeaker()
+            audioRouteManager.routeToSpeaker()
         } else if (isNear) {
             acquireWakeLock()
-            routeAudioToEarpiece()
+            audioRouteManager.routeToEarpiece()
         } else {
-            routeAudioToSpeaker()
+            audioRouteManager.routeToSpeaker()
         }
     }
 
@@ -111,11 +111,11 @@ class ProximitySensorManager(
 
         if (isNear && isEnabled) {
             acquireWakeLock()
-            routeAudioToEarpiece()
+            audioRouteManager.routeToEarpiece()
         } else {
             releaseWakeLock()
             if (!isEnabled) {
-                routeAudioToSpeaker()
+                audioRouteManager.routeToSpeaker()
             }
         }
 
@@ -184,40 +184,6 @@ class ProximitySensorManager(
     }
 
     /**
-     * Modern API 31+ earpiece routing with legacy fallback.
-     */
-    private fun routeAudioToEarpiece() {
-        val am = audioManager ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val devices = am.availableCommunicationDevices
-            val earpiece = devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE }
-            if (earpiece != null) {
-                am.setCommunicationDevice(earpiece)
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            am.isSpeakerphoneOn = false
-        }
-    }
-
-    /**
-     * Modern API 31+ speakerphone routing with legacy fallback.
-     */
-    private fun routeAudioToSpeaker() {
-        val am = audioManager ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val devices = am.availableCommunicationDevices
-            val speaker = devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
-            if (speaker != null) {
-                am.setCommunicationDevice(speaker)
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            am.isSpeakerphoneOn = true
-        }
-    }
-
-    /**
      * Stops sensor listening and releases wake lock.
      */
     fun stop() {
@@ -235,12 +201,10 @@ class ProximitySensorManager(
     fun release() {
         stop()
         proximityWakeLock = null
+        audioRouteManager.reset()
 
         val am = audioManager
         if (am != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                am.clearCommunicationDevice()
-            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
                 audioFocusRequest = null

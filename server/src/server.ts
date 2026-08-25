@@ -5,9 +5,12 @@ import { logger } from './utils/logger.js';
 import { Server } from 'socket.io';
 import { realtimeServer } from './socket.js';
 
+import { initializeFirebase } from './utils/firebase.js';
+
 async function startServer() {
   try {
     await initializeDatabasePool();
+    initializeFirebase();
 
     const server = app.listen(env.PORT, () => {
       logger.info(

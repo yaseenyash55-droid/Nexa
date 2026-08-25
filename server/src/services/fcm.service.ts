@@ -167,6 +167,8 @@ export class FcmNotificationService {
 
 export const fcmNotificationService = new FcmNotificationService();
 
+import { getFirebaseMessaging } from '../utils/firebase.js';
+
 /**
  * Direct FCM incoming call push dispatcher for a single target device token.
  */
@@ -176,6 +178,46 @@ export async function sendIncomingCallPush(
   roomId: string,
   callType: 'audio' | 'video'
 ): Promise<void> {
+  const callerDisplayName = callerData.name || callerData.username || `User ${callerData.id}`;
+  const messaging = getFirebaseMessaging();
+
+  if (messaging) {
+    try {
+      await messaging.send({
+        token: targetUserFcmToken,
+        data: {
+          type: 'INCOMING_CALL',
+          destination: 'CALL',
+          callId: roomId,
+          roomId,
+          callerId: String(callerData.id),
+          callerName: callerDisplayName,
+          callerUsername: callerData.username || '',
+          callerAvatarUrl: callerData.avatarUrl || '',
+          callType,
+          timestamp: new Date().toISOString()
+        },
+        android: {
+          priority: 'high',
+          ttl: 30000,
+          notification: {
+            channelId: 'nexa_call_channel',
+            priority: 'max'
+          }
+        },
+        webpush: {
+          headers: {
+            Urgency: 'high'
+          }
+        }
+      });
+      logger.info({ roomId, targetUserFcmToken: targetUserFcmToken.slice(0, 10) + '...' }, 'FCM incoming call push sent via Admin SDK');
+      return;
+    } catch (error) {
+      logger.error({ error }, 'Failed to dispatch FCM call alert via Firebase Admin SDK');
+    }
+  }
+
   const message: FcmHighPriorityMessage = {
     to: targetUserFcmToken,
     priority: 'high',
@@ -187,7 +229,7 @@ export async function sendIncomingCallPush(
       callId: roomId,
       roomId,
       callerId: String(callerData.id),
-      callerName: callerData.name || callerData.username || `User ${callerData.id}`,
+      callerName: callerDisplayName,
       callerUsername: callerData.username || '',
       callerAvatarUrl: callerData.avatarUrl || '',
       callType,
