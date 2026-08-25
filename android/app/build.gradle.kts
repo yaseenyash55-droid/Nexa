@@ -37,17 +37,19 @@ android {
 
     signingConfigs {
         create("release") {
-            val storeFilePath = System.getenv("KEYSTORE_FILE") ?: keyProperties.getProperty("storeFile") ?: "nexa-release.jks"
+            val storeFilePath = System.getenv("KEYSTORE_FILE") ?: keyProperties.getProperty("storeFile") ?: "release-key.jks"
             val storePasswordProp = System.getenv("KEYSTORE_PASSWORD") ?: keyProperties.getProperty("storePassword") ?: "nexa2026release"
-            val keyAliasProp = System.getenv("KEY_ALIAS") ?: keyProperties.getProperty("keyAlias") ?: "nexa"
+            val keyAliasProp = System.getenv("KEY_ALIAS") ?: keyProperties.getProperty("keyAlias") ?: "nexa-alias"
             val keyPasswordProp = System.getenv("KEY_PASSWORD") ?: keyProperties.getProperty("keyPassword") ?: "nexa2026release"
 
             val foundKeystore = listOf(
                 file(storeFilePath),
                 rootProject.file(storeFilePath),
                 project.file(storeFilePath),
-                rootProject.file("nexa-release.jks"),
-                project.file("nexa-release.jks")
+                project.file("release-key.jks"),
+                rootProject.file("release-key.jks"),
+                project.file("nexa-release.jks"),
+                rootProject.file("nexa-release.jks")
             ).firstOrNull { it.exists() }
 
             if (foundKeystore != null) {
