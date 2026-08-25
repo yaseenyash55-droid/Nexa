@@ -27,6 +27,7 @@
 -keep class com.google.firebase.messaging.** { *; }
 -keep class com.google.firebase.iid.** { *; }
 -dontwarn com.google.firebase.**
+-dontwarn com.google.firebase.messaging.**
 -dontwarn com.google.android.gms.**
 -keepattributes *Annotation*,InnerClasses,EnclosingMethod
 
