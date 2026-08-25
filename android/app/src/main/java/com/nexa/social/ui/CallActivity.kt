@@ -189,8 +189,13 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
                 return
             }
 
-            val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            val ringtoneUri = try {
+                android.net.Uri.parse("android.resource://$packageName/${com.nexa.social.R.raw.ringtone}")
+            } catch (e: Exception) {
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            }
             val r = RingtoneManager.getRingtone(applicationContext, ringtoneUri)
+                ?: RingtoneManager.getRingtone(applicationContext, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE))
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 r?.isLooping = true
             }
