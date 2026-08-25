@@ -191,9 +191,13 @@ export const MessagesPage: React.FC = () => {
 
     const socketHost = API_BASE_URL.replace(/\/api$/, '');
     const socket = io(socketHost, {
-      auth: { token },
+      auth: { token: token.startsWith('Bearer ') ? token : `Bearer ${token}` },
       withCredentials: true,
-      transports: ['websocket', 'polling']
+      transports: ['websocket'],
+      upgrade: false,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000
     });
     socketRef.current = socket;
     setRealtimeSocket(socket);

@@ -65,14 +65,17 @@ object SocketManager {
         if (socket?.connected() == true) return
 
         try {
+            val authToken = if (token.startsWith("Bearer ")) token else "Bearer $token"
             val options = IO.Options().apply {
                 forceNew = false
                 reconnection = true
-                reconnectionAttempts = 5
+                reconnectionAttempts = 10
                 reconnectionDelay = 1000
                 reconnectionDelayMax = 10000
                 timeout = 15000
-                auth = mapOf("token" to token)
+                transports = arrayOf(io.socket.engineio.client.transports.WebSocket.NAME)
+                upgrade = false
+                auth = mapOf("token" to authToken)
             }
 
             socket = IO.socket(SOCKET_SERVER_URL, options)
