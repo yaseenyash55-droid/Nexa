@@ -153,6 +153,39 @@
                     android:contentDescription="Selected Media Preview"
                     android:scaleType="centerCrop" />
 
+                <!-- Video indicator badge overlay -->
+                <LinearLayout
+                    android:id="@+id/videoBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_unread_badge"
+                    android:backgroundTint="#CC000000"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="6dp"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_video"
+                        app:tint="#38BDF8" />
+
+                    <TextView
+                        android:id="@+id/tvVideoLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="Video attached"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
                 <ImageButton
                     android:id="@+id/btnRemoveImage"
                     android:layout_width="36dp"
@@ -160,7 +193,7 @@
                     android:layout_gravity="top|end"
                     android:layout_margin="12dp"
                     android:background="@color/background_card"
-                    android:contentDescription="Remove Image"
+                    android:contentDescription="Remove Media"
                     android:padding="6dp"
                     android:src="@drawable/ic_close"
                     app:tint="@color/text_white" />
@@ -181,14 +214,35 @@
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
-                android:layout_marginEnd="8dp"
+                android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:text="Gallery"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:text="Photos"
                 android:textColor="@color/text_white"
-                android:textSize="13sp"
+                android:textSize="12sp"
                 app:cornerRadius="12dp"
                 app:icon="@drawable/ic_gallery"
                 app:iconTint="@color/brand_cyan"
+                app:strokeColor="@color/border_dark"
+                app:strokeWidth="1dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnVideos"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:text="Videos"
+                android:textColor="@color/text_white"
+                android:textSize="12sp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_video"
+                app:iconTint="#A855F7"
                 app:strokeColor="@color/border_dark"
                 app:strokeWidth="1dp" />
 
@@ -197,11 +251,13 @@
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="4dp"
                 android:layout_weight="1"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
                 android:text="Camera"
                 android:textColor="@color/text_white"
-                android:textSize="13sp"
+                android:textSize="12sp"
                 app:cornerRadius="12dp"
                 app:icon="@drawable/ic_camera"
                 app:iconTint="@color/brand_primary"

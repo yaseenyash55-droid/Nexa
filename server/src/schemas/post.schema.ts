@@ -4,8 +4,10 @@ const storedImageUrlSchema = z.string().refine(
   value =>
     value === '' ||
     /^https?:\/\/\S+$/i.test(value) ||
-    /^\/uploads\/[A-Za-z0-9._-]+$/.test(value),
-  'Invalid image URL format'
+    /^\/uploads\/[A-Za-z0-9._\/-]+$/.test(value) ||
+    value.startsWith('data:image/') ||
+    value.startsWith('data:video/'),
+  'Invalid media URL format'
 );
 
 export const createPostSchema = z.object({

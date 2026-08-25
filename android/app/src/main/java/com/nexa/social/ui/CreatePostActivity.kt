@@ -2,6 +2,7 @@ package com.nexa.social.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
@@ -33,16 +34,32 @@ class CreatePostActivity : AppCompatActivity() {
     private lateinit var binding: ActivityCreatePostBinding
     private lateinit var prefManager: PreferenceManager
 
-    private var selectedImageUri: Uri? = null
+    private var selectedMediaUri: Uri? = null
+    private var isVideoSelected = false
     private var cameraTempFile: File? = null
 
     private val photoPickerLauncher = registerForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            selectedImageUri = uri
+            selectedMediaUri = uri
+            isVideoSelected = false
             cleanupCameraTempFile()
+            binding.videoBadge.visibility = View.GONE
             binding.imgPreview.setImageURI(uri)
+            binding.cardImagePreview.visibility = View.VISIBLE
+        }
+    }
+
+    private val videoPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            selectedMediaUri = uri
+            isVideoSelected = true
+            cleanupCameraTempFile()
+            binding.videoBadge.visibility = View.VISIBLE
+            loadVideoThumbnail(uri)
             binding.cardImagePreview.visibility = View.VISIBLE
         }
     }
@@ -52,7 +69,9 @@ class CreatePostActivity : AppCompatActivity() {
     ) { success: Boolean ->
         if (success && cameraTempFile != null && cameraTempFile!!.exists() && cameraTempFile!!.length() > 0) {
             val uri = Uri.fromFile(cameraTempFile)
-            selectedImageUri = uri
+            selectedMediaUri = uri
+            isVideoSelected = false
+            binding.videoBadge.visibility = View.GONE
             binding.imgPreview.setImageURI(uri)
             binding.cardImagePreview.visibility = View.VISIBLE
         } else {
@@ -113,6 +132,12 @@ class CreatePostActivity : AppCompatActivity() {
             )
         }
 
+        binding.btnVideos.setOnClickListener {
+            videoPickerLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+            )
+        }
+
         binding.btnCamera.setOnClickListener {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                 launchCameraCapture()
@@ -122,13 +147,40 @@ class CreatePostActivity : AppCompatActivity() {
         }
 
         binding.btnRemoveImage.setOnClickListener {
-            selectedImageUri = null
+            selectedMediaUri = null
+            isVideoSelected = false
             cleanupCameraTempFile()
+            binding.videoBadge.visibility = View.GONE
             binding.cardImagePreview.visibility = View.GONE
         }
 
         binding.btnPost.setOnClickListener {
             submitPost()
+        }
+    }
+
+    private fun loadVideoThumbnail(uri: Uri) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            var retriever: MediaMetadataRetriever? = null
+            try {
+                retriever = MediaMetadataRetriever()
+                retriever.setDataSource(this@CreatePostActivity, uri)
+                val bitmap = retriever.getFrameAtTime(1000000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    ?: retriever.frameAtTime
+                withContext(Dispatchers.Main) {
+                    if (bitmap != null) {
+                        binding.imgPreview.setImageBitmap(bitmap)
+                    } else {
+                        binding.imgPreview.setImageResource(com.nexa.social.R.drawable.ic_video)
+                    }
+                }
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) {
+                    binding.imgPreview.setImageResource(com.nexa.social.R.drawable.ic_video)
+                }
+            } finally {
+                try { retriever?.release() } catch (_: Exception) {}
+            }
         }
     }
 
@@ -158,8 +210,8 @@ class CreatePostActivity : AppCompatActivity() {
             return
         }
 
-        if (content.isEmpty() && selectedImageUri == null) {
-            binding.tilContent.error = "Please enter post text or attach an image"
+        if (content.isEmpty() && selectedMediaUri == null) {
+            binding.tilContent.error = "Please enter post text or attach a photo/video"
             return
         } else {
             binding.tilContent.error = null
@@ -170,14 +222,15 @@ class CreatePostActivity : AppCompatActivity() {
         lifecycleScope.launch {
             var tempProcessingFile: File? = null
             try {
-                var uploadedImageUrl: String? = null
+                var uploadedMediaUrl: String? = null
 
                 // 1. Process and upload media file if selected
-                if (selectedImageUri != null) {
-                    val mediaInfo = prepareAndValidateMedia(selectedImageUri!!)
+                if (selectedMediaUri != null) {
+                    val mediaInfo = prepareAndValidateMedia(selectedMediaUri!!, isVideoSelected)
                     if (mediaInfo == null) {
                         setLoading(false)
-                        Toast.makeText(this@CreatePostActivity, "Invalid image file (must be JPEG, PNG, or WebP under 10 MB)", Toast.LENGTH_LONG).show()
+                        val limitMsg = if (isVideoSelected) "Invalid video (must be MP4/WebM under 50 MB)" else "Invalid image (must be JPEG/PNG/WebP under 10 MB)"
+                        Toast.makeText(this@CreatePostActivity, limitMsg, Toast.LENGTH_LONG).show()
                         return@launch
                     }
 
@@ -185,23 +238,22 @@ class CreatePostActivity : AppCompatActivity() {
 
                     val requestFile: RequestBody = tempProcessingFile.asRequestBody(mediaInfo.mimeType.toMediaTypeOrNull())
                     val filePart = MultipartBody.Part.createFormData("file", tempProcessingFile.name, requestFile)
-                    val kindPart = "photo".toRequestBody("text/plain".toMediaTypeOrNull())
+                    val kindPart = (if (isVideoSelected) "video" else "photo").toRequestBody("text/plain".toMediaTypeOrNull())
 
                     val mediaResponse = NexaApiClient.postApi.uploadMedia(filePart, kindPart)
                     if (mediaResponse.isSuccessful && mediaResponse.body()?.data != null) {
-                        uploadedImageUrl = mediaResponse.body()!!.data?.publicUrl
+                        uploadedMediaUrl = mediaResponse.body()!!.data?.publicUrl
                     } else {
                         setLoading(false)
-                        val mediaError = mediaResponse.body()?.error?.message ?: "Failed to upload image (${mediaResponse.code()})"
+                        val mediaError = mediaResponse.body()?.error?.message ?: "Failed to upload media (${mediaResponse.code()})"
                         Toast.makeText(this@CreatePostActivity, mediaError, Toast.LENGTH_LONG).show()
-                        // Stop execution: Never create a text-only post when image upload failed
                         return@launch
                     }
                 }
 
                 // 2. Create post
                 val postResponse = NexaApiClient.postApi.createPost(
-                    request = CreatePostRequest(content = content, imageUrl = uploadedImageUrl)
+                    request = CreatePostRequest(content = content, imageUrl = uploadedMediaUrl)
                 )
 
                 setLoading(false)
@@ -229,28 +281,33 @@ class CreatePostActivity : AppCompatActivity() {
 
     private data class ValidatedMedia(val file: File, val mimeType: String)
 
-    private suspend fun prepareAndValidateMedia(uri: Uri): ValidatedMedia? = withContext(Dispatchers.IO) {
+    private suspend fun prepareAndValidateMedia(uri: Uri, isVideo: Boolean): ValidatedMedia? = withContext(Dispatchers.IO) {
         return@withContext try {
             val inputStream: InputStream = contentResolver.openInputStream(uri) ?: return@withContext null
 
-            // Read magic bytes for MIME signature verification
-            val headerBytes = ByteArray(12)
+            // Read magic bytes
+            val headerBytes = ByteArray(32)
             val bytesRead = inputStream.read(headerBytes)
             if (bytesRead < 4) {
                 inputStream.close()
                 return@withContext null
             }
 
-            val mimeType = detectImageMimeType(headerBytes) ?: run {
-                inputStream.close()
-                return@withContext null
+            val detectedMime = if (isVideo) {
+                detectVideoMimeType(headerBytes) ?: contentResolver.getType(uri) ?: "video/mp4"
+            } else {
+                detectImageMimeType(headerBytes) ?: contentResolver.getType(uri) ?: "image/jpeg"
             }
 
-            val ext = when (mimeType) {
+            val ext = when (detectedMime) {
                 "image/jpeg" -> ".jpg"
                 "image/png" -> ".png"
                 "image/webp" -> ".webp"
-                else -> ".jpg"
+                "video/mp4" -> ".mp4"
+                "video/webm" -> ".webm"
+                "video/quicktime" -> ".mov"
+                "video/3gpp" -> ".3gp"
+                else -> if (isVideo) ".mp4" else ".jpg"
             }
 
             val tempFile = File.createTempFile("upload_stage_", ext, cacheDir)
@@ -261,13 +318,14 @@ class CreatePostActivity : AppCompatActivity() {
             outputStream.flush()
             outputStream.close()
 
-            // Verify size limit: Max 10 MB (10 * 1024 * 1024 bytes)
-            if (tempFile.length() > 10 * 1024 * 1024) {
+            // Verify size limits: 50 MB for video, 10 MB for image
+            val maxAllowedBytes = if (isVideo) 50L * 1024 * 1024 else 10L * 1024 * 1024
+            if (tempFile.length() > maxAllowedBytes) {
                 tempFile.delete()
                 return@withContext null
             }
 
-            ValidatedMedia(tempFile, mimeType)
+            ValidatedMedia(tempFile, detectedMime)
         } catch (_: Exception) {
             null
         }
@@ -293,7 +351,7 @@ class CreatePostActivity : AppCompatActivity() {
             return "image/png"
         }
 
-        // WebP: RIFF ... WEBP (header 0..3 == "RIFF", header 8..11 == "WEBP")
+        // WebP: RIFF ... WEBP
         if (header.size >= 12 &&
             header[0] == 'R'.code.toByte() &&
             header[1] == 'I'.code.toByte() &&
@@ -310,11 +368,32 @@ class CreatePostActivity : AppCompatActivity() {
         return null
     }
 
+    private fun detectVideoMimeType(header: ByteArray): String? {
+        // MP4 / MOV: bytes 4..7 contain "ftyp" or "moov"
+        if (header.size >= 8) {
+            val tag = String(header.sliceArray(4..7))
+            if (tag == "ftyp" || tag == "moov") {
+                return "video/mp4"
+            }
+        }
+        // WebM / Matroska: 1A 45 DF A3
+        if (header.size >= 4 &&
+            header[0] == 0x1A.toByte() &&
+            header[1] == 0x45.toByte() &&
+            header[2] == 0xDF.toByte() &&
+            header[3] == 0xA3.toByte()
+        ) {
+            return "video/webm"
+        }
+        return null
+    }
+
     private fun setLoading(isLoading: Boolean) {
         binding.postProgressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
         binding.btnPost.isEnabled = !isLoading
         binding.btnClose.isEnabled = !isLoading
         binding.btnGallery.isEnabled = !isLoading
+        binding.btnVideos.isEnabled = !isLoading
         binding.btnCamera.isEnabled = !isLoading
         binding.etContent.isEnabled = !isLoading
     }
