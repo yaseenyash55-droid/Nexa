@@ -38,13 +38,12 @@ export const DownloadPage: React.FC = () => {
                 </a>
 
                 <a
-                  href={ANDROID_RELEASE.githubRawUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={ANDROID_RELEASE.directAppReleaseUrl}
+                  download="app-release.apk"
                   className="px-5 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-semibold border border-slate-700 transition-all flex items-center gap-2"
                 >
-                  <ExternalLink className="w-4 h-4" />
-                  <span>Mirror (GitHub Raw)</span>
+                  <Download className="w-4 h-4" />
+                  <span>Direct APK Mirror</span>
                 </a>
               </div>
             </div>
