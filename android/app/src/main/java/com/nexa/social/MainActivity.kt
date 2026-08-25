@@ -196,6 +196,34 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun checkFullScreenIntentPermission() {
+        if (!NotificationHelper.canUseFullScreenIntent(this)) {
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Incoming Call Alerts")
+                .setMessage("To receive full-screen incoming call alerts when your screen is locked, please allow Full Screen Intent permission in system settings.")
+                .setPositiveButton("Open Settings") { _, _ ->
+                    try {
+                        startActivity(NotificationHelper.getManageFullScreenIntent(this))
+                    } catch (e: Exception) {
+                        try {
+                            val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = android.net.Uri.parse("package:$packageName")
+                            }
+                            startActivity(intent)
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+                .setNegativeButton("Later", null)
+                .show()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        checkFullScreenIntentPermission()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
