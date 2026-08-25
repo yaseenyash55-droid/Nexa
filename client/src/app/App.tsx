@@ -18,6 +18,7 @@ import { RegisterPage } from '../pages/RegisterPage.js';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage.js';
 import { NotFoundPage } from '../pages/NotFoundPage.js';
 import { initializeLiveUpdates } from '../utils/capacitorLiveUpdates.js';
+import { webFcmService } from '../services/fcm.service.js';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +28,22 @@ const queryClient = new QueryClient({
     }
   }
 });
+
+const AppNotificationInitializer: React.FC = () => {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    // Register background service worker immediately
+    void webFcmService.registerServiceWorker();
+
+    // If authenticated, request permission and sync web push token
+    if (user) {
+      void webFcmService.requestPermissionAndSyncToken();
+    }
+  }, [user]);
+
+  return null;
+};
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading } = useAuth();
@@ -56,6 +73,7 @@ export const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
+          <AppNotificationInitializer />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<HomePage />} />

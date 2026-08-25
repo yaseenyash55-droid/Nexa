@@ -1,10 +1,19 @@
 package com.nexa.social.ui
 
 import android.Manifest
+import android.app.PendingIntent
+import android.app.PictureInPictureParams
+import android.app.RemoteAction
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.graphics.drawable.Icon
+import android.os.Build
 import android.os.Bundle
+import android.util.Rational
 import android.view.View
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -13,10 +22,12 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.nexa.social.NexaApiClient
+import com.nexa.social.R
 import com.nexa.social.call.WebRtcCallManager
 import com.nexa.social.data.models.IceServerConfiguration
 import com.nexa.social.databinding.ActivityCallBinding
 import com.nexa.social.utils.CallSignalListener
+import com.nexa.social.utils.ProximitySensorManager
 import com.nexa.social.utils.RemoteIceCandidate
 import com.nexa.social.utils.SocketManager
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +44,14 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
         private const val EXTRA_TARGET_NAME = "extra_target_name"
         private const val EXTRA_CALL_TYPE = "extra_call_type"
         private const val EXTRA_DIRECTION = "extra_direction"
+
+        private const val ACTION_PIP_MUTE = "com.nexa.social.action.PIP_MUTE"
+        private const val ACTION_PIP_CAMERA = "com.nexa.social.action.PIP_CAMERA"
+        private const val ACTION_PIP_END = "com.nexa.social.action.PIP_END"
+
+        private const val REQUEST_CODE_MUTE = 101
+        private const val REQUEST_CODE_CAMERA = 102
+        private const val REQUEST_CODE_END = 103
 
         fun outgoingIntent(context: Context, targetId: Int, targetName: String, callType: String) =
             Intent(context, CallActivity::class.java).apply {
@@ -70,6 +89,32 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     private var microphoneEnabled = true
     private var cameraEnabled = true
     private var pendingAction: (() -> Unit)? = null
+    private var isReceiverRegistered = false
+    private var proximitySensorManager: ProximitySensorManager? = null
+
+    private val pipActionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                ACTION_PIP_MUTE -> {
+                    microphoneEnabled = !microphoneEnabled
+                    callManager?.setMicrophoneEnabled(microphoneEnabled)
+                    binding.btnMute.text = if (microphoneEnabled) "Mute" else "Unmute"
+                    updatePipParams()
+                }
+                ACTION_PIP_CAMERA -> {
+                    if (callType == "video") {
+                        cameraEnabled = !cameraEnabled
+                        callManager?.setCameraEnabled(cameraEnabled)
+                        binding.btnToggleVideo.text = if (cameraEnabled) "Camera" else "Camera off"
+                        updatePipParams()
+                    }
+                }
+                ACTION_PIP_END -> {
+                    endCall("ended")
+                }
+            }
+        }
+    }
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -107,13 +152,38 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
         binding.tvCallStatus.text = if (direction == "incoming") "Incoming ${if (callType == "video") "video" else "voice"} call" else "Preparing call…"
 
         setupControls()
+        registerPipReceiver()
+        updatePipParams()
+        proximitySensorManager = ProximitySensorManager(this)
         SocketManager.registerCallSignalListener(this)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = endCall("ended")
         })
 
-        if (direction == "outgoing") requestMediaPermissions { prepareAndPlaceCall() }
+        NotificationHelper.cancelNotification(this)
+
+        if (direction == "outgoing") {
+            requestMediaPermissions { prepareAndPlaceCall() }
+        } else if (intent.getBooleanExtra("extra_auto_accept", false)) {
+            requestMediaPermissions { prepareAndAcceptCall() }
+        }
+    }
+
+    private fun registerPipReceiver() {
+        if (!isReceiverRegistered) {
+            val filter = IntentFilter().apply {
+                addAction(ACTION_PIP_MUTE)
+                addAction(ACTION_PIP_CAMERA)
+                addAction(ACTION_PIP_END)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(pipActionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(pipActionReceiver, filter)
+            }
+            isReceiverRegistered = true
+        }
     }
 
     private fun setupControls() {
@@ -130,13 +200,137 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
             microphoneEnabled = !microphoneEnabled
             callManager?.setMicrophoneEnabled(microphoneEnabled)
             binding.btnMute.text = if (microphoneEnabled) "Mute" else "Unmute"
+            updatePipParams()
         }
         binding.btnToggleVideo.setOnClickListener {
             cameraEnabled = !cameraEnabled
             callManager?.setCameraEnabled(cameraEnabled)
             binding.btnToggleVideo.text = if (cameraEnabled) "Camera" else "Camera off"
+            proximitySensorManager?.updateState(allowScreenOff = !cameraEnabled)
+            updatePipParams()
         }
         binding.btnSwitchCamera.setOnClickListener { callManager?.switchCamera() }
+    }
+
+    private fun buildPipParams(): PictureInPictureParams? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+        val builder = PictureInPictureParams.Builder()
+
+        // Configure aspect ratio for video / audio calls (bounded between 1:2.39 and 2.39:1)
+        val aspectRatio = if (callType == "video") Rational(9, 16) else Rational(16, 9)
+        builder.setAspectRatio(aspectRatio)
+
+        val actions = ArrayList<RemoteAction>()
+
+        // 1. Mute Action
+        val muteIcon = Icon.createWithResource(
+            this,
+            if (microphoneEnabled) R.drawable.ic_pip_mic else R.drawable.ic_pip_mic_off
+        )
+        val mutePendingIntent = PendingIntent.getBroadcast(
+            this,
+            REQUEST_CODE_MUTE,
+            Intent(ACTION_PIP_MUTE).setPackage(packageName),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        actions.add(
+            RemoteAction(
+                muteIcon,
+                if (microphoneEnabled) "Mute" else "Unmute",
+                if (microphoneEnabled) "Mute microphone" else "Unmute microphone",
+                mutePendingIntent
+            )
+        )
+
+        // 2. Camera Toggle Action (for video calls)
+        if (callType == "video") {
+            val cameraIcon = Icon.createWithResource(
+                this,
+                if (cameraEnabled) R.drawable.ic_pip_video else R.drawable.ic_pip_video_off
+            )
+            val cameraPendingIntent = PendingIntent.getBroadcast(
+                this,
+                REQUEST_CODE_CAMERA,
+                Intent(ACTION_PIP_CAMERA).setPackage(packageName),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            actions.add(
+                RemoteAction(
+                    cameraIcon,
+                    if (cameraEnabled) "Camera off" else "Camera on",
+                    if (cameraEnabled) "Turn off camera" else "Turn on camera",
+                    cameraPendingIntent
+                )
+            )
+        }
+
+        // 3. End Call Action
+        val endIcon = Icon.createWithResource(this, R.drawable.ic_pip_call_end)
+        val endPendingIntent = PendingIntent.getBroadcast(
+            this,
+            REQUEST_CODE_END,
+            Intent(ACTION_PIP_END).setPackage(packageName),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        actions.add(
+            RemoteAction(
+                endIcon,
+                "End Call",
+                "End ongoing call",
+                endPendingIntent
+            )
+        )
+
+        builder.setActions(actions)
+
+        // Android 12+ (API 31) Auto-enter and seamless resizing
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setAutoEnterEnabled(accepted && !ended)
+            builder.setSeamlessResizeEnabled(true)
+        }
+
+        return builder.build()
+    }
+
+    private fun updatePipParams() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val params = buildPipParams()
+            if (params != null) {
+                setPictureInPictureParams(params)
+            }
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && accepted && !ended) {
+            val params = buildPipParams()
+            if (params != null) {
+                enterPictureInPictureMode(params)
+            } else {
+                @Suppress("DEPRECATION")
+                enterPictureInPictureMode()
+            }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        if (isInPictureInPictureMode) {
+            binding.activeControls.visibility = View.GONE
+            binding.incomingControls.visibility = View.GONE
+            binding.tvCallerName.visibility = View.GONE
+            binding.tvCallStatus.visibility = View.GONE
+            binding.btnSwitchCamera.visibility = View.GONE
+        } else {
+            if (!ended) {
+                binding.activeControls.visibility = if (direction == "incoming" && !accepted) View.GONE else View.VISIBLE
+                binding.incomingControls.visibility = if (direction == "incoming" && !accepted) View.VISIBLE else View.GONE
+                binding.tvCallerName.visibility = View.VISIBLE
+                binding.tvCallStatus.visibility = View.VISIBLE
+                binding.btnSwitchCamera.visibility = if (callType == "video") View.VISIBLE else View.GONE
+            }
+        }
     }
 
     private fun requestMediaPermissions(action: () -> Unit) {
@@ -187,6 +381,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     private fun prepareAndPlaceCall() {
         prepareManager {
             binding.tvCallStatus.text = "Calling…"
+            proximitySensorManager?.start(allowScreenOff = callType == "audio" || !cameraEnabled)
             SocketManager.emitCallInvite(callId, targetId, callType) { success, error ->
                 if (success) binding.tvCallStatus.text = "Ringing…"
                 else showFailure(error ?: "Unable to place call")
@@ -203,6 +398,8 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
                     binding.incomingControls.visibility = View.GONE
                     binding.activeControls.visibility = View.VISIBLE
                     binding.tvCallStatus.text = "Connecting…"
+                    proximitySensorManager?.start(allowScreenOff = callType == "audio" || !cameraEnabled)
+                    updatePipParams()
                 } else {
                     showFailure(error ?: "Unable to accept call")
                 }
@@ -214,12 +411,16 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
         if (callId != this.callId) return
         accepted = true
         binding.tvCallStatus.text = "Connecting…"
+        proximitySensorManager?.start(allowScreenOff = callType == "audio" || !cameraEnabled)
+        updatePipParams()
         callManager?.createOffer()
     }
 
     override fun onCallRejected(callId: String, reason: String) {
         if (callId != this.callId) return
         ended = true
+        proximitySensorManager?.stop()
+        updatePipParams()
         showFailure(if (reason == "busy") "User is busy" else "Call declined", finishAfter = true)
     }
 
@@ -238,6 +439,8 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     override fun onCallEnded(callId: String, reason: String) {
         if (callId != this.callId) return
         ended = true
+        proximitySensorManager?.stop()
+        updatePipParams()
         binding.tvCallStatus.text = if (reason == "disconnected") "User disconnected" else "Call ended"
         binding.root.postDelayed({ finish() }, 900)
     }
@@ -261,6 +464,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
                 PeerConnection.PeerConnectionState.CLOSED -> "Call ended"
                 else -> binding.tvCallStatus.text
             }
+            updatePipParams()
         }
     }
 
@@ -269,10 +473,13 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     }
 
     private fun endCall(reason: String) {
+        proximitySensorManager?.release()
+        proximitySensorManager = null
         if (!ended) {
             if (direction == "incoming" && !accepted) SocketManager.emitCallReject(callId, "declined")
             else SocketManager.emitCallEnd(callId, reason)
             ended = true
+            updatePipParams()
         }
         finish()
     }
@@ -283,7 +490,29 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
         if (finishAfter) binding.root.postDelayed({ finish() }, 900)
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (accepted && !ended) {
+            proximitySensorManager?.start(allowScreenOff = callType == "audio" || !cameraEnabled)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        proximitySensorManager?.stop()
+    }
+
     override fun onDestroy() {
+        proximitySensorManager?.release()
+        proximitySensorManager = null
+        if (isReceiverRegistered) {
+            try {
+                unregisterReceiver(pipActionReceiver)
+            } catch {
+                // Ignore
+            }
+            isReceiverRegistered = false
+        }
         SocketManager.unregisterCallSignalListener(this)
         if (!ended) {
             if (direction == "incoming" && !accepted) SocketManager.emitCallReject(callId, "dismissed")

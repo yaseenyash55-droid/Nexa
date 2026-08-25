@@ -7,7 +7,9 @@ enum class NotificationDestination {
     CHAT,
     POST,
     REEL,
-    PROFILE;
+    PROFILE,
+    CALL,
+    CALL_INVITE;
 
     companion object {
         fun fromString(value: String?): NotificationDestination {

@@ -15,6 +15,41 @@ class NexaFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
 
+        // Parse destination and type
+        val destinationStr = remoteMessage.data["destination"]
+            ?: remoteMessage.data["type"]
+            ?: "HOME"
+
+        val destination = NotificationDestination.fromString(destinationStr)
+
+        // Check if this payload is an incoming call alert
+        val callId = remoteMessage.data["callId"] ?: remoteMessage.data["roomId"]
+        val isCallInvite = destination == NotificationDestination.CALL ||
+            destination == NotificationDestination.CALL_INVITE ||
+            remoteMessage.data["type"] == "CALL_INVITE" ||
+            remoteMessage.data["type"] == "INCOMING_CALL" ||
+            !callId.isNullOrBlank()
+
+        if (isCallInvite && !callId.isNullOrBlank()) {
+            val callerId = remoteMessage.data["callerId"]?.toIntOrNull()
+                ?: remoteMessage.data["userId"]?.toIntOrNull()
+                ?: 1
+            val callerName = remoteMessage.data["callerName"]
+                ?: remoteMessage.data["callerUsername"]
+                ?: "Nexa User"
+            val callType = remoteMessage.data["callType"]
+                ?.takeIf { it == "video" } ?: "audio"
+
+            NotificationHelper.showIncomingCallNotification(
+                context = applicationContext,
+                callId = callId,
+                callerId = callerId,
+                callerName = callerName,
+                callType = callType
+            )
+            return
+        }
+
         val title = remoteMessage.notification?.title
             ?: remoteMessage.data["title"]
             ?: "Nexa Social"
@@ -24,14 +59,7 @@ class NexaFirebaseMessagingService : FirebaseMessagingService() {
             ?: remoteMessage.data["message"]
             ?: "You have a new update on Nexa."
 
-        // Parse destination and validate
-        val destinationStr = remoteMessage.data["destination"]
-            ?: remoteMessage.data["type"]
-            ?: "HOME"
-
-        val destination = NotificationDestination.fromString(destinationStr)
-
-        // Parse and validate resource identifiers
+        // Parse and validate resource identifiers for general notifications
         val resourceId = remoteMessage.data["resourceId"]
             ?: remoteMessage.data["postId"]
             ?: remoteMessage.data["userId"]

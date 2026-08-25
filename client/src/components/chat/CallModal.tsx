@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff, X } from 'lucide-react';
+import { Mic, MicOff, MonitorUp, MonitorOff, Phone, PhoneOff, Sparkles, Video, VideoOff, X } from 'lucide-react';
 import { Socket } from 'socket.io-client';
 import { callsApi, IceConfiguration } from '../../api/calls.api.js';
+import { startScreenSharing, ScreenShareController } from '../../utils/screenShare.js';
+import { enableBackgroundBlur, BackgroundBlurController } from '../../utils/backgroundBlur.js';
 import { User } from '../../types/index.js';
 import { Avatar } from '../ui/Avatar.js';
 
@@ -47,12 +49,16 @@ export const CallModal: React.FC<CallModalProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [microphoneEnabled, setMicrophoneEnabled] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(callType === 'video');
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isBackgroundBlurred, setIsBackgroundBlurred] = useState(false);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const screenShareControllerRef = useRef<ScreenShareController | null>(null);
+  const backgroundBlurControllerRef = useRef<BackgroundBlurController | null>(null);
   const iceConfigurationRef = useRef<IceConfiguration | null>(null);
   const callIdRef = useRef(initialCallId || createCallId());
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
@@ -238,6 +244,12 @@ export const CallModal: React.FC<CallModalProps> = ({
       socket.off('call:ice-candidate', handleCandidate);
       socket.off('call:rejected', handleRejected);
       socket.off('call:ended', handleEnded);
+      void screenShareControllerRef.current?.stop();
+      screenShareControllerRef.current = null;
+      setIsScreenSharing(false);
+      void backgroundBlurControllerRef.current?.stop();
+      backgroundBlurControllerRef.current = null;
+      setIsBackgroundBlurred(false);
       peerRef.current?.close();
       peerRef.current = null;
       localStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -288,6 +300,12 @@ export const CallModal: React.FC<CallModalProps> = ({
   };
 
   const closeCall = (decline = false) => {
+    void screenShareControllerRef.current?.stop();
+    screenShareControllerRef.current = null;
+    setIsScreenSharing(false);
+    void backgroundBlurControllerRef.current?.stop();
+    backgroundBlurControllerRef.current = null;
+    setIsBackgroundBlurred(false);
     if (socket && !remoteEndedRef.current) {
       if (direction === 'incoming' && !acceptedRef.current) {
         socket.emit('call:reject', { callId: callIdRef.current, reason: decline ? 'declined' : 'dismissed' });
@@ -310,6 +328,83 @@ export const CallModal: React.FC<CallModalProps> = ({
     setCameraEnabled(next);
   };
 
+  const toggleScreenShare = async () => {
+    if (isScreenSharing) {
+      await screenShareControllerRef.current?.stop();
+      screenShareControllerRef.current = null;
+      setIsScreenSharing(false);
+      return;
+    }
+
+    const controller = await startScreenSharing({
+      peerConnection: peerRef.current,
+      cameraStream: localStreamRef.current,
+      onStarted: (screenStream) => {
+        setIsScreenSharing(true);
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = screenStream;
+        }
+      },
+      onStopped: () => {
+        setIsScreenSharing(false);
+        screenShareControllerRef.current = null;
+        if (localVideoRef.current && localStreamRef.current) {
+          localVideoRef.current.srcObject = isBackgroundBlurred && backgroundBlurControllerRef.current
+            ? backgroundBlurControllerRef.current.blurredStream
+            : localStreamRef.current;
+        }
+      },
+      onError: (err, code) => {
+        if (code === 'PERMISSION_DENIED') {
+          return;
+        }
+        setErrorMessage(err.message || 'Screen sharing failed');
+      }
+    });
+
+    if (controller) {
+      screenShareControllerRef.current = controller;
+    }
+  };
+
+  const toggleBackgroundBlur = async () => {
+    if (isBackgroundBlurred) {
+      await backgroundBlurControllerRef.current?.stop();
+      backgroundBlurControllerRef.current = null;
+      setIsBackgroundBlurred(false);
+      if (localVideoRef.current && localStreamRef.current && !isScreenSharing) {
+        localVideoRef.current.srcObject = localStreamRef.current;
+      }
+      return;
+    }
+
+    const controller = await enableBackgroundBlur({
+      peerConnection: peerRef.current,
+      rawStream: localStreamRef.current,
+      blurRadius: 18,
+      onStarted: (blurredStream) => {
+        setIsBackgroundBlurred(true);
+        if (localVideoRef.current && !isScreenSharing) {
+          localVideoRef.current.srcObject = blurredStream;
+        }
+      },
+      onStopped: () => {
+        setIsBackgroundBlurred(false);
+        backgroundBlurControllerRef.current = null;
+        if (localVideoRef.current && localStreamRef.current && !isScreenSharing) {
+          localVideoRef.current.srcObject = localStreamRef.current;
+        }
+      },
+      onError: (err) => {
+        setErrorMessage(err.message || 'Background blur filter failed');
+      }
+    });
+
+    if (controller) {
+      backgroundBlurControllerRef.current = controller;
+    }
+  };
+
   if (!isOpen) return null;
 
   const statusText: Record<CallStatus, string> = {
@@ -317,7 +412,7 @@ export const CallModal: React.FC<CallModalProps> = ({
     ringing: 'Ringing…',
     incoming: `Incoming ${callType === 'video' ? 'video' : 'voice'} call`,
     connecting: 'Connecting…',
-    connected: 'Connected',
+    connected: isScreenSharing ? 'Connected (Sharing Screen)' : isBackgroundBlurred ? 'Connected (Blurred)' : 'Connected',
     unavailable: 'Calling unavailable',
     error: errorMessage || 'Call failed'
   };
@@ -340,7 +435,11 @@ export const CallModal: React.FC<CallModalProps> = ({
             </div>
           )}
           {callType === 'video' && <video ref={localVideoRef} autoPlay muted playsInline className="absolute bottom-4 right-4 w-28 sm:w-40 aspect-video object-cover bg-slate-800 border border-slate-600 rounded-xl shadow-xl" />}
-          <div className="absolute left-4 top-4 rounded-full bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-white">{statusText[status]}</div>
+          <div className="absolute left-4 top-4 rounded-full bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-white flex items-center gap-2">
+            {statusText[status]}
+            {isScreenSharing && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-indigo-500/80 text-white font-medium">SCREEN</span>}
+            {isBackgroundBlurred && !isScreenSharing && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-cyan-500/80 text-white font-medium">BLUR</span>}
+          </div>
         </div>
         <div className="p-5 flex items-center justify-center gap-3">
           {direction === 'incoming' && status === 'incoming' ? (
@@ -352,6 +451,19 @@ export const CallModal: React.FC<CallModalProps> = ({
             <>
               <button type="button" onClick={toggleMicrophone} disabled={!localStreamRef.current} className="p-3 rounded-full bg-slate-800 disabled:opacity-40 text-white" aria-label={microphoneEnabled ? 'Mute microphone' : 'Unmute microphone'}>{microphoneEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}</button>
               {callType === 'video' && <button type="button" onClick={toggleCamera} disabled={!localStreamRef.current} className="p-3 rounded-full bg-slate-800 disabled:opacity-40 text-white" aria-label={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}>{cameraEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}</button>}
+              {callType === 'video' && (
+                <button
+                  type="button"
+                  onClick={() => void toggleBackgroundBlur()}
+                  disabled={!localStreamRef.current || isScreenSharing}
+                  className={`p-3 rounded-full text-white transition-colors ${isBackgroundBlurred ? 'bg-cyan-600 hover:bg-cyan-500 ring-2 ring-cyan-400' : 'bg-slate-800 hover:bg-slate-700 disabled:opacity-40'}`}
+                  aria-label={isBackgroundBlurred ? 'Disable background blur' : 'Enable background blur'}
+                  title={isBackgroundBlurred ? 'Disable background blur' : 'Enable background blur'}
+                >
+                  <Sparkles className="w-5 h-5" />
+                </button>
+              )}
+              <button type="button" onClick={() => void toggleScreenShare()} disabled={!peerRef.current} className={`p-3 rounded-full text-white transition-colors ${isScreenSharing ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-slate-800 hover:bg-slate-700 disabled:opacity-40'}`} aria-label={isScreenSharing ? 'Stop screen sharing' : 'Share screen'}>{isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <MonitorUp className="w-5 h-5" />}</button>
               <button type="button" onClick={() => closeCall()} className="p-4 rounded-full bg-rose-600 text-white" aria-label="End call"><PhoneOff className="w-5 h-5" /></button>
             </>
           )}

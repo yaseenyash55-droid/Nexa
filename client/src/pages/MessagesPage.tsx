@@ -15,9 +15,10 @@ import { useAuth } from '../contexts/AuthContext.js';
 import { formatDistanceToNow } from 'date-fns';
 import { io, Socket } from 'socket.io-client';
 import { useSearchParams } from 'react-router-dom';
-import { API_BASE_URL, getAccessToken } from '../api/client.js';
 import { useTheme } from '../contexts/ThemeContext.js';
+import { API_BASE_URL, getAccessToken } from '../api/client.js';
 import { decryptMessage, DecryptedMessageResult } from '../utils/e2ee.js';
+import { webFcmService } from '../services/fcm.service.js';
 
 export const MessagesPage: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -276,6 +277,53 @@ export const MessagesPage: React.FC = () => {
       setRealtimeSocket(null);
     };
   }, [currentUser, queryClient]);
+
+  // Handle Web Push Call Notification Actions & Deep Links
+  useEffect(() => {
+    const pushCallId = searchParams.get('callId');
+    const pushTargetId = Number.parseInt(searchParams.get('targetId') || searchParams.get('userId') || '', 10);
+    const pushCallType = (searchParams.get('callType') === 'video' ? 'video' : 'audio') as 'video' | 'audio';
+    const pushAction = searchParams.get('action');
+
+    if (pushCallId && pushTargetId > 0 && pushAction === 'accept') {
+      void usersApi.getById(pushTargetId).then((target) => {
+        setCallModalState({
+          isOpen: true,
+          type: pushCallType,
+          direction: 'incoming',
+          callId: pushCallId,
+          targetUser: target
+        });
+      }).catch(() => {
+        console.warn('Unable to resolve push caller target user');
+      });
+    }
+
+    const unsubscribe = webFcmService.onCallAction(async (event) => {
+      if (event.action === 'accept' && event.callId && event.callerId) {
+        const callerIdNum = Number(event.callerId);
+        try {
+          const target = await usersApi.getById(callerIdNum);
+          setCallModalState({
+            isOpen: true,
+            type: event.callType === 'video' ? 'video' : 'audio',
+            direction: 'incoming',
+            callId: event.callId,
+            targetUser: target
+          });
+        } catch {
+          console.warn('Unable to load target user for call action');
+        }
+      } else if (event.action === 'decline' && event.callId) {
+        socketRef.current?.emit('call:reject', { callId: event.callId, reason: 'declined' });
+        setCallModalState((prev) => (prev.callId === event.callId ? { ...prev, isOpen: false } : prev));
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [searchParams]);
 
   useEffect(() => {
     if (!currentUser || !selectedUser || chatType !== 'direct') return;

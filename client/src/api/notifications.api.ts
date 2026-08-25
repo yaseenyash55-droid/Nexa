@@ -13,5 +13,13 @@ export const notificationsApi = {
 
   async markAllAsRead(): Promise<void> {
     await api.patch('/notifications/read-all');
+  },
+
+  async registerFcmToken(fcmToken: string, platform = 'web', deviceId?: string): Promise<void> {
+    await api.post('/notifications/fcm-token', { fcmToken, platform, deviceId });
+  },
+
+  async revokeFcmToken(fcmToken?: string): Promise<void> {
+    await api.post('/notifications/fcm-token/revoke', { fcmToken });
   }
 };

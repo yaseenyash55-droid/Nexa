@@ -1,5 +1,6 @@
 import { verifyAccessToken } from './utils/jwt.js';
 import { getMessageRepository } from './repositories/factory.js';
+import { fcmNotificationService } from './services/fcm.service.js';
 
 export interface AuthenticatedSocketData {
   userId: number;
@@ -151,6 +152,19 @@ export class NexaRealtimeServer {
       callerUsername: caller.username,
       callType
     });
+
+    // Asynchronously dispatch high-priority FCM push notification to callee's devices (Android/Web)
+    fcmNotificationService
+      .sendCallInvitePush(calleeId, {
+        callId,
+        callerId: caller.userId,
+        callerUsername: caller.username,
+        callType
+      })
+      .catch(() => {
+        // Safe swallow: FCM push failure should not abort socket signaling
+      });
+
     return call;
   }
 
