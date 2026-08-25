@@ -141,9 +141,6 @@ export class NexaRealtimeServer {
     if (callType !== 'audio' && callType !== 'video') {
       throw new Error('Invalid call type');
     }
-    if (!this.isUserOnline(calleeId)) {
-      throw new Error('User is offline');
-    }
     if (this.activeCalls.has(callId)) {
       throw new Error('Call identifier is already active');
     }

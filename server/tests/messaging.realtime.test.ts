@@ -132,12 +132,14 @@ describe('Messaging Security & Realtime Interoperability Suite', () => {
         'audio'
       )).toThrow('Invalid call recipient');
 
-      expect(() => realtimeServer.createCall(
+      const offlineCall = realtimeServer.createCall(
         { userId: 101, username: 'alice', email: '' },
         '4f7a6010-11c0-4b2d-9494-31e90d3ba9ca',
         303,
         'audio'
-      )).toThrow('User is offline');
+      );
+      expect(offlineCall.callId).toBe('4f7a6010-11c0-4b2d-9494-31e90d3ba9ca');
+      realtimeServer.endCall(101, '4f7a6010-11c0-4b2d-9494-31e90d3ba9ca');
 
       realtimeServer.createCall(
         { userId: 101, username: 'alice', email: '' },

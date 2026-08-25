@@ -75,11 +75,11 @@ export class OracleMessageRepository implements IMessageRepository {
       let senderProfileImage: string | undefined;
 
       try {
-        const userRes = await conn.execute<any>(
+        const userRes = await conn.execute(
           'SELECT USERNAME, DISPLAY_NAME, PROFILE_IMAGE_URL FROM USERS WHERE USER_ID = :senderId',
           { senderId: Number(msg.senderId) }
         );
-        const userRow = userRes.rows?.[0];
+        const userRow = userRes.rows?.[0] as any;
         if (userRow) {
           senderUsername = userRow.USERNAME || userRow[0] || 'user';
           senderDisplayName = userRow.DISPLAY_NAME || userRow[1] || 'User';
