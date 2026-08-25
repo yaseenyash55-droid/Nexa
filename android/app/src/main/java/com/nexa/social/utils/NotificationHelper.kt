@@ -7,7 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -227,6 +229,33 @@ object NotificationHelper {
             notificationManager.cancel(notificationId)
         } catch (_: Exception) {
             // Safe ignore
+        }
+    }
+
+    /**
+     * Checks if Full Screen Intent is granted on Android 14+ (API 34+).
+     * Returns true if granted or on API < 34.
+     */
+    fun canUseFullScreenIntent(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            return notificationManager?.canUseFullScreenIntent() ?: true
+        }
+        return true
+    }
+
+    /**
+     * Creates an intent to navigate the user directly to the app's full-screen intent settings screen on Android 14+.
+     */
+    fun getManageFullScreenIntent(context: Context): Intent {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                data = Uri.parse("package:${context.packageName}")
+            }
+        } else {
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:${context.packageName}")
+            }
         }
     }
 }
