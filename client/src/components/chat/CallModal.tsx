@@ -5,6 +5,7 @@ import { callsApi, IceConfiguration } from '../../api/calls.api.js';
 import { startScreenSharing, ScreenShareController } from '../../utils/screenShare.js';
 import { enableBackgroundBlur, BackgroundBlurController } from '../../utils/backgroundBlur.js';
 import { ringtoneAudio } from '../../utils/ringtoneAudio.js';
+import { createTelemetryMonitor, WebRtcStreamMetrics } from '../../utils/webrtcTelemetry.js';
 import { User } from '../../types/index.js';
 import { Avatar } from '../ui/Avatar.js';
 
@@ -53,6 +54,7 @@ export const CallModal: React.FC<CallModalProps> = ({
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isBackgroundBlurred, setIsBackgroundBlurred] = useState(false);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [streamMetrics, setStreamMetrics] = useState<WebRtcStreamMetrics | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
@@ -60,6 +62,7 @@ export const CallModal: React.FC<CallModalProps> = ({
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenShareControllerRef = useRef<ScreenShareController | null>(null);
   const backgroundBlurControllerRef = useRef<BackgroundBlurController | null>(null);
+  const telemetryMonitorRef = useRef<ReturnType<typeof createTelemetryMonitor> | null>(null);
   const iceConfigurationRef = useRef<IceConfiguration | null>(null);
   const callIdRef = useRef(initialCallId || createCallId());
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
@@ -467,6 +470,28 @@ export const CallModal: React.FC<CallModalProps> = ({
     };
   }, [isOpen, status]);
 
+  useEffect(() => {
+    if (status === 'connected' && peerRef.current) {
+      const monitor = createTelemetryMonitor({
+        pollIntervalMs: 3000,
+        packetLossThresholdPercent: 5.0,
+        onMetricsUpdate: (metrics) => {
+          setStreamMetrics(metrics);
+        }
+      });
+      monitor.start(peerRef.current);
+      telemetryMonitorRef.current = monitor;
+    } else {
+      telemetryMonitorRef.current?.stop();
+      telemetryMonitorRef.current = null;
+      setStreamMetrics(null);
+    }
+    return () => {
+      telemetryMonitorRef.current?.stop();
+      telemetryMonitorRef.current = null;
+    };
+  }, [status]);
+
   if (!isOpen) return null;
 
   const statusText: Record<CallStatus, string> = {
@@ -513,6 +538,20 @@ export const CallModal: React.FC<CallModalProps> = ({
             {statusText[status]}
             {isScreenSharing && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-indigo-500/80 text-white font-medium">SCREEN</span>}
             {isBackgroundBlurred && !isScreenSharing && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-cyan-500/80 text-white font-medium">BLUR</span>}
+            {status === 'connected' && streamMetrics && (
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                streamMetrics.qualityLevel === 'optimal' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                streamMetrics.qualityLevel === 'moderate' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                'bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  streamMetrics.qualityLevel === 'optimal' ? 'bg-emerald-400' :
+                  streamMetrics.qualityLevel === 'moderate' ? 'bg-amber-400' :
+                  'bg-rose-400'
+                }`} />
+                {streamMetrics.qualityLevel === 'optimal' ? 'HD' : `${streamMetrics.packetLossRate}% Loss`}
+              </span>
+            )}
           </div>
         </div>
         <div className="p-5 flex items-center justify-center gap-3">
