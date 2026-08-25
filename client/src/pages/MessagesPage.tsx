@@ -7,7 +7,7 @@ import { groupsApi, Group, GroupMessage } from '../api/groups.api.js';
 import { broadcastsApi, Broadcast } from '../api/broadcasts.api.js';
 import { Message, User } from '../types/index.js';
 import { Avatar } from '../components/ui/Avatar.js';
-import { Send, MessageSquare, Search, CheckCheck, Check, Phone, Video, ShieldCheck, Users, Plus, Radio } from 'lucide-react';
+import { Send, MessageSquare, Search, CheckCheck, Check, Phone, Video, ShieldCheck, Users, Plus, Radio, Paperclip, FileText, Download, Sparkles, Image as ImageIcon, Smile } from 'lucide-react';
 import { CallModal } from '../components/chat/CallModal.js';
 import { CreateGroupModal } from '../components/chat/CreateGroupModal.js';
 import { CreateBroadcastModal } from '../components/chat/CreateBroadcastModal.js';
@@ -19,6 +19,88 @@ import { useTheme } from '../contexts/ThemeContext.js';
 import { API_BASE_URL, getAccessToken } from '../api/client.js';
 import { decryptMessage, DecryptedMessageResult } from '../utils/e2ee.js';
 import { webFcmService } from '../services/fcm.service.js';
+
+const MessageContent: React.FC<{ content: string; isSelf: boolean }> = ({ content, isSelf }) => {
+  // 1. Check if content has photo URL (e.g. 📷 [Photo] https://... or direct image URL)
+  const photoMatch = content.match(/(?:📷\s*\[Photo\]\s*|(?:^|\s))(https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?|https?:\/\/\S*supabase\.co\S*|https?:\/\/\S*\/uploads\/\S+)/i);
+  // 2. Check if content has video URL (e.g. 🎥 [Video] https://... or direct video URL)
+  const videoMatch = content.match(/(?:🎥\s*\[Video\]\s*|(?:^|\s))(https?:\/\/\S+\.(?:mp4|webm|mov|3gp)(?:\?\S*)?)/i);
+  // 3. Check if content has file URL (e.g. 📁 [File] https://... or general file URL)
+  const fileMatch = content.match(/(?:📁\s*\[File\]\s*)(https?:\/\/\S+)/i);
+  // 4. Check for GIF badge
+  const gifMatch = content.match(/^\[GIF:\s*(.+?)\]$/i);
+
+  if (photoMatch) {
+    const url = photoMatch[1];
+    const cleanText = content.replace(photoMatch[0], '').trim();
+    return (
+      <div className="space-y-1.5">
+        <div className="rounded-xl overflow-hidden max-w-[280px] border border-white/10 shadow-md bg-black/20">
+          <img
+            src={url}
+            alt="Attached Photo"
+            className="w-full max-h-64 object-cover cursor-pointer hover:scale-[1.02] transition duration-200"
+            onClick={() => window.open(url, '_blank')}
+            loading="lazy"
+          />
+        </div>
+        {cleanText && <p className="leading-relaxed whitespace-pre-line text-xs">{cleanText}</p>}
+      </div>
+    );
+  }
+
+  if (videoMatch) {
+    const url = videoMatch[1];
+    const cleanText = content.replace(videoMatch[0], '').trim();
+    return (
+      <div className="space-y-1.5">
+        <div className="rounded-xl overflow-hidden max-w-[300px] border border-white/10 shadow-md bg-black/40">
+          <video
+            src={url}
+            controls
+            playsInline
+            className="w-full max-h-64 rounded-xl"
+            preload="metadata"
+          />
+        </div>
+        {cleanText && <p className="leading-relaxed whitespace-pre-line text-xs">{cleanText}</p>}
+      </div>
+    );
+  }
+
+  if (fileMatch) {
+    const url = fileMatch[1];
+    const fileName = url.split('/').pop()?.split('?')[0] || 'Attachment File';
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-2.5 p-2.5 bg-slate-900/70 hover:bg-slate-900 rounded-xl border border-slate-700/50 transition max-w-[280px] group"
+      >
+        <div className="p-2 bg-brand-500/20 rounded-lg text-brand-300">
+          <FileText className="w-5 h-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-white truncate">{decodeURIComponent(fileName)}</p>
+          <p className="text-[10px] text-brand-300 flex items-center gap-1">Click to download</p>
+        </div>
+        <Download className="w-4 h-4 text-slate-400 group-hover:text-white transition" />
+      </a>
+    );
+  }
+
+  if (gifMatch) {
+    return (
+      <div className="inline-flex items-center gap-2 px-3 py-2 bg-brand-500/20 text-brand-200 rounded-xl border border-brand-500/30 text-xs font-bold shadow-sm">
+        <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+        <span>{gifMatch[1]}</span>
+      </div>
+    );
+  }
+
+  return <p className="leading-relaxed whitespace-pre-line">{content}</p>;
+};
 
 export const MessagesPage: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -729,7 +811,7 @@ export const MessagesPage: React.FC = () => {
                               : `${currentChatTheme.receiverBubble} rounded-bl-none`
                           }`}
                         >
-                          <p className="leading-relaxed whitespace-pre-line">{decryptedInfo.text}</p>
+                          <MessageContent content={decryptedInfo.text} isSelf={isSelf} />
                           <div className={`flex items-center justify-end gap-1.5 text-[9px] ${isSelf ? 'text-brand-200' : 'text-slate-400'}`}>
                             <span>{formatDistanceToNow(new Date(m.createdAt), { addSuffix: true })}</span>
                             {isSelf && (
@@ -839,7 +921,7 @@ export const MessagesPage: React.FC = () => {
                               {m.sender.displayName || m.sender.username}
                             </p>
                           )}
-                          <p className="leading-relaxed whitespace-pre-line">{m.content}</p>
+                          <MessageContent content={m.content} isSelf={isSelf} />
                           <div className={`flex items-center justify-end text-[9px] ${isSelf ? 'text-brand-200' : 'text-slate-400'}`}>
                             <span>{formatDistanceToNow(new Date(m.createdAt), { addSuffix: true })}</span>
                           </div>

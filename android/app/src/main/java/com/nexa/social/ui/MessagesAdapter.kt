@@ -1,10 +1,15 @@
 package com.nexa.social.ui
 
+import android.content.Intent
+import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
+import com.google.android.material.card.MaterialCardView
 import com.nexa.social.R
 import com.nexa.social.data.models.DisplayMessage
 import com.nexa.social.utils.ChatTheme
@@ -88,11 +93,24 @@ class MessagesAdapter(
         private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
         private val tvReadStatus: TextView? = itemView.findViewById(R.id.tvReadStatus)
         private val bubbleLayout: View? = itemView.findViewById(R.id.bubbleLayout)
+        private val cardMedia: MaterialCardView? = itemView.findViewById(R.id.cardMedia)
+        private val imgMediaAttachment: ImageView? = itemView.findViewById(R.id.imgMediaAttachment)
+        private val layoutFileAttachment: View? = itemView.findViewById(R.id.layoutFileAttachment)
+        private val tvFileName: TextView? = itemView.findViewById(R.id.tvFileName)
 
         fun bind(msg: DisplayMessage, theme: ChatTheme) {
             bubbleLayout?.background = theme.createSentBubbleDrawable()
             tvContent.setTextColor(theme.sentTextColor)
-            tvContent.text = msg.content
+
+            bindMessageAttachments(
+                content = msg.content,
+                tvContent = tvContent,
+                cardMedia = cardMedia,
+                imgMediaAttachment = imgMediaAttachment,
+                layoutFileAttachment = layoutFileAttachment,
+                tvFileName = tvFileName
+            )
+
             val time = formatTimestamp(msg.timestamp) ?: "Sent"
             tvTime.text = time
             if (msg.isRead) {
@@ -115,6 +133,10 @@ class MessagesAdapter(
         private val btnMarkRead: TextView? = itemView.findViewById(R.id.btnMarkRead)
         private val tvReadStatus: TextView? = itemView.findViewById(R.id.tvReadStatus)
         private val bubbleLayout: View? = itemView.findViewById(R.id.bubbleLayout)
+        private val cardMedia: MaterialCardView? = itemView.findViewById(R.id.cardMedia)
+        private val imgMediaAttachment: ImageView? = itemView.findViewById(R.id.imgMediaAttachment)
+        private val layoutFileAttachment: View? = itemView.findViewById(R.id.layoutFileAttachment)
+        private val tvFileName: TextView? = itemView.findViewById(R.id.tvFileName)
 
         fun bind(msg: DisplayMessage, theme: ChatTheme) {
             bubbleLayout?.background = theme.createReceivedBubbleDrawable()
@@ -126,7 +148,15 @@ class MessagesAdapter(
                 tvSenderName.visibility = View.GONE
             }
 
-            tvContent.text = msg.content
+            bindMessageAttachments(
+                content = msg.content,
+                tvContent = tvContent,
+                cardMedia = cardMedia,
+                imgMediaAttachment = imgMediaAttachment,
+                layoutFileAttachment = layoutFileAttachment,
+                tvFileName = tvFileName
+            )
+
             tvTime.text = formatTimestamp(msg.timestamp) ?: "Received"
 
             if (msg.isRead) {
@@ -155,6 +185,78 @@ class MessagesAdapter(
     companion object {
         private const val TYPE_SENT = 1
         private const val TYPE_RECEIVED = 2
+
+        private val photoRegex = Regex("""(?:📷\s*\[Photo\]\s*|(?:^|\s))(https?://\S+\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?|https?://\S*supabase\.co\S*|https?://\S*/uploads/\S+)""", RegexOption.IGNORE_CASE)
+        private val fileRegex = Regex("""(?:📁\s*\[File\]\s*)(https?://\S+)""", RegexOption.IGNORE_CASE)
+
+        private fun bindMessageAttachments(
+            content: String,
+            tvContent: TextView,
+            cardMedia: MaterialCardView?,
+            imgMediaAttachment: ImageView?,
+            layoutFileAttachment: View?,
+            tvFileName: TextView?
+        ) {
+            val photoMatch = photoRegex.find(content)
+            val fileMatch = fileRegex.find(content)
+
+            if (photoMatch != null) {
+                val url = photoMatch.groupValues[1]
+                val cleanText = content.replace(photoMatch.value, "").trim()
+
+                cardMedia?.visibility = View.VISIBLE
+                imgMediaAttachment?.load(url) {
+                    crossfade(true)
+                    placeholder(R.drawable.ic_gallery)
+                    error(R.drawable.ic_gallery)
+                }
+                cardMedia?.setOnClickListener {
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        it.context.startActivity(intent)
+                    } catch (_: Exception) {}
+                }
+
+                layoutFileAttachment?.visibility = View.GONE
+                if (cleanText.isNotEmpty()) {
+                    tvContent.text = cleanText
+                    tvContent.visibility = View.VISIBLE
+                } else {
+                    tvContent.visibility = View.GONE
+                }
+                return
+            }
+
+            if (fileMatch != null) {
+                val url = fileMatch.groupValues[1]
+                val cleanText = content.replace(fileMatch.value, "").trim()
+                val fileName = url.substringAfterLast("/").substringBefore("?")
+
+                layoutFileAttachment?.visibility = View.VISIBLE
+                tvFileName?.text = Uri.decode(fileName)
+                layoutFileAttachment?.setOnClickListener {
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        it.context.startActivity(intent)
+                    } catch (_: Exception) {}
+                }
+
+                cardMedia?.visibility = View.GONE
+                if (cleanText.isNotEmpty()) {
+                    tvContent.text = cleanText
+                    tvContent.visibility = View.VISIBLE
+                } else {
+                    tvContent.visibility = View.GONE
+                }
+                return
+            }
+
+            // Normal text message
+            cardMedia?.visibility = View.GONE
+            layoutFileAttachment?.visibility = View.GONE
+            tvContent.text = content
+            tvContent.visibility = View.VISIBLE
+        }
 
         fun formatTimestamp(timestamp: String?): String? {
             if (timestamp.isNullOrEmpty()) return null
