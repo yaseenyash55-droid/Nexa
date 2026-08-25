@@ -136,7 +136,11 @@ export const CallModal: React.FC<CallModalProps> = ({
       stream.getTracks().forEach((track) => peer.addTrack(track, stream));
       peer.onicecandidate = (event) => {
         if (event.candidate) {
-          socket.emit('call:ice-candidate', { callId, candidate: event.candidate.toJSON() });
+          socket.emit('call:ice-candidate', {
+            callId,
+            targetUserId: targetUser.userId,
+            candidate: event.candidate.toJSON()
+          });
         }
       };
       peer.ontrack = (event) => {
@@ -155,7 +159,11 @@ export const CallModal: React.FC<CallModalProps> = ({
           if (direction === 'outgoing' || acceptedRef.current) {
             const offer = await peer.createOffer({ iceRestart: true });
             await peer.setLocalDescription(offer);
-            socket.emit('call:offer', { callId, sdp: offer.sdp });
+            socket.emit('call:offer', {
+              callId,
+              targetUserId: targetUser.userId,
+              sdp: offer.sdp
+            });
           }
         } catch (iceErr) {
           console.warn('[WebRTC] ICE restart attempt failed:', iceErr);
@@ -211,7 +219,11 @@ export const CallModal: React.FC<CallModalProps> = ({
         const peer = await initializePeer();
         const offer = await peer.createOffer();
         await peer.setLocalDescription(offer);
-        socket.emit('call:offer', { callId, sdp: offer.sdp });
+        socket.emit('call:offer', {
+          callId,
+          targetUserId: targetUser.userId,
+          sdp: offer.sdp
+        });
       } catch (error) {
         fail(error);
       }
@@ -225,7 +237,11 @@ export const CallModal: React.FC<CallModalProps> = ({
         await flushCandidates();
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
-        socket.emit('call:answer', { callId, sdp: answer.sdp });
+        socket.emit('call:answer', {
+          callId,
+          targetUserId: targetUser.userId,
+          sdp: answer.sdp
+        });
         setStatus('connecting');
       } catch (error) {
         fail(error);
@@ -314,6 +330,7 @@ export const CallModal: React.FC<CallModalProps> = ({
       peer.onicecandidate = (event) => {
         if (event.candidate) socket.emit('call:ice-candidate', {
           callId: callIdRef.current,
+          targetUserId: targetUser.userId,
           candidate: event.candidate.toJSON()
         });
       };
@@ -338,7 +355,10 @@ export const CallModal: React.FC<CallModalProps> = ({
         }
       };
       peerRef.current = peer;
-      socket.emit('call:accept', { callId: callIdRef.current }, (response: AckResponse) => {
+      socket.emit('call:accept', {
+        callId: callIdRef.current,
+        targetUserId: targetUser.userId
+      }, (response: AckResponse) => {
         if (response?.success) {
           acceptedRef.current = true;
           setStatus('connecting');
@@ -362,9 +382,17 @@ export const CallModal: React.FC<CallModalProps> = ({
     setIsBackgroundBlurred(false);
     if (socket && !remoteEndedRef.current) {
       if (direction === 'incoming' && !acceptedRef.current) {
-        socket.emit('call:reject', { callId: callIdRef.current, reason: decline ? 'declined' : 'dismissed' });
+        socket.emit('call:reject', {
+          callId: callIdRef.current,
+          targetUserId: targetUser.userId,
+          reason: decline ? 'declined' : 'dismissed'
+        });
       } else {
-        socket.emit('call:end', { callId: callIdRef.current, reason: 'ended' });
+        socket.emit('call:end', {
+          callId: callIdRef.current,
+          targetUserId: targetUser.userId,
+          reason: 'ended'
+        });
       }
     }
     onClose();

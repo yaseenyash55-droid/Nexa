@@ -48,7 +48,7 @@ interface ActiveCall {
   state: 'ringing' | 'accepted';
 }
 
-const CALL_ID_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+const CALL_ID_PATTERN = /^[A-Za-z0-9_.-]{4,128}$/;
 
 export class NexaRealtimeServer {
   private activeConnections = new Map<number, Set<string>>();

@@ -201,15 +201,23 @@ class WebRtcCallManager(
     }
 
     fun createOffer() {
-        peerConnection.createOffer(descriptionObserver(setLocalAndNotify = true), MediaConstraints())
+        val constraints = MediaConstraints().apply {
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", if (videoEnabled) "true" else "false"))
+        }
+        peerConnection.createOffer(descriptionObserver(setLocalAndNotify = true), constraints)
     }
 
     fun acceptOfferAndCreateAnswer(sdp: String) {
+        val constraints = MediaConstraints().apply {
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", if (videoEnabled) "true" else "false"))
+        }
         peerConnection.setRemoteDescription(object : SimpleSdpObserver() {
             override fun onSetSuccess() {
                 remoteDescriptionSet = true
                 flushPendingCandidates()
-                peerConnection.createAnswer(descriptionObserver(setLocalAndNotify = true), MediaConstraints())
+                peerConnection.createAnswer(descriptionObserver(setLocalAndNotify = true), constraints)
             }
 
             override fun onSetFailure(error: String?) {

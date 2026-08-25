@@ -100,6 +100,10 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     private var proximitySensorManager: ProximitySensorManager? = null
     private var mediaPlayer: MediaPlayer? = null
 
+    private var pendingRemoteOfferSdp: String? = null
+    private var pendingRemoteAnswerSdp: String? = null
+    private val pendingRemoteCandidates = mutableListOf<RemoteIceCandidate>()
+
     private val pipActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
@@ -433,11 +437,31 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
                 try {
                     callManager = createManager(iceServers)
                     callManager?.startLocalMedia()
+                    flushPendingSignals()
                     onReady()
                 } catch (error: Exception) {
                     showFailure(error.message ?: "Unable to prepare call")
                 }
             }
+        }
+    }
+
+    private fun flushPendingSignals() {
+        val manager = callManager ?: return
+        if (accepted) {
+            pendingRemoteOfferSdp?.let {
+                manager.acceptOfferAndCreateAnswer(it)
+                pendingRemoteOfferSdp = null
+            }
+        }
+        pendingRemoteAnswerSdp?.let {
+            manager.acceptAnswer(it)
+            pendingRemoteAnswerSdp = null
+        }
+        if (pendingRemoteCandidates.isNotEmpty()) {
+            val list = ArrayList(pendingRemoteCandidates)
+            pendingRemoteCandidates.clear()
+            list.forEach { manager.addRemoteIceCandidate(it) }
         }
     }
 
@@ -464,15 +488,17 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     private fun prepareAndAcceptCall() {
         stopRinging()
         binding.btnAccept.isEnabled = false
+        accepted = true
+        binding.incomingControls.visibility = View.GONE
+        binding.activeControls.visibility = View.VISIBLE
+        binding.tvCallStatus.text = "Connecting…"
+        proximitySensorManager?.start(allowScreenOff = callType == "audio" || !cameraEnabled)
+        updatePipParams()
+
         prepareManager {
             SocketManager.emitCallAccept(callId, targetId) { success, error ->
                 if (success) {
-                    accepted = true
-                    binding.incomingControls.visibility = View.GONE
-                    binding.activeControls.visibility = View.VISIBLE
-                    binding.tvCallStatus.text = "Connecting…"
-                    proximitySensorManager?.start(allowScreenOff = callType == "audio" || !cameraEnabled)
-                    updatePipParams()
+                    flushPendingSignals()
                 } else {
                     showFailure(error ?: "Unable to accept call")
                 }
@@ -487,7 +513,13 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
         binding.tvCallStatus.text = "Connecting…"
         proximitySensorManager?.start(allowScreenOff = callType == "audio" || !cameraEnabled)
         updatePipParams()
-        callManager?.createOffer()
+        if (callManager != null) {
+            callManager?.createOffer()
+        } else {
+            prepareManager {
+                callManager?.createOffer()
+            }
+        }
     }
 
     override fun onCallRejected(callId: String, reason: String) {
@@ -500,15 +532,30 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
     }
 
     override fun onCallOffer(callId: String, sdp: String) {
-        if (callId == this.callId && accepted && sdp.isNotBlank()) callManager?.acceptOfferAndCreateAnswer(sdp)
+        if (callId != this.callId || sdp.isBlank()) return
+        pendingRemoteOfferSdp = sdp
+        if (accepted && callManager != null) {
+            callManager?.acceptOfferAndCreateAnswer(sdp)
+            pendingRemoteOfferSdp = null
+        }
     }
 
     override fun onCallAnswer(callId: String, sdp: String) {
-        if (callId == this.callId && sdp.isNotBlank()) callManager?.acceptAnswer(sdp)
+        if (callId != this.callId || sdp.isBlank()) return
+        if (callManager != null) {
+            callManager?.acceptAnswer(sdp)
+        } else {
+            pendingRemoteAnswerSdp = sdp
+        }
     }
 
     override fun onIceCandidate(callId: String, candidate: RemoteIceCandidate) {
-        if (callId == this.callId) callManager?.addRemoteIceCandidate(candidate)
+        if (callId != this.callId) return
+        if (callManager != null) {
+            callManager?.addRemoteIceCandidate(candidate)
+        } else {
+            pendingRemoteCandidates.add(candidate)
+        }
     }
 
     override fun onCallEnded(callId: String, reason: String) {

@@ -1,6 +1,7 @@
 package com.nexa.social.utils
 
 import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -185,7 +186,28 @@ object SocketManager {
                         callType = json.optString("callType", "audio")
                     )
                     if (call.callId.isNotBlank() && call.callerId > 0) {
-                        mainHandler.post { incomingCallListener?.invoke(call) }
+                        mainHandler.post {
+                            if (incomingCallListener != null) {
+                                incomingCallListener?.invoke(call)
+                            } else {
+                                appContext?.let { ctx ->
+                                    try {
+                                        val intent = com.nexa.social.ui.CallActivity.incomingIntent(
+                                            ctx,
+                                            call.callId,
+                                            call.callerId,
+                                            call.callerUsername,
+                                            call.callType
+                                        ).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                        }
+                                        ctx.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "Failed to launch incoming call directly", e)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
