@@ -1,6 +1,35 @@
+import { Server } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { Redis } from 'ioredis';
 import { verifyAccessToken } from './utils/jwt.js';
 import { getMessageRepository } from './repositories/factory.js';
 import { fcmNotificationService } from './services/fcm.service.js';
+import { logger } from './utils/logger.js';
+
+export function setupSocketCluster(io: Server): void {
+  const redisUrl = process.env.REDIS_URL;
+
+  if (!redisUrl) {
+    logger.warn('REDIS_URL not detected. Running in single-instance memory mode.');
+    return;
+  }
+
+  const pubClient = new Redis(redisUrl, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+    lazyConnect: true
+  });
+  const subClient = pubClient.duplicate();
+
+  Promise.all([pubClient.connect(), subClient.connect()])
+    .then(() => {
+      io.adapter(createAdapter(pubClient, subClient));
+      logger.info('Redis Pub/Sub adapter attached to Socket.io cluster.');
+    })
+    .catch((err) => {
+      logger.error({ err }, 'Failed to connect Redis adapter, falling back to memory mode.');
+    });
+}
 
 export interface AuthenticatedSocketData {
   userId: number;

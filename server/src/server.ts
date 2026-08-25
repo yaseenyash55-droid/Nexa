@@ -3,7 +3,7 @@ import { env } from './config/env.js';
 import { initializeDatabasePool, closeDatabasePool } from './db/index.js';
 import { logger } from './utils/logger.js';
 import { Server } from 'socket.io';
-import { realtimeServer } from './socket.js';
+import { realtimeServer, setupSocketCluster } from './socket.js';
 
 import { initializeFirebase } from './utils/firebase.js';
 
@@ -34,6 +34,8 @@ async function startServer() {
         credentials: true
       }
     });
+
+    setupSocketCluster(io);
 
     io.use((socket, next) => {
       const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization;
