@@ -83,6 +83,17 @@ class HomeFragment : Fragment() {
             },
             onBookmarkClick = { post ->
                 viewModel.toggleBookmark(post)
+            },
+            onDeleteClick = { post ->
+                lifecycleScope.launch {
+                    val repo = com.nexa.social.data.repository.PostRepository()
+                    repo.deletePost(post.postId).onSuccess {
+                        android.widget.Toast.makeText(requireContext(), "Post deleted successfully", android.widget.Toast.LENGTH_SHORT).show()
+                        viewModel.loadFeed(isRefresh = true)
+                    }.onFailure {
+                        android.widget.Toast.makeText(requireContext(), "Failed to delete post: ${it.message}", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         )
         binding.rvFeed.adapter = postAdapter

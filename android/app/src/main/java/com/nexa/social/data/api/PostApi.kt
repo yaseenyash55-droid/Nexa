@@ -74,6 +74,9 @@ interface PostApi {
         @Body request: com.nexa.social.data.models.CreateCommentRequest
     ): Response<ApiResponse<com.nexa.social.data.models.Comment>>
 
+    @DELETE("posts/{id}")
+    suspend fun deletePost(@retrofit2.http.Path("id") id: Int): Response<ApiResponse<Map<String, Any>>>
+
     @DELETE("posts/{postId}/comments/{commentId}")
     suspend fun deleteComment(
         @retrofit2.http.Path("postId") postId: Int,

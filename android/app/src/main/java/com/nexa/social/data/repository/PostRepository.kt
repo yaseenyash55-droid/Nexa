@@ -135,6 +135,19 @@ class PostRepository {
         }
     }
 
+    suspend fun deletePost(postId: Int): Result<Unit> {
+        return try {
+            val response = NexaApiClient.postApi.deletePost(postId)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Failed to delete post"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun deleteComment(postId: Int, commentId: Int): Result<Unit> {
         return try {
             val response = NexaApiClient.postApi.deleteComment(postId, commentId)

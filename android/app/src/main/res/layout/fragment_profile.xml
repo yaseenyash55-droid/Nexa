@@ -197,7 +197,7 @@
             android:background="@color/border_dark"
             app:layout_constraintTop_toBottomOf="@id/statsContainer" />
 
-        <!-- Tab Layout Placeholder -->
+        <!-- Tab Layout -->
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabLayout"
             android:layout_width="match_parent"
@@ -215,7 +215,15 @@
             <com.google.android.material.tabs.TabItem
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Likes" />
+                android:text="Grid" />
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Reels" />
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Videos" />
         </com.google.android.material.tabs.TabLayout>
 
         <!-- RecyclerView for User Posts -->
