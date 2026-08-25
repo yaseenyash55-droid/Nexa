@@ -308,6 +308,8 @@ export const env = {
   WEBRTC_TURN_SHARED_SECRET: webRtcTurnSharedSecret,
   WEBRTC_TURN_CREDENTIAL_TTL_SECONDS: webRtcTurnCredentialTtlSeconds,
 
+  REDIS_URL: process.env.REDIS_URL || '',
+
   DATA_SOURCE: databaseProvider,
   USE_MOCK_DATA: false
 };
