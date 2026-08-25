@@ -52,6 +52,8 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "artillery": "^2.0.34",
+    "artillery-engine-socketio-v3": "^1.2.0",
     "supertest": "^7.0.0",
     "tsx": "^4.16.2",
     "typescript": "^5.4.5",
