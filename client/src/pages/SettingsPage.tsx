@@ -74,6 +74,7 @@ export const SettingsPage: React.FC = () => {
       setLocation(user.location || '');
       setWebsiteUrl(user.websiteUrl || '');
       setProfileImageUrl(user.profileImageUrl || '');
+      setCoverImageUrl(user.coverImageUrl || '');
     }
   }, [user]);
 
@@ -81,6 +82,12 @@ export const SettingsPage: React.FC = () => {
   const [selectedRawImage, setSelectedRawImage] = useState<string | null>(null);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Cover Banner Crop state
+  const [coverImageUrl, setCoverImageUrl] = useState('');
+  const [selectedRawCover, setSelectedRawCover] = useState<string | null>(null);
+  const [isCoverCropperOpen, setIsCoverCropperOpen] = useState(false);
+  const coverFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -98,20 +105,52 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setProfileErrorMsg('Please select a valid image file');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setSelectedRawCover(reader.result as string);
+        setIsCoverCropperOpen(true);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleCropComplete = async (croppedFile: File, _previewUrl: string) => {
     try {
       setProfileSuccessMsg('Uploading cropped profile picture...');
       const uploadedUrl = await mediaApi.uploadFile(croppedFile, 'avatar');
       setProfileImageUrl(uploadedUrl);
-      setProfileSuccessMsg('Cropped image ready! Click "Save Profile Changes" below to apply.');
+      setProfileSuccessMsg('Cropped profile photo ready! Click "Save Profile Changes" below to apply.');
     } catch (err: any) {
       setProfileErrorMsg(err.message || 'Failed to upload cropped image');
+    }
+  };
+
+  const handleCoverCropComplete = async (croppedFile: File, _previewUrl: string) => {
+    try {
+      setProfileSuccessMsg('Uploading cropped cover banner...');
+      const uploadedUrl = await mediaApi.uploadFile(croppedFile, 'photo');
+      setCoverImageUrl(uploadedUrl);
+      setProfileSuccessMsg('Cropped cover banner ready! Click "Save Profile Changes" below to apply.');
+    } catch (err: any) {
+      setProfileErrorMsg(err.message || 'Failed to upload cropped cover banner');
     }
   };
 
   const handleRemoveAvatar = () => {
     setProfileImageUrl('');
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleRemoveCover = () => {
+    setCoverImageUrl('');
+    if (coverFileInputRef.current) coverFileInputRef.current.value = '';
   };
 
   // Security password state
@@ -153,18 +192,22 @@ export const SettingsPage: React.FC = () => {
         bio: bio.trim(),
         location: location.trim(),
         websiteUrl: websiteUrl.trim(),
-        profileImageUrl: profileImageUrl.trim() || undefined
+        profileImageUrl: profileImageUrl.trim() || undefined,
+        coverImageUrl: coverImageUrl.trim() || undefined
       });
 
-      const updatedUser = res.data.data;
-      setUser(updatedUser);
-      queryClient.setQueryData(['profile', updatedUser.username], updatedUser);
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
-      queryClient.invalidateQueries({ queryKey: ['user-posts'] });
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
-      queryClient.invalidateQueries({ queryKey: ['suggestions'] });
+      const updatedUser = res.data?.data || res.data;
+      if (updatedUser && updatedUser.userId) {
+        setUser(updatedUser);
+        queryClient.setQueryData(['profile', updatedUser.username], updatedUser);
+        queryClient.invalidateQueries({ queryKey: ['profile'] });
+        queryClient.invalidateQueries({ queryKey: ['user-posts'] });
+        queryClient.invalidateQueries({ queryKey: ['posts'] });
+        queryClient.invalidateQueries({ queryKey: ['suggestions'] });
+      }
 
-      setProfileSuccessMsg('Profile settings and avatar updated successfully');
+      setProfileSuccessMsg('Profile changes saved successfully!');
+
     } catch (err: any) {
       setProfileErrorMsg(err.response?.data?.error?.message || err.message || 'Failed to update profile settings');
     } finally {
@@ -303,7 +346,7 @@ export const SettingsPage: React.FC = () => {
             {/* Profile Picture Upload & Crop Settings */}
             <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                Profile Picture (Avatar)
+                Profile Picture (Avatar — 1:1)
               </label>
 
               <div className="flex flex-col sm:flex-row items-center gap-5">
@@ -353,9 +396,77 @@ export const SettingsPage: React.FC = () => {
                     )}
                   </div>
                   <p className="text-[11px] text-slate-400">
-                    Supports JPG, PNG, GIF, or WebP from local storage. Interactive cropping included.
+                    Supports JPG, PNG, GIF, or WebP from local storage. Drag, zoom, and reposition within 1:1 circular crop.
                   </p>
                 </div>
+              </div>
+            </div>
+
+            {/* Cover Banner Upload & Crop Settings */}
+            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                Cover Banner (Wide — 2.5:1)
+              </label>
+
+              <div className="space-y-3">
+                <div className="w-full h-32 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden relative group">
+                  {coverImageUrl || user?.coverImageUrl ? (
+                    <img
+                      src={coverImageUrl || user?.coverImageUrl || ''}
+                      alt="Cover banner preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-slate-500 text-xs">
+                      No cover banner uploaded
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => coverFileInputRef.current?.click()}
+                    className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white gap-2 text-xs font-medium"
+                    title="Change Cover Banner"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Change Cover Banner</span>
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <input
+                    ref={coverFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleCoverFileChange}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => coverFileInputRef.current?.click()}
+                    className="gap-1.5"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-brand-400" />
+                    <span>Upload & Crop Banner</span>
+                  </Button>
+
+                  {(coverImageUrl || user?.coverImageUrl) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveCover}
+                      className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 gap-1.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Remove Banner</span>
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Interactive widescreen cropping (2.5:1 ratio) with zoom and pan adjustments.
+                </p>
               </div>
             </div>
 
@@ -626,7 +737,7 @@ export const SettingsPage: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Interactive Image Cropper Modal */}
+      {/* Interactive Image Cropper Modals */}
       {selectedRawImage && (
         <ImageCropperModal
           isOpen={isCropperOpen}
@@ -636,6 +747,18 @@ export const SettingsPage: React.FC = () => {
           cropShape="round"
           title="Crop Profile Photo (1:1)"
           onCropComplete={handleCropComplete}
+        />
+      )}
+
+      {selectedRawCover && (
+        <ImageCropperModal
+          isOpen={isCoverCropperOpen}
+          onClose={() => setIsCoverCropperOpen(false)}
+          imageSrc={selectedRawCover}
+          aspectRatio={2.5}
+          cropShape="rect"
+          title="Crop Cover Banner (Wide 2.5:1)"
+          onCropComplete={handleCoverCropComplete}
         />
       )}
     </AppShell>

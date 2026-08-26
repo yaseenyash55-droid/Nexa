@@ -295,8 +295,9 @@ export class OracleUserRepository implements IUserRepository {
 
   async searchUsers(query: string, currentUserId?: number, limit = 10): Promise<User[]> {
     const trimmed = query.trim();
-    const searchPattern = `%${trimmed.toLowerCase()}%`;
-    const isNumeric = /^\d+$/.test(trimmed);
+    const cleanSearch = trimmed.replace(/^[@#]+/, '').trim();
+    const searchPattern = `%${cleanSearch.toLowerCase()}%`;
+    const isNumeric = /^\d+$/.test(cleanSearch);
     const sql = `
       SELECT u.USER_ID, u.USERNAME, u.EMAIL, u.DISPLAY_NAME, u.BIO, u.PROFILE_IMAGE_URL,
              u.COVER_IMAGE_URL, u.LOCATION, u.WEBSITE_URL, u.CREATED_AT, u.UPDATED_AT,
@@ -311,7 +312,7 @@ export class OracleUserRepository implements IUserRepository {
       FETCH NEXT :limit ROWS ONLY
     `;
     const binds: Record<string, any> = { searchPattern, limit };
-    if (isNumeric) binds.numericId = parseInt(trimmed, 10);
+    if (isNumeric) binds.numericId = parseInt(cleanSearch, 10);
     if (currentUserId) binds.currentUserId = currentUserId;
 
     const res = await executeSql<RawUserRow>(sql, binds);
