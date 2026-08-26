@@ -138,7 +138,7 @@ export const HelpPage: React.FC = () => {
       steps: [
         'Comprehensive guide covering feed algorithms, hashtag trends, and bookmarking.',
         'Instructions for creating and broadcasting in Group Channels.',
-        'Guidelines for uploading HD reels, applying filters, and tagging users.',
+        'Guidelines for uploading HD Bytes, applying filters, and tagging users.',
         'Detailed steps on privacy controls, block lists, and muted accounts.'
       ],
       actionText: 'View Manual',

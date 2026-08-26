@@ -66,7 +66,7 @@ class HomeFragment : Fragment() {
                 .onSuccess { storyAdapter.submitStories(it) }
                 .onFailure {
                     if (storyAdapter.itemCount <= 1) {
-                        Toast.makeText(requireContext(), "Stories are temporarily unavailable", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), "Cosmic temporarily unavailable", Toast.LENGTH_SHORT).show()
                     }
                 }
         }

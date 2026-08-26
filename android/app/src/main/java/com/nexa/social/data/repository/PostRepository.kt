@@ -76,7 +76,7 @@ class PostRepository {
             if (response.isSuccessful && response.body()?.data != null) {
                 Result.success(response.body()!!.data!!)
             } else {
-                Result.failure(Exception(response.body()?.message ?: "Failed to fetch reels"))
+                Result.failure(Exception(response.body()?.message ?: "Failed to fetch bytes"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -89,7 +89,7 @@ class PostRepository {
             if (response.isSuccessful) {
                 Result.success(Unit)
             } else {
-                Result.failure(Exception(response.body()?.message ?: "Failed to like reel"))
+                Result.failure(Exception(response.body()?.message ?: "Failed to like byte"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -102,7 +102,7 @@ class PostRepository {
             if (response.isSuccessful) {
                 Result.success(Unit)
             } else {
-                Result.failure(Exception(response.body()?.message ?: "Failed to unlike reel"))
+                Result.failure(Exception(response.body()?.message ?: "Failed to unlike byte"))
             }
         } catch (e: Exception) {
             Result.failure(e)

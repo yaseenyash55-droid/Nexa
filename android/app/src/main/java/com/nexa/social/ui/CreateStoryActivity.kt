@@ -25,10 +25,13 @@ class CreateStoryActivity : AppCompatActivity() {
 
     private val photoPicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
-            selectedPhotoUri = uri
-            binding.ivPreview.setImageURI(uri)
-            binding.ivPreview.visibility = View.VISIBLE
-            binding.tvPhotoHelp.visibility = View.GONE
+            val cropDialog = CropImageDialogFragment.newInstance(uri, 9f / 16f) { croppedUri ->
+                selectedPhotoUri = croppedUri
+                binding.ivPreview.setImageURI(croppedUri)
+                binding.ivPreview.visibility = View.VISIBLE
+                binding.tvPhotoHelp.visibility = View.GONE
+            }
+            cropDialog.show(supportFragmentManager, "CropStoryImageDialog")
         }
     }
 

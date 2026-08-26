@@ -59,7 +59,7 @@ class ReelsViewModel(private val repository: PostRepository = PostRepository()) 
             }.onFailure { exception ->
                 isLoadingMore = false
                 if (currentReels.isEmpty()) {
-                    _uiState.value = ReelsUiState.Error(exception.message ?: "Failed to load reels")
+                    _uiState.value = ReelsUiState.Error(exception.message ?: "Failed to load bytes")
                 }
             }
         }

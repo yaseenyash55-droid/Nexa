@@ -72,7 +72,7 @@ class StoryViewerActivity : AppCompatActivity() {
         private const val EXTRA_CAPTIONS = "storyCaptions"
 
         fun createIntent(context: Context, stories: List<Story>): Intent {
-            require(stories.isNotEmpty()) { "At least one story is required" }
+            require(stories.isNotEmpty()) { "At least one cosmic is required" }
             val author = stories.first().author
             return Intent(context, StoryViewerActivity::class.java).apply {
                 putStringArrayListExtra(EXTRA_MEDIA_URLS, ArrayList(stories.map { it.mediaUrl }))

@@ -9,17 +9,17 @@ class StoryRepository {
         val response = NexaApiClient.storyApi.getFeed()
         val body = response.body()
         if (!response.isSuccessful) {
-            throw IllegalStateException(body?.error?.message ?: body?.message ?: "Unable to load stories")
+            throw IllegalStateException(body?.error?.message ?: body?.message ?: "Unable to load Cosmic")
         }
-        body?.data ?: throw IllegalStateException(body?.error?.message ?: body?.message ?: "Stories response was empty")
+        body?.data ?: throw IllegalStateException(body?.error?.message ?: body?.message ?: "Cosmic response was empty")
     }
 
     suspend fun createStory(mediaUrl: String, caption: String?): Result<Story> = runCatching {
         val response = NexaApiClient.storyApi.createStory(CreateStoryRequest(mediaUrl, caption))
         val body = response.body()
         if (!response.isSuccessful) {
-            throw IllegalStateException(body?.error?.message ?: body?.message ?: "Unable to publish story")
+            throw IllegalStateException(body?.error?.message ?: body?.message ?: "Unable to publish Cosmic")
         }
-        body?.data ?: throw IllegalStateException(body?.error?.message ?: body?.message ?: "Story response was empty")
+        body?.data ?: throw IllegalStateException(body?.error?.message ?: body?.message ?: "Cosmic response was empty")
     }
 }
