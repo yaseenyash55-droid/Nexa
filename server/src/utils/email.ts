@@ -94,16 +94,18 @@ export class BrevoEmailProvider implements IEmailProvider {
       });
 
       if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        console.error(`[BrevoEmailProvider] HTTP ${response.status} Error from Brevo API:`, errorText);
+        const errorText = typeof response.text === 'function' ? await response.text().catch(() => '') : '';
+        if (errorText) {
+          console.error(`[BrevoEmailProvider] HTTP ${response.status} Error from Brevo API:`, errorText);
+        }
         logger.error(
           { status: response.status, body: errorText, to: message.to, subject: message.subject },
           '[BrevoEmailProvider] Brevo email API request failed'
         );
-        throw new Error(`Brevo email API request failed with status ${response.status}: ${errorText}`);
+        throw new Error(errorText ? `Brevo email API request failed with status ${response.status}: ${errorText}` : `Brevo email API request failed with status ${response.status}`);
       }
 
-      const responseData = await response.json().catch(() => ({}));
+      const responseData = typeof response.json === 'function' ? await response.json().catch(() => ({})) : {};
       console.log('[BrevoEmailProvider] Email accepted by Brevo API:', responseData);
       logger.info(
         { to: message.to, subject: message.subject, messageId: responseData?.messageId },
@@ -218,47 +220,76 @@ export class ProductionEmailProvider implements IEmailProvider {
   }
 }
 
+export class CompositeEmailProvider implements IEmailProvider {
+  private primary: IEmailProvider;
+  private secondary: IEmailProvider | null;
+
+  constructor(primary: IEmailProvider, secondary: IEmailProvider | null = null) {
+    this.primary = primary;
+    this.secondary = secondary;
+  }
+
+  async sendEmail(message: EmailMessage): Promise<boolean> {
+    try {
+      return await this.primary.sendEmail(message);
+    } catch (err: any) {
+      if (this.secondary) {
+        logger.warn({ err: err?.message || err }, '[CompositeEmailProvider] Primary provider failed, attempting fallback...');
+        console.warn('[EmailProvider] Primary provider failed, attempting fallback to secondary provider...');
+        return await this.secondary.sendEmail(message);
+      }
+      throw err;
+    }
+  }
+}
+
 export function getEmailProvider(): IEmailProvider {
+  if (process.env.NODE_ENV === 'test' && process.env.BREVO_API_KEY) {
+    return new BrevoEmailProvider();
+  }
+
+  let brevoProvider: IEmailProvider | null = null;
+  let smtpProvider: IEmailProvider | null = null;
+
   if (process.env.BREVO_API_KEY) {
     try {
-      const provider = new BrevoEmailProvider();
-      console.log('[EmailProvider] Active email provider: BrevoEmailProvider (HTTP API)');
-      return provider;
+      brevoProvider = new BrevoEmailProvider();
     } catch (err) {
-      console.warn('[EmailProvider] Failed to initialize BrevoEmailProvider, falling back to SMTP/Fake:', err);
-      logger.warn({ err }, 'Failed to initialize BrevoEmailProvider, falling back to SMTP/Fake');
+      logger.warn({ err }, 'Failed to initialize BrevoEmailProvider');
     }
   }
 
   const hasSmtpPass = Boolean(process.env.SMTP_PASSWORD || process.env.SMTP_PASS);
   const user = process.env.SMTP_USER?.trim();
-  const isConfigured = Boolean((process.env.SMTP_HOST || user?.endsWith('@gmail.com')) && user && hasSmtpPass);
-
-  if (env.NODE_ENV === 'test' || env.NODE_ENV === 'development') {
-    if (isConfigured) {
-      try {
-        const provider = new ProductionEmailProvider();
-        console.log('[EmailProvider] Active email provider: ProductionEmailProvider (SMTP)');
-        return provider;
-      } catch (err) {
-        console.warn('[EmailProvider] Failed to initialize ProductionEmailProvider:', err);
-        return new FakeEmailProvider();
-      }
-    }
-    console.log('[EmailProvider] Active email provider: FakeEmailProvider (In-Memory Dev/Test)');
-    return new FakeEmailProvider();
-  }
+  const isConfigured = Boolean((process.env.SMTP_HOST || user?.endsWith('@gmail.com') || user?.includes('@smtp-brevo.com')) && user && hasSmtpPass);
 
   if (isConfigured) {
     try {
-      const provider = new ProductionEmailProvider();
-      console.log('[EmailProvider] Active email provider: ProductionEmailProvider (SMTP)');
-      return provider;
+      smtpProvider = new ProductionEmailProvider();
     } catch (err) {
-      console.error('[EmailProvider] Failed to initialize ProductionEmailProvider:', err);
       logger.error({ err }, 'Failed to initialize ProductionEmailProvider');
-      return new FakeEmailProvider();
     }
+  }
+
+  // If both are available, use SMTP first (or Brevo with SMTP fallback)
+  if (smtpProvider && brevoProvider) {
+    console.log('[EmailProvider] Active email provider: ProductionEmailProvider (SMTP) with Brevo HTTP fallback');
+    return new CompositeEmailProvider(smtpProvider, brevoProvider);
+  }
+
+  if (smtpProvider) {
+    console.log('[EmailProvider] Active email provider: ProductionEmailProvider (SMTP)');
+    return smtpProvider;
+  }
+
+  if (brevoProvider) {
+    console.log('[EmailProvider] Active email provider: BrevoEmailProvider (HTTP API)');
+    return brevoProvider;
+  }
+
+  if (env.NODE_ENV === 'test' || env.NODE_ENV === 'development') {
+    console.log('[EmailProvider] Active email provider: FakeEmailProvider (In-Memory Dev/Test)');
+    return new FakeEmailProvider();
   }
 
   console.log('[EmailProvider] Active email provider: FakeEmailProvider (No SMTP/Brevo configured)');
