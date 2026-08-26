@@ -91,9 +91,9 @@ export const ReelsPage: React.FC = () => {
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-brand-400" /> Nexa Reels & Videos
+              <Sparkles className="w-5 h-5 text-brand-400" /> Nexa Bytes & Videos
             </h1>
-            <p className="text-xs text-slate-400">Discover trending video clips and long-form video content</p>
+            <p className="text-xs text-slate-400">Discover trending Bytes and video content</p>
           </div>
           <Button
             size="sm"
@@ -101,27 +101,27 @@ export const ReelsPage: React.FC = () => {
               if (user) {
                 setIsAddReelOpen(true);
               } else {
-                alert('🔒 Authentication Required\n\nPlease log in to upload videos.');
+                alert('🔒 Authentication Required\n\nPlease log in to upload Bytes.');
                 window.location.href = '/login';
               }
             }}
             leftIcon={<Plus className="w-4 h-4" />}
           >
-            Create Reel / Video
+            Create Byte / Video
           </Button>
         </div>
 
         {/* Reels Vertical Scroll Feed */}
         {isLoading ? (
           <div className="h-[600px] rounded-3xl bg-slate-900 animate-pulse flex items-center justify-center text-slate-500 text-sm">
-            Loading videos...
+            Loading Bytes...
           </div>
         ) : reels.length === 0 ? (
           <div className="h-96 rounded-3xl bg-slate-900 border border-slate-800 flex flex-col items-center justify-center p-6 text-center space-y-3">
             <Sparkles className="w-10 h-10 text-brand-400" />
-            <h3 className="text-base font-bold text-white">No Videos Posted Yet</h3>
+            <h3 className="text-base font-bold text-white">No Bytes Posted Yet</h3>
             <p className="text-xs text-slate-400 max-w-sm">
-              Be the first in your network to record and share a video reel or long video!
+              Be the first in your network to record and share a Byte or video!
             </p>
             <Button
               size="sm"
@@ -129,12 +129,12 @@ export const ReelsPage: React.FC = () => {
                 if (user) {
                   setIsAddReelOpen(true);
                 } else {
-                  alert('🔒 Authentication Required\n\nPlease log in to upload videos.');
+                  alert('🔒 Authentication Required\n\nPlease log in to upload Bytes.');
                   window.location.href = '/login';
                 }
               }}
             >
-              Upload First Video
+              Upload First Byte
             </Button>
           </div>
         ) : (
@@ -146,7 +146,7 @@ export const ReelsPage: React.FC = () => {
         )}
 
         {/* Create Reel Modal */}
-        <Modal isOpen={isAddReelOpen} onClose={() => setIsAddReelOpen(false)} title="Upload Reel / Video">
+        <Modal isOpen={isAddReelOpen} onClose={() => setIsAddReelOpen(false)} title="Upload Byte / Video">
           <div className="space-y-4">
             {errorMsg && (
               <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400 flex items-center gap-2">
@@ -198,7 +198,7 @@ export const ReelsPage: React.FC = () => {
                     ) : (
                       <>
                         <Film className="w-3.5 h-3.5 text-purple-400" />
-                        <span>Short Reel ({Math.round(videoDuration)}s)</span>
+                        <span>Short Byte ({Math.round(videoDuration)}s)</span>
                       </>
                     )}
                   </div>
@@ -241,7 +241,7 @@ export const ReelsPage: React.FC = () => {
                 onClick={() => createReelMutation.mutate()}
                 rightIcon={<Sparkles className="w-4 h-4" />}
               >
-                Publish {isLongVideo ? 'Long Video' : 'Reel'}
+                Publish {isLongVideo ? 'Long Video' : 'Byte'}
               </Button>
             </div>
           </div>
@@ -301,7 +301,7 @@ const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => voi
           className="w-full h-full object-cover"
         />
       ) : (
-        <img src={resolvedVideoUrl} alt="Reel media" onError={handleImageError} className="w-full h-full object-cover" />
+        <img src={resolvedVideoUrl} alt="Byte media" onError={handleImageError} className="w-full h-full object-cover" />
       )}
 
       {/* Top Controls Bar */}
@@ -309,11 +309,11 @@ const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => voi
         {isOwnerOrModerator && (
           <button
             onClick={() => {
-              if (confirm('Delete this video reel?')) {
+              if (confirm('Delete this Byte?')) {
                 deleteMutation.mutate();
               }
             }}
-            title="Delete video reel"
+            title="Delete Byte"
             className="p-2 bg-rose-900/60 backdrop-blur-md rounded-full text-rose-300 hover:text-white hover:bg-rose-600 transition-colors"
           >
             <Trash2 className="w-4 h-4" />
@@ -330,7 +330,7 @@ const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => voi
       {/* Right Side Action Floating Bar */}
       <div className="absolute right-4 bottom-12 z-20 flex flex-col items-center gap-5">
         <button
-          onClick={() => requireAuth(() => likeMutation.mutate(), 'Log in to like video reels.')}
+          onClick={() => requireAuth(() => likeMutation.mutate(), 'Log in to like Bytes.')}
           className="flex flex-col items-center gap-1 text-white group"
         >
           <div
@@ -346,7 +346,7 @@ const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => voi
         <button
           onClick={() => setIsReportOpen(true)}
           className="flex flex-col items-center gap-1 text-white group"
-          title="Report Reel"
+          title="Report Byte"
         >
           <div className="p-3 bg-black/50 backdrop-blur-md rounded-full text-amber-400 group-hover:scale-110 transition-transform">
             <AlertTriangle className="w-5 h-5" />
@@ -361,7 +361,7 @@ const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => voi
             }
           }}
           className="flex flex-col items-center gap-1 text-white group"
-          title="Copy Reel link"
+          title="Copy Byte link"
         >
           <div className="p-3 bg-black/50 backdrop-blur-md rounded-full text-white group-hover:scale-110 transition-transform">
             <Share2 className="w-6 h-6" />

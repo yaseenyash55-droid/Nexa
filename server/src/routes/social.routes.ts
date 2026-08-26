@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { aiAndMediaRateLimiter } from '../middleware/rateLimit.middleware.js';
 import { getStoryRepository, getReelRepository, getMessageRepository } from '../repositories/factory.js';
@@ -90,9 +92,6 @@ socialRouter.get('/reels', async (req: any, res, next) => {
     next(err);
   }
 });
-
-import fs from 'fs';
-import path from 'path';
 
 function saveBase64ReelToDisk(base64Data: string, userId: number): string {
   if (!base64Data || !base64Data.startsWith('data:video/')) {

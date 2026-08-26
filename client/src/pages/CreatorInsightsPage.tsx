@@ -24,7 +24,7 @@ export const CreatorInsightsPage: React.FC = () => {
               <h1 className="text-xl font-bold text-white tracking-tight">Creator Insights</h1>
             </div>
             <p className="text-xs text-slate-300">
-              Privacy-safe aggregate analytics for your posts, reels, and stories.
+              Privacy-safe aggregate analytics for your posts, bytes, and cosmic.
             </p>
           </div>
           <span className="aurora-badge text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1">
@@ -51,7 +51,7 @@ export const CreatorInsightsPage: React.FC = () => {
         {/* Top Content Chart Overview */}
         <div className="aurora-glass rounded-2xl p-5 space-y-4">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-brand-400" /> Top Performing Posts & Reels
+            <Sparkles className="w-4 h-4 text-brand-400" /> Top Performing Posts & Bytes
           </h3>
           <div className="space-y-3">
             <div className="p-3.5 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center justify-between">

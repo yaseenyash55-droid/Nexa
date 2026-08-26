@@ -319,4 +319,31 @@ class NativeFeaturesUnitTest {
         assertEquals("Password must be at least 8 characters", validateRegister("alice", "alice@example.com", "short"))
         assertEquals(null, validateRegister("alice", "alice@example.com", "password123"))
     }
+
+    @Test
+    fun `music track model formats duration and resolves cover images correctly`() {
+        val track = com.nexa.social.data.models.MusicTrack(
+            id = "12345",
+            name = "Cyberpunk Odyssey",
+            duration = 215, // 3 mins 35 secs
+            artistName = "Synthwave Master",
+            image = "https://usercontent.jamendo.com/image.jpg",
+            audioUrl = "https://mp3d.jamendo.com/track/12345/mp32/"
+        )
+
+        assertEquals("3:35", track.formattedDuration())
+        assertEquals("https://usercontent.jamendo.com/image.jpg", track.resolvedImageUrl())
+
+        val fallbackTrack = com.nexa.social.data.models.MusicTrack(
+            id = "67890",
+            name = "Acoustic Horizon",
+            duration = 65, // 1 min 05 secs
+            artistName = "Folk Guitarist",
+            albumImage = "https://usercontent.jamendo.com/album.jpg",
+            audioUrl = "https://mp3d.jamendo.com/track/67890/mp32/"
+        )
+
+        assertEquals("1:05", fallbackTrack.formattedDuration())
+        assertEquals("https://usercontent.jamendo.com/album.jpg", fallbackTrack.resolvedImageUrl())
+    }
 }

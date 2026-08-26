@@ -29,12 +29,18 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 
+import android.text.Editable
+import android.text.TextWatcher
+import coil.load
+import com.nexa.social.utils.LocalChatStorage
+
 class CreatePostActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityCreatePostBinding
     private lateinit var prefManager: PreferenceManager
 
     private var selectedMediaUri: Uri? = null
+    private var attachedGifUrl: String? = null
     private var isVideoSelected = false
     private var cameraTempFile: File? = null
 
@@ -43,6 +49,7 @@ class CreatePostActivity : AppCompatActivity() {
     ) { uri: Uri? ->
         if (uri != null) {
             selectedMediaUri = uri
+            attachedGifUrl = null
             isVideoSelected = false
             cleanupCameraTempFile()
             binding.videoBadge.visibility = View.GONE
@@ -56,6 +63,7 @@ class CreatePostActivity : AppCompatActivity() {
     ) { uri: Uri? ->
         if (uri != null) {
             selectedMediaUri = uri
+            attachedGifUrl = null
             isVideoSelected = true
             cleanupCameraTempFile()
             binding.videoBadge.visibility = View.VISIBLE
@@ -70,6 +78,7 @@ class CreatePostActivity : AppCompatActivity() {
         if (success && cameraTempFile != null && cameraTempFile!!.exists() && cameraTempFile!!.length() > 0) {
             val uri = Uri.fromFile(cameraTempFile)
             selectedMediaUri = uri
+            attachedGifUrl = null
             isVideoSelected = false
             binding.videoBadge.visibility = View.GONE
             binding.imgPreview.setImageURI(uri)
@@ -98,6 +107,30 @@ class CreatePostActivity : AppCompatActivity() {
 
         setupUserHeader()
         setupClickListeners()
+        setupDraftAutoSave()
+    }
+
+    private fun setupDraftAutoSave() {
+        // Restore existing draft
+        val (draftContent, draftMedia) = LocalChatStorage.getInstance(this).getPostDraft()
+        if (draftContent.isNotBlank()) {
+            binding.etContent.setText(draftContent)
+            binding.etContent.setSelection(draftContent.length)
+        }
+        if (draftMedia.isNotBlank()) {
+            attachedGifUrl = draftMedia
+            binding.imgPreview.load(draftMedia)
+            binding.cardImagePreview.visibility = View.VISIBLE
+        }
+
+        binding.etContent.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                LocalChatStorage.getInstance(this@CreatePostActivity)
+                    .savePostDraft(s?.toString() ?: "", attachedGifUrl ?: "")
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
     }
 
     override fun onDestroy() {
@@ -146,12 +179,37 @@ class CreatePostActivity : AppCompatActivity() {
             }
         }
 
+        binding.btnEmoji.setOnClickListener {
+            EmojiPickerDialogFragment { emoji ->
+                val start = binding.etContent.selectionStart.coerceAtLeast(0)
+                val end = binding.etContent.selectionEnd.coerceAtLeast(0)
+                binding.etContent.text?.replace(minOf(start, end), maxOf(start, end), emoji)
+            }.show(supportFragmentManager, "post_emoji_picker")
+        }
+
+        binding.btnGif.setOnClickListener {
+            GifPickerDialogFragment { gifUrl, _ ->
+                attachedGifUrl = gifUrl
+                selectedMediaUri = null
+                isVideoSelected = false
+                cleanupCameraTempFile()
+                binding.videoBadge.visibility = View.GONE
+                binding.imgPreview.load(gifUrl)
+                binding.cardImagePreview.visibility = View.VISIBLE
+                LocalChatStorage.getInstance(this)
+                    .savePostDraft(binding.etContent.text.toString(), gifUrl)
+            }.show(supportFragmentManager, "post_gif_picker")
+        }
+
         binding.btnRemoveImage.setOnClickListener {
             selectedMediaUri = null
+            attachedGifUrl = null
             isVideoSelected = false
             cleanupCameraTempFile()
             binding.videoBadge.visibility = View.GONE
             binding.cardImagePreview.visibility = View.GONE
+            LocalChatStorage.getInstance(this)
+                .savePostDraft(binding.etContent.text.toString(), "")
         }
 
         binding.btnPost.setOnClickListener {
@@ -210,8 +268,8 @@ class CreatePostActivity : AppCompatActivity() {
             return
         }
 
-        if (content.isEmpty() && selectedMediaUri == null) {
-            binding.tilContent.error = "Please enter post text or attach a photo/video"
+        if (content.isEmpty() && selectedMediaUri == null && attachedGifUrl.isNullOrEmpty()) {
+            binding.tilContent.error = "Please enter post text or attach a photo/video/GIF"
             return
         } else {
             binding.tilContent.error = null
@@ -222,7 +280,7 @@ class CreatePostActivity : AppCompatActivity() {
         lifecycleScope.launch {
             var tempProcessingFile: File? = null
             try {
-                var uploadedMediaUrl: String? = null
+                var uploadedMediaUrl: String? = attachedGifUrl
 
                 // 1. Process and upload media file if selected
                 if (selectedMediaUri != null) {
@@ -259,6 +317,7 @@ class CreatePostActivity : AppCompatActivity() {
                 setLoading(false)
 
                 if (postResponse.isSuccessful && postResponse.body()?.data != null) {
+                    LocalChatStorage.getInstance(this@CreatePostActivity).clearPostDraft()
                     Toast.makeText(this@CreatePostActivity, "Post published successfully!", Toast.LENGTH_SHORT).show()
                     setResult(RESULT_OK)
                     finish()

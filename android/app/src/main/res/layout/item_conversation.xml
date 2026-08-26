@@ -21,33 +21,51 @@
         app:strokeColor="@color/border_dark"
         app:strokeWidth="1dp" />
 
-    <TextView
-        android:id="@+id/tvDisplayName"
+    <LinearLayout
+        android:id="@+id/llNameContainer"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textColor="@color/text_white"
-        android:textSize="15sp"
-        android:textStyle="bold"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
         app:layout_constraintEnd_toStartOf="@id/tvTimestamp"
         app:layout_constraintStart_toEndOf="@id/ivAvatar"
-        app:layout_constraintTop_toTopOf="@id/ivAvatar" />
+        app:layout_constraintTop_toTopOf="@id/ivAvatar">
+
+        <TextView
+            android:id="@+id/tvDisplayName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/text_white"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvUsername"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/tvLastMessage"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="3dp"
         android:ellipsize="end"
         android:maxLines="1"
         android:textColor="@color/text_secondary"
         android:textSize="13sp"
         app:layout_constraintEnd_toStartOf="@id/unreadBadge"
         app:layout_constraintStart_toEndOf="@id/ivAvatar"
-        app:layout_constraintTop_toBottomOf="@id/tvDisplayName" />
+        app:layout_constraintTop_toBottomOf="@id/llNameContainer" />
 
     <TextView
         android:id="@+id/tvTimestamp"
@@ -56,7 +74,7 @@
         android:textColor="@color/text_muted"
         android:textSize="11sp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@id/tvDisplayName" />
+        app:layout_constraintTop_toTopOf="@id/ivAvatar" />
 
     <TextView
         android:id="@+id/unreadBadge"

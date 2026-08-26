@@ -15,13 +15,23 @@ export async function createGroup(req: AuthenticatedRequest, res: Response) {
       return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Group name is required' } });
     }
 
+    const parsedMemberIds: number[] = Array.isArray(memberIds)
+      ? Array.from(
+          new Set(
+            memberIds
+              .map((id: any) => parseInt(id, 10))
+              .filter((id: number) => !isNaN(id) && id > 0 && id !== currentUserId)
+          )
+        )
+      : [];
+
     const repo = getGroupRepository();
     const group = await repo.createGroup({
-      name,
-      description,
-      avatarUrl,
+      name: name.trim(),
+      description: description?.trim() || undefined,
+      avatarUrl: avatarUrl?.trim() || undefined,
       createdBy: currentUserId,
-      memberIds
+      memberIds: parsedMemberIds
     });
 
     return res.status(201).json({ data: group });

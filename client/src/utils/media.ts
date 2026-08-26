@@ -1,4 +1,4 @@
-const BACKEND_BASE_URL = 'https://nexa-backend-in6s.onrender.com';
+import { API_BASE_URL } from '../api/client.js';
 
 export function getMediaUrl(url: string | null | undefined): string | null {
   if (!url || typeof url !== 'string') return null;
@@ -6,34 +6,28 @@ export function getMediaUrl(url: string | null | undefined): string | null {
   const trimmed = url.trim();
   if (!trimmed) return null;
 
-  // Replace old cloudflare tunnel URLs with current backend domain
-  if (trimmed.includes('trycloudflare.com')) {
-    const parts = trimmed.split('/uploads/');
-    if (parts.length === 2) {
-      return `${BACKEND_BASE_URL}/uploads/${parts[1]}`;
-    }
+  // Handle data URIs or blob URLs
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
+    return trimmed;
   }
 
-  // Handle relative upload paths
-  if (trimmed.startsWith('/uploads/')) {
-    return `${BACKEND_BASE_URL}${trimmed}`;
-  }
-
-  if (trimmed.startsWith('uploads/')) {
-    return `${BACKEND_BASE_URL}/${trimmed}`;
-  }
-
-  // Handle full HTTP / HTTPS URLs
+  // Handle full HTTP / HTTPS URLs (e.g. S3 / Supabase / Cloudinary / external CDNs)
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return trimmed;
   }
 
-  // Handle data URIs if any exist
-  if (trimmed.startsWith('data:image/')) {
-    return trimmed;
+  const backendHost = API_BASE_URL.replace(/\/api$/, '');
+
+  // Handle relative upload paths
+  if (trimmed.startsWith('/uploads/')) {
+    return `${backendHost}${trimmed}`;
   }
 
-  return `${BACKEND_BASE_URL}/${trimmed.replace(/^\/+/, '')}`;
+  if (trimmed.startsWith('uploads/')) {
+    return `${backendHost}/${trimmed}`;
+  }
+
+  return `${backendHost}/${trimmed.replace(/^\/+/, '')}`;
 }
 
 export function handleImageError(

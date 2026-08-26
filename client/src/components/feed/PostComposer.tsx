@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Sparkles, X, Upload, CheckCircle2, AlertCircle, HelpCircle, Film, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Sparkles, X, Upload, CheckCircle2, AlertCircle, HelpCircle, Film, Loader2, Smile, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.js';
 import { Avatar } from '../ui/Avatar.js';
 import { Button } from '../ui/Button.js';
@@ -7,6 +7,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { postsApi } from '../../api/posts.api.js';
 import { mediaApi } from '../../api/media.api.js';
 import { getMediaUrl, handleImageError } from '../../utils/media.js';
+import { EmojiPickerPopover } from '../ui/EmojiPickerPopover.js';
+import { GifPickerModal } from '../ui/GifPickerModal.js';
 
 interface PostComposerProps {
   onPostCreated?: () => void;
@@ -15,20 +17,63 @@ interface PostComposerProps {
 export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [content, setContent] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
+
+  // Restore drafts from browser localStorage
+  const [content, setContent] = useState(() => {
+    try {
+      return localStorage.getItem('nexa_post_draft_content') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const [imageUrl, setImageUrl] = useState(() => {
+    try {
+      return localStorage.getItem('nexa_post_draft_image') || '';
+    } catch {
+      return '';
+    }
+  });
+
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [isGifModalOpen, setIsGifModalOpen] = useState(false);
   const [showPostingGuide, setShowPostingGuide] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-persist drafts to browser localStorage
+  useEffect(() => {
+    try {
+      if (content.trim()) {
+        localStorage.setItem('nexa_post_draft_content', content);
+      } else {
+        localStorage.removeItem('nexa_post_draft_content');
+      }
+    } catch (_e) {}
+  }, [content]);
+
+  useEffect(() => {
+    try {
+      if (imageUrl) {
+        localStorage.setItem('nexa_post_draft_image', imageUrl);
+      } else {
+        localStorage.removeItem('nexa_post_draft_image');
+      }
+    } catch (_e) {}
+  }, [imageUrl]);
 
   const createPostMutation = useMutation({
     mutationFn: () => postsApi.createPost({ content, imageUrl }),
     onSuccess: () => {
       setContent('');
       setImageUrl('');
+      try {
+        localStorage.removeItem('nexa_post_draft_content');
+        localStorage.removeItem('nexa_post_draft_image');
+      } catch (_e) {}
       setFeedback({ type: 'success', text: 'Post published successfully!' });
       queryClient.invalidateQueries({ queryKey: ['feed'] });
       if (onPostCreated) onPostCreated();
@@ -198,8 +243,9 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
       )}
 
       {/* Composer Action Toolbar */}
-      <div className="flex items-center justify-between pt-3 border-t border-slate-800/60">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between pt-3 border-t border-slate-800/60 relative">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* File Upload Button */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -207,7 +253,44 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
             className="p-2 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/60 bg-slate-900/40 border border-slate-800"
           >
             <Upload className="w-4 h-4 text-brand-400" />
-            <span>{isUploading ? 'Uploading...' : 'Upload Image / Footage'}</span>
+            <span className="hidden sm:inline">{isUploading ? 'Uploading...' : 'Upload Media'}</span>
+          </button>
+
+          {/* Emoji Picker Popover Button */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+              className={`p-2 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-medium border ${
+                isEmojiPickerOpen
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60 bg-slate-900/40 border-slate-800'
+              }`}
+              title="Add Emoji"
+            >
+              <Smile className="w-4 h-4 text-amber-400" />
+              <span className="hidden sm:inline">Emoji</span>
+            </button>
+
+            <EmojiPickerPopover
+              isOpen={isEmojiPickerOpen}
+              onClose={() => setIsEmojiPickerOpen(false)}
+              onSelectEmoji={(emoji) => {
+                setContent((prev) => prev + emoji);
+              }}
+              position="top"
+            />
+          </div>
+
+          {/* GIF Picker Button */}
+          <button
+            type="button"
+            onClick={() => setIsGifModalOpen(true)}
+            className="p-2 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/60 bg-slate-900/40 border border-slate-800"
+            title="Search & Attach GIF"
+          >
+            <ImageIcon className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline">GIF</span>
           </button>
 
           <button
@@ -216,8 +299,8 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
             className="p-2 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-brand-300 hover:bg-slate-800/60"
             title="Posting & Media Advice"
           >
-            <HelpCircle className="w-4 h-4 text-amber-400" />
-            <span className="hidden sm:inline">Posting Guide</span>
+            <HelpCircle className="w-4 h-4 text-cyan-400" />
+            <span className="hidden md:inline">Guide</span>
           </button>
         </div>
 
@@ -236,6 +319,15 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
             Post
           </Button>
         </div>
+
+        {/* Search GIF Modal */}
+        <GifPickerModal
+          isOpen={isGifModalOpen}
+          onClose={() => setIsGifModalOpen(false)}
+          onSelectGif={(gifUrl) => {
+            setImageUrl(gifUrl);
+          }}
+        />
       </div>
     </div>
   );

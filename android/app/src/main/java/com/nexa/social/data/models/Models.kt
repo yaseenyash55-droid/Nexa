@@ -25,7 +25,8 @@ data class User(
     @SerializedName("location") val location: String? = null,
     @SerializedName("websiteUrl") val websiteUrl: String? = null,
     @SerializedName("followersCount") val followersCount: Int = 0,
-    @SerializedName("followingCount") val followingCount: Int = 0
+    @SerializedName("followingCount") val followingCount: Int = 0,
+    @SerializedName("isFollowing") val isFollowing: Boolean = false
 )
 
 data class LoginRequest(
@@ -278,6 +279,7 @@ data class CreateCommentRequest(
 )
 
 data class UpdateProfileRequest(
+    @SerializedName("username") val username: String? = null,
     @SerializedName("displayName") val displayName: String?,
     @SerializedName("bio") val bio: String? = null,
     @SerializedName("location") val location: String? = null,

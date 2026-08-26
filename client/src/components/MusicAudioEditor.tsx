@@ -117,7 +117,7 @@ export const MusicAudioEditor: React.FC<MusicAudioEditorProps> = ({ onAudioSelec
         <div className="flex flex-col gap-3 p-3 bg-slate-950/80 rounded-lg border border-purple-500/30 mt-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-purple-300">Trimming: {selectedTrack.title}</span>
-            <span className="text-[10px] text-slate-400">15s Story/Reel Segment</span>
+            <span className="text-[10px] text-slate-400">15s Cosmic/Byte Segment</span>
           </div>
 
           {/* Start Time Offset Slider */}
@@ -156,7 +156,7 @@ export const MusicAudioEditor: React.FC<MusicAudioEditorProps> = ({ onAudioSelec
             onClick={handleApplyAudio}
             className="w-full py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md transition-all mt-1"
           >
-            Attach Audio to Story / Reel
+            Attach Audio to Cosmic / Byte
           </button>
         </div>
       )}

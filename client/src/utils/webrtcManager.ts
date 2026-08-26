@@ -70,14 +70,10 @@ export async function safeGetUserMedia(constraints: MediaStreamConstraints): Pro
     // If high-resolution video constraints fail with OverconstrainedError, fall back to basic video
     if (err instanceof Error && (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError')) {
       console.warn('[WebRTC] High-res video constraints failed, retrying with standard video constraints...', err);
-      try {
-        return await navigator.mediaDevices.getUserMedia({
-          audio: constraints.audio,
-          video: constraints.video ? true : false
-        });
-      } catch (fallbackErr) {
-        throw fallbackErr;
-      }
+      return await navigator.mediaDevices.getUserMedia({
+        audio: constraints.audio,
+        video: constraints.video ? true : false
+      });
     }
     throw err;
   }

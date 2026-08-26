@@ -1,4 +1,5 @@
 import { getUserRepository, getNotificationRepository } from '../repositories/factory.js';
+import { IUserRepository, INotificationRepository } from '../repositories/types.js';
 import { User } from '../types/index.js';
 
 import fs from 'fs';
@@ -27,17 +28,22 @@ function saveBase64ImageToDisk(base64Data: string, prefix: string, userId: numbe
 }
 
 export class UserService {
+  constructor(
+    private overrideUserRepo?: IUserRepository,
+    private overrideNotifRepo?: INotificationRepository
+  ) {}
+
   private toPublicUser(user: User): User {
     const { email: _email, passwordHash: _passwordHash, ...publicUser } = user;
     return publicUser as User;
   }
 
   private get userRepo() {
-    return getUserRepository();
+    return this.overrideUserRepo || getUserRepository();
   }
 
   private get notifRepo() {
-    return getNotificationRepository();
+    return this.overrideNotifRepo || getNotificationRepository();
   }
 
   async getUserById(userId: number, currentUserId?: number): Promise<User> {
@@ -60,6 +66,7 @@ export class UserService {
   }
 
   async updateProfile(userId: number, updates: {
+    username?: string;
     displayName?: string;
     bio?: string;
     profileImageUrl?: string;
@@ -67,6 +74,27 @@ export class UserService {
     location?: string;
     websiteUrl?: string;
   }): Promise<User> {
+    if (updates.username !== undefined) {
+      const cleanUsername = updates.username.trim().toLowerCase();
+      if (!/^[a-zA-Z0-9_]{3,30}$/.test(cleanUsername)) {
+        throw {
+          statusCode: 400,
+          code: 'INVALID_USERNAME',
+          message: 'Username must be 3-30 characters long and contain only letters, numbers, and underscores'
+        };
+      }
+
+      const existingUser = await this.userRepo.findByUsername(cleanUsername);
+      if (existingUser && existingUser.userId !== userId) {
+        throw {
+          statusCode: 409,
+          code: 'USERNAME_TAKEN',
+          message: 'This username is already taken. Please choose another one.'
+        };
+      }
+      updates.username = cleanUsername;
+    }
+
     if (updates.profileImageUrl && updates.profileImageUrl.startsWith('data:image/')) {
       updates.profileImageUrl = saveBase64ImageToDisk(updates.profileImageUrl, 'avatar', userId);
     }

@@ -1,216 +1,207 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Modal } from './Modal.js';
 import { Button } from './Button.js';
-import { ZoomIn, ZoomOut, RotateCw, Check, Move, Disc, Square } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCw, RefreshCw, Check } from 'lucide-react';
 
 interface ImageCropperModalProps {
   isOpen: boolean;
   onClose: () => void;
-  imageSrc: string;
-  onCropComplete: (croppedDataUrl: string) => void;
+  imageSrc: string | null;
+  aspectRatio: number; // e.g. 1 for avatar, 2.5 for banner
+  cropShape?: 'round' | 'rect';
   title?: string;
-  initialAspectRatio?: '1:1' | '4:5' | '16:9';
+  onCropComplete: (croppedFile: File, previewUrl: string) => void;
 }
 
 export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
   isOpen,
   onClose,
   imageSrc,
-  onCropComplete,
-  title = "Crop & Adjust Media",
-  initialAspectRatio = '1:1'
+  aspectRatio = 1,
+  cropShape = 'rect',
+  title = 'Crop Image',
+  onCropComplete
 }) => {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [maskType, setMaskType] = useState<'circle' | 'square'>('square');
-  const [aspectRatio, setAspectRatio] = useState<'1:1' | '4:5' | '16:9'>(initialAspectRatio);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const offsetStartRef = useRef({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
 
-  const imageRef = useRef<HTMLImageElement | null>(null);
-
-  // Reset state when a new image is loaded
+  // Reset state when opening a new image
   useEffect(() => {
     if (isOpen) {
       setZoom(1);
       setRotation(0);
-      setPan({ x: 0, y: 0 });
-      setAspectRatio(initialAspectRatio);
+      setOffset({ x: 0, y: 0 });
     }
-  }, [isOpen, imageSrc, initialAspectRatio]);
+  }, [isOpen, imageSrc]);
 
-  // Handle Mouse / Touch Dragging
-  const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
     setIsDragging(true);
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    setDragStart({ x: clientX - pan.x, y: clientY - pan.y });
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    offsetStartRef.current = { ...offset };
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   };
 
-  const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDragging) return;
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    setPan({
-      x: clientX - dragStart.x,
-      y: clientY - dragStart.y
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    setOffset({
+      x: offsetStartRef.current.x + dx,
+      y: offsetStartRef.current.y + dy
     });
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (isDragging) {
+      setIsDragging(false);
+      try {
+        (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY * -0.002;
+    setZoom((prev) => Math.min(Math.max(1, prev + delta), 4));
   };
 
   const handleRotate = () => {
     setRotation((prev) => (prev + 90) % 360);
   };
 
-  const handleCrop = () => {
-    if (!imageRef.current) return;
-    const img = imageRef.current;
+  const handleReset = () => {
+    setZoom(1);
+    setRotation(0);
+    setOffset({ x: 0, y: 0 });
+  };
 
-    let outW = 600;
-    let outH = 600;
-    if (aspectRatio === '4:5') {
-      outW = 600;
-      outH = 750;
-    } else if (aspectRatio === '16:9') {
-      outW = 800;
-      outH = 450;
-    }
+  const handleApplyCrop = useCallback(() => {
+    if (!imageRef.current || !containerRef.current) return;
+
+    const img = imageRef.current;
+    const container = containerRef.current;
+
+    // Dimensions of crop window in DOM pixels
+    const cropWidth = container.clientWidth;
+    const cropHeight = container.clientHeight;
+
+    // Target output dimensions
+    const outputWidth = cropShape === 'round' ? 800 : 1200;
+    const outputHeight = Math.round(outputWidth / aspectRatio);
 
     const canvas = document.createElement('canvas');
-    canvas.width = outW;
-    canvas.height = outH;
+    canvas.width = outputWidth;
+    canvas.height = outputHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.clearRect(0, 0, outW, outH);
-    ctx.save();
-    ctx.translate(outW / 2, outH / 2);
+    // Enable high-quality image smoothing
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // Center canvas coordinate system
+    ctx.translate(outputWidth / 2, outputHeight / 2);
     ctx.rotate((rotation * Math.PI) / 180);
 
-    const cropFrameW = aspectRatio === '16:9' ? 320 : aspectRatio === '4:5' ? 220 : 250;
-    const cropFrameH = aspectRatio === '16:9' ? 180 : aspectRatio === '4:5' ? 275 : 250;
+    // Scale calculation from displayed container size to exported canvas size
+    const scaleFactor = outputWidth / cropWidth;
 
-    const scale = (outW / cropFrameW) * zoom;
-    const imgWidth = img.naturalWidth;
-    const imgHeight = img.naturalHeight;
-    const baseScale = Math.max(cropFrameW / imgWidth, cropFrameH / imgHeight);
+    // Compute dimensions of image when rendered to fit container at zoom = 1
+    const naturalWidth = img.naturalWidth;
+    const naturalHeight = img.naturalHeight;
 
-    const drawW = imgWidth * baseScale * scale;
-    const drawH = imgHeight * baseScale * scale;
+    const imgAspect = naturalWidth / naturalHeight;
+    let renderW = cropWidth;
+    let renderH = cropHeight;
 
-    const panX = pan.x * (outW / cropFrameW);
-    const panY = pan.y * (outH / cropFrameH);
+    if (imgAspect > aspectRatio) {
+      renderH = cropHeight;
+      renderW = cropHeight * imgAspect;
+    } else {
+      renderW = cropWidth;
+      renderH = cropWidth / imgAspect;
+    }
 
-    ctx.drawImage(
-      img,
-      -drawW / 2 + panX,
-      -drawH / 2 + panY,
-      drawW,
-      drawH
-    );
+    // Apply zoom & offset
+    const drawnW = renderW * zoom * scaleFactor;
+    const drawnH = renderH * zoom * scaleFactor;
+    const drawnX = (offset.x * scaleFactor) - (drawnW / 2);
+    const drawnY = (offset.y * scaleFactor) - (drawnH / 2);
 
-    ctx.restore();
+    ctx.drawImage(img, drawnX, drawnY, drawnW, drawnH);
 
-    const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
-    onCropComplete(croppedDataUrl);
-    onClose();
-  };
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const croppedFile = new File([blob], `cropped_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const previewUrl = URL.createObjectURL(blob);
+      onCropComplete(croppedFile, previewUrl);
+      onClose();
+    }, 'image/jpeg', 0.92);
+  }, [aspectRatio, cropShape, offset, rotation, zoom, onCropComplete, onClose]);
+
+  if (!isOpen || !imageSrc) return null;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
-      <div className="space-y-5 select-none">
-        {/* Crop Area Container */}
-        <div
-          className="relative w-full h-72 bg-slate-950 rounded-2xl overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing border border-slate-800"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onTouchStart={handleMouseDown}
-          onTouchMove={handleMouseMove}
-          onTouchEnd={handleMouseUp}
-        >
-          {/* Base Image */}
-          {imageSrc && (
+      <div className="space-y-4">
+        {/* Cropping Viewport Container */}
+        <div className="relative w-full flex items-center justify-center bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 p-2 sm:p-4 select-none">
+          <div
+            ref={containerRef}
+            onWheel={handleWheel}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            style={{
+              aspectRatio: `${aspectRatio}`,
+              maxHeight: '360px'
+            }}
+            className={`relative w-full overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing border-2 border-brand-500/80 shadow-2xl bg-black ${
+              cropShape === 'round' ? 'rounded-full max-w-[280px] sm:max-w-[320px]' : 'rounded-xl'
+            }`}
+          >
+            {/* Target Image being positioned */}
             <img
               ref={imageRef}
               src={imageSrc}
               alt="Crop preview"
-              className="max-w-none pointer-events-none transition-transform duration-75"
+              draggable={false}
               style={{
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom}) rotate(${rotation}deg)`,
-                maxHeight: '100%',
-                objectFit: 'contain'
+                transform: `translate(${offset.x}px, ${offset.y}px) rotate(${rotation}deg) scale(${zoom})`,
+                transformOrigin: 'center center',
+                transition: isDragging ? 'none' : 'transform 0.1s ease-out'
               }}
+              className="max-w-none pointer-events-none object-contain select-none will-change-transform"
             />
-          )}
 
-          {/* Dynamic Mask Overlay */}
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center bg-slate-950/60">
-            <div
-              className={`border-2 border-brand-400 shadow-[0_0_0_9999px_rgba(15,23,42,0.75)] ${
-                maskType === 'circle' && aspectRatio === '1:1' ? 'rounded-full' : 'rounded-2xl'
-              }`}
-              style={{
-                width: aspectRatio === '16:9' ? '320px' : aspectRatio === '4:5' ? '220px' : '250px',
-                height: aspectRatio === '16:9' ? '180px' : aspectRatio === '4:5' ? '275px' : '250px'
-              }}
-            />
-          </div>
-
-          {/* Drag Instruction Indicator */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-slate-700/80 text-[10px] text-slate-300 font-medium flex items-center gap-1.5 pointer-events-none">
-            <Move className="w-3 h-3 text-brand-400" />
-            <span>Drag to reposition photo</span>
+            {/* Grid overlay for rule-of-thirds alignment */}
+            <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-30 border border-white/20">
+              <div className="border-r border-b border-white/30" />
+              <div className="border-r border-b border-white/30" />
+              <div className="border-b border-white/30" />
+              <div className="border-r border-b border-white/30" />
+              <div className="border-r border-b border-white/30" />
+              <div className="border-b border-white/30" />
+              <div className="border-r border-white/30" />
+              <div className="border-r border-white/30" />
+              <div />
+            </div>
           </div>
         </div>
 
-        {/* Controls Bar */}
-        <div className="space-y-3 bg-slate-900/60 p-4 rounded-xl border border-slate-800/80">
-          {/* Aspect Ratio Selector */}
-          <div className="space-y-1.5 border-b border-slate-800/80 pb-3">
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Aspect Ratio Suitable for Feed & Footages</label>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setAspectRatio('1:1')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  aspectRatio === '1:1'
-                    ? 'bg-brand-600 text-white shadow-glow-brand'
-                    : 'bg-slate-800/60 text-slate-400 hover:text-white'
-                }`}
-              >
-                <span>1:1 Square</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setAspectRatio('4:5')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  aspectRatio === '4:5'
-                    ? 'bg-brand-600 text-white shadow-glow-brand'
-                    : 'bg-slate-800/60 text-slate-400 hover:text-white'
-                }`}
-              >
-                <span>4:5 Portrait</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setAspectRatio('16:9')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  aspectRatio === '16:9'
-                    ? 'bg-brand-600 text-white shadow-glow-brand'
-                    : 'bg-slate-800/60 text-slate-400 hover:text-white'
-                }`}
-              >
-                <span>16:9 Landscape / Video</span>
-              </button>
-            </div>
-          </div>
-          {/* Zoom Slider */}
+        {/* Zoom & Adjustment Controls */}
+        <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
           <div className="flex items-center gap-3">
             <ZoomOut className="w-4 h-4 text-slate-400 shrink-0" />
             <input
@@ -222,59 +213,42 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
               onChange={(e) => setZoom(parseFloat(e.target.value))}
               className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-brand-500"
             />
-            <ZoomIn className="w-4 h-4 text-slate-400 shrink-0" />
-            <span className="text-xs font-semibold text-slate-300 w-10 text-right">
-              {Math.round(zoom * 100)}%
-            </span>
+            <ZoomIn className="w-4 h-4 text-brand-400 shrink-0" />
+            <span className="text-xs text-slate-400 w-10 text-right font-mono">{zoom.toFixed(1)}x</span>
           </div>
 
-          {/* Mask & Rotate Buttons */}
-          <div className="flex items-center justify-between border-t border-slate-800/80 pt-3">
+          <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
+            <p className="text-[11px] text-slate-400">Drag to reposition / scroll to zoom</p>
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setMaskType('circle')}
-                className={`p-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                  maskType === 'circle'
-                    ? 'bg-brand-600/30 text-brand-300 border border-brand-500/40'
-                    : 'bg-slate-800/50 text-slate-400 hover:text-white'
-                }`}
+                onClick={handleRotate}
+                title="Rotate 90°"
+                className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
               >
-                <Disc className="w-4 h-4" />
-                <span>Circle</span>
+                <RotateCw className="w-3.5 h-3.5" />
+                <span>Rotate</span>
               </button>
               <button
                 type="button"
-                onClick={() => setMaskType('square')}
-                className={`p-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                  maskType === 'square'
-                    ? 'bg-brand-600/30 text-brand-300 border border-brand-500/40'
-                    : 'bg-slate-800/50 text-slate-400 hover:text-white'
-                }`}
+                onClick={handleReset}
+                title="Reset Position"
+                className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
               >
-                <Square className="w-4 h-4" />
-                <span>Square</span>
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Reset</span>
               </button>
             </div>
-
-            <button
-              type="button"
-              onClick={handleRotate}
-              className="p-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700/50"
-            >
-              <RotateCw className="w-4 h-4 text-aurora-cyan" />
-              <span>Rotate ({rotation}°)</span>
-            </button>
           </div>
         </div>
 
-        {/* Modal Action Buttons */}
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <Button variant="secondary" onClick={onClose} size="sm">
+        {/* Modal Actions */}
+        <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleCrop} size="sm" className="gap-1.5">
-            <Check className="w-4 h-4" /> Save Cropped Photo
+          <Button type="button" variant="primary" onClick={handleApplyCrop}>
+            <Check className="w-4 h-4 mr-1.5" /> Apply & Crop
           </Button>
         </div>
       </div>

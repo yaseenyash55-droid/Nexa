@@ -49,10 +49,13 @@ class EditProfileBottomSheetDialogFragment : BottomSheetDialogFragment() {
         ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            selectedProfileImageUri = uri
-            binding.ivProfilePreview.load(uri) {
-                transformations(CircleCropTransformation())
+            val cropDialog = CropImageDialogFragment.newInstance(uri) { croppedUri ->
+                selectedProfileImageUri = croppedUri
+                binding.ivProfilePreview.load(croppedUri) {
+                    transformations(CircleCropTransformation())
+                }
             }
+            cropDialog.show(parentFragmentManager, "CropImageDialogFragment")
         }
     }
 
@@ -83,6 +86,7 @@ class EditProfileBottomSheetDialogFragment : BottomSheetDialogFragment() {
                 error(com.nexa.social.R.drawable.ic_profile)
                 transformations(CircleCropTransformation())
             }
+            binding.etUsername.setText(user.username)
             binding.etDisplayName.setText(user.displayName)
             binding.etBio.setText(user.bio ?: "")
             binding.etLocation.setText(user.location ?: "")
@@ -93,10 +97,18 @@ class EditProfileBottomSheetDialogFragment : BottomSheetDialogFragment() {
     private fun setupSaveButton() {
         binding.btnSaveProfile.setOnClickListener {
             val user = currentUser ?: return@setOnClickListener
+            val username = binding.etUsername.text.toString().trim().lowercase()
             val displayName = binding.etDisplayName.text.toString().trim()
             val bio = binding.etBio.text.toString().trim()
             val location = binding.etLocation.text.toString().trim()
             val website = binding.etWebsite.text.toString().trim()
+
+            if (username.length < 3 || username.length > 30 || !username.matches(Regex("^[a-zA-Z0-9_]+$"))) {
+                binding.tilUsername.error = "Username must be 3-30 letters, numbers, or underscores"
+                return@setOnClickListener
+            } else {
+                binding.tilUsername.error = null
+            }
 
             if (displayName.isEmpty()) {
                 binding.tilDisplayName.error = "Display name cannot be empty"
@@ -169,6 +181,7 @@ class EditProfileBottomSheetDialogFragment : BottomSheetDialogFragment() {
                 }
 
                 val req = UpdateProfileRequest(
+                    username = username,
                     displayName = displayName,
                     bio = bio.ifEmpty { null },
                     location = location.ifEmpty { null },

@@ -13,6 +13,7 @@ import { PostCard } from '../components/feed/PostCard.js';
 import { PostSkeleton } from '../components/ui/Skeleton.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
 import { userApi, authApi, api } from '../api/client.js';
+import { mediaApi } from '../api/media.api.js';
 import { postsApi } from '../api/posts.api.js';
 import { privacyApi } from '../api/privacy.api.js';
 import {
@@ -54,6 +55,7 @@ export const SettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'account' | 'appearance' | 'bookmarks' | 'insights' | 'protection' | 'moderation' | 'security' | 'notifications' | 'privacy' | 'data'>(initialTab);
   
   // Profile form state
+  const [username, setUsername] = useState(user?.username || '');
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [location, setLocation] = useState(user?.location || '');
@@ -84,9 +86,15 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleCropComplete = (croppedDataUrl: string) => {
-    setProfileImageUrl(croppedDataUrl);
-    setProfileSuccessMsg('Cropped image ready! Click "Save Profile Changes" below to apply.');
+  const handleCropComplete = async (croppedFile: File, _previewUrl: string) => {
+    try {
+      setProfileSuccessMsg('Uploading cropped profile picture...');
+      const uploadedUrl = await mediaApi.uploadFile(croppedFile, 'avatar');
+      setProfileImageUrl(uploadedUrl);
+      setProfileSuccessMsg('Cropped image ready! Click "Save Profile Changes" below to apply.');
+    } catch (err: any) {
+      setProfileErrorMsg(err.message || 'Failed to upload cropped image');
+    }
   };
 
   const handleRemoveAvatar = () => {
@@ -120,7 +128,15 @@ export const SettingsPage: React.FC = () => {
       setProfileErrorMsg(null);
       setProfileSuccessMsg(null);
 
+      const cleanUsername = username.trim().toLowerCase();
+      if (!/^[a-zA-Z0-9_]{3,30}$/.test(cleanUsername)) {
+        setProfileErrorMsg('Username must be 3-30 characters long and contain only letters, numbers, and underscores');
+        setIsUpdatingProfile(false);
+        return;
+      }
+
       const res = await userApi.updateProfile(user.userId, {
+        username: cleanUsername,
         displayName,
         bio,
         location,
@@ -325,8 +341,19 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label="Username" value={`@${user?.username || ''}`} disabled className="opacity-60 cursor-not-allowed" />
-              <Input label="Email Address" value={user?.email || ''} disabled className="opacity-60 cursor-not-allowed" />
+              <div>
+                <Input
+                  label="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-zA-Z0-9_]/g, ''))}
+                  placeholder="username"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">3-30 letters, numbers, or underscores</p>
+              </div>
+              <div>
+                <Input label="Email Address" value={user?.email || ''} disabled className="opacity-60 cursor-not-allowed" />
+                <p className="text-[10px] text-slate-500 mt-1">Email address associated with your account</p>
+              </div>
             </div>
 
             <Input
@@ -509,7 +536,7 @@ export const SettingsPage: React.FC = () => {
                   <p className="font-semibold text-slate-100 flex items-center gap-2">
                     <HeartOff className="w-4 h-4 text-rose-400" /> Hide Like & Reaction Counts
                   </p>
-                  <p className="text-[11px] text-slate-400">Hide total like counts on posts and reels in your feeds</p>
+                  <p className="text-[11px] text-slate-400">Hide total like counts on posts and bytes in your feeds</p>
                 </div>
                 <button onClick={() => setHideLikeCounts(!hideLikeCounts)} className={`w-12 h-6 rounded-full transition-colors p-1 relative ${hideLikeCounts ? 'bg-brand-600' : 'bg-slate-700'}`}>
                   <div className={`w-4 h-4 bg-white rounded-full transition-transform ${hideLikeCounts ? 'translate-x-6' : 'translate-x-0'}`} />
@@ -519,9 +546,9 @@ export const SettingsPage: React.FC = () => {
               <div className="flex items-center justify-between p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
                 <div>
                   <p className="font-semibold text-slate-100 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-amber-400" /> Default Stories to Close Friends
+                    <Users className="w-4 h-4 text-amber-400" /> Default Cosmic to Close Friends
                   </p>
-                  <p className="text-[11px] text-slate-400">Limit new 24h stories to your designated Close Friends list</p>
+                  <p className="text-[11px] text-slate-400">Limit new 24h Cosmic to your designated Close Friends list</p>
                 </div>
                 <button onClick={() => setCloseFriendsOnly(!closeFriendsOnly)} className={`w-12 h-6 rounded-full transition-colors p-1 relative ${closeFriendsOnly ? 'bg-brand-600' : 'bg-slate-700'}`}>
                   <div className={`w-4 h-4 bg-white rounded-full transition-transform ${closeFriendsOnly ? 'translate-x-6' : 'translate-x-0'}`} />
@@ -586,6 +613,9 @@ export const SettingsPage: React.FC = () => {
           isOpen={isCropperOpen}
           onClose={() => setIsCropperOpen(false)}
           imageSrc={selectedRawImage}
+          aspectRatio={1}
+          cropShape="round"
+          title="Crop Profile Photo (1:1)"
           onCropComplete={handleCropComplete}
         />
       )}
@@ -745,7 +775,7 @@ const InsightsTabSection: React.FC = () => {
 
       <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 space-y-2">
         <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Top Performing Content</h3>
-        <p className="text-xs text-slate-400">Your top reel reached 6,420 unique viewers on the Nexa Explore feed with 94.2% positive engagement.</p>
+        <p className="text-xs text-slate-400">Your top Byte reached 6,420 unique viewers on the Nexa Explore feed with 94.2% positive engagement.</p>
       </div>
     </div>
   );

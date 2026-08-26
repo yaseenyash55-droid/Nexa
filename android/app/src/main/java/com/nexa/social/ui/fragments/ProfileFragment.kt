@@ -220,6 +220,22 @@ class ProfileFragment : Fragment() {
         binding.tvFollowersCount.text = user.followersCount.toString()
         binding.tvFollowingCount.text = user.followingCount.toString()
 
+        binding.llFollowers.setOnClickListener {
+            com.nexa.social.ui.FollowersFollowingBottomSheetDialogFragment.newInstance(
+                userId = user.userId,
+                username = user.username,
+                initialTab = "followers"
+            ).show(childFragmentManager, "followers_following")
+        }
+
+        binding.llFollowing.setOnClickListener {
+            com.nexa.social.ui.FollowersFollowingBottomSheetDialogFragment.newInstance(
+                userId = user.userId,
+                username = user.username,
+                initialTab = "following"
+            ).show(childFragmentManager, "followers_following")
+        }
+
         val avatarUrl = user.profileImageUrl?.let {
             if (it.startsWith("http")) it else "${NexaApiClient.BASE_URL.removeSuffix("api/")}${it.removePrefix("/")}"
         }

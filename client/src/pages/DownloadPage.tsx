@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, Smartphone, ShieldCheck, Video, Bell, Sparkles, ArrowRight, ExternalLink } from 'lucide-react';
+import { Download, Smartphone, ShieldCheck, Video, Bell, Sparkles, ArrowRight } from 'lucide-react';
 import { AppShell } from '../components/layout/AppShell.js';
 import { ANDROID_RELEASE } from '../config/androidRelease.js';
 

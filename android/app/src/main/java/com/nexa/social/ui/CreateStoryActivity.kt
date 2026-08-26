@@ -68,16 +68,16 @@ class CreateStoryActivity : AppCompatActivity() {
                 val upload = NexaApiClient.postApi.uploadMedia(filePart, kindPart)
                 val publicUrl = upload.body()?.data?.publicUrl
                 if (!upload.isSuccessful || publicUrl.isNullOrBlank()) {
-                    throw IllegalStateException(upload.body()?.error?.message ?: "Story upload failed (${upload.code()})")
+                    throw IllegalStateException(upload.body()?.error?.message ?: "Cosmic upload failed (${upload.code()})")
                 }
 
                 val caption = binding.etCaption.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
                 storyRepository.createStory(publicUrl!!, caption).getOrElse { throw it }
-                Toast.makeText(this@CreateStoryActivity, "Story shared", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@CreateStoryActivity, "Cosmic shared", Toast.LENGTH_SHORT).show()
                 setResult(RESULT_OK)
                 finish()
             } catch (error: Exception) {
-                Toast.makeText(this@CreateStoryActivity, error.message ?: "Unable to share story", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@CreateStoryActivity, error.message ?: "Unable to share Cosmic", Toast.LENGTH_LONG).show()
             } finally {
                 prepared?.file?.delete()
                 setLoading(false)

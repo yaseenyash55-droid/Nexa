@@ -230,6 +230,7 @@ export class OracleUserRepository implements IUserRepository {
   }
 
   async updateUser(userId: number, updates: {
+    username?: string;
     displayName?: string;
     bio?: string;
     profileImageUrl?: string;
@@ -240,6 +241,10 @@ export class OracleUserRepository implements IUserRepository {
     const fields: string[] = [];
     const binds: Record<string, any> = { userId };
 
+    if (updates.username !== undefined) {
+      fields.push('USERNAME = :username');
+      binds.username = updates.username;
+    }
     if (updates.displayName !== undefined) {
       fields.push('DISPLAY_NAME = :displayName');
       binds.displayName = updates.displayName;
@@ -275,7 +280,9 @@ export class OracleUserRepository implements IUserRepository {
   }
 
   async searchUsers(query: string, currentUserId?: number, limit = 10): Promise<User[]> {
-    const searchPattern = `%${query.toLowerCase().trim()}%`;
+    const trimmed = query.trim();
+    const searchPattern = `%${trimmed.toLowerCase()}%`;
+    const isNumeric = /^\d+$/.test(trimmed);
     const sql = `
       SELECT u.USER_ID, u.USERNAME, u.EMAIL, u.DISPLAY_NAME, u.BIO, u.PROFILE_IMAGE_URL,
              u.COVER_IMAGE_URL, u.LOCATION, u.WEBSITE_URL, u.CREATED_AT, u.UPDATED_AT,
@@ -283,11 +290,14 @@ export class OracleUserRepository implements IUserRepository {
              (SELECT COUNT(*) FROM FOLLOWERS WHERE FOLLOWER_ID = u.USER_ID) AS FOLLOWING_COUNT,
              ${currentUserId ? `(SELECT COUNT(*) FROM FOLLOWERS WHERE FOLLOWER_ID = :currentUserId AND FOLLOWING_ID = u.USER_ID)` : '0'} AS IS_FOLLOWING
       FROM USERS u
-      WHERE LOWER(u.USERNAME) LIKE :searchPattern OR LOWER(u.DISPLAY_NAME) LIKE :searchPattern
+      WHERE LOWER(u.USERNAME) LIKE :searchPattern 
+         OR LOWER(u.DISPLAY_NAME) LIKE :searchPattern
+         ${isNumeric ? 'OR u.USER_ID = :numericId' : ''}
       ORDER BY u.USER_ID ASC
       FETCH NEXT :limit ROWS ONLY
     `;
     const binds: Record<string, any> = { searchPattern, limit };
+    if (isNumeric) binds.numericId = parseInt(trimmed, 10);
     if (currentUserId) binds.currentUserId = currentUserId;
 
     const res = await executeSql<RawUserRow>(sql, binds);

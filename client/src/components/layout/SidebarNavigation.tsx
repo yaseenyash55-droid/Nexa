@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, Compass, Film, MessageSquare, Bell, User as UserIcon, Settings as SettingsIcon, BookOpen, LogOut, PlusSquare } from 'lucide-react';
+import { Home, Compass, Film, MessageSquare, Bell, User as UserIcon, Settings as SettingsIcon, BookOpen, LogOut, PlusSquare, Music } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.js';
 import { Avatar } from '../ui/Avatar.js';
 import { DrDoomOrbLogo } from '../ui/DrDoomOrbLogo.js';
@@ -22,7 +22,8 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onOpenComp
   const navItems = [
     { to: '/', label: 'Home Feed', icon: <Home className="w-5 h-5" /> },
     { to: '/explore', label: 'Explore', icon: <Compass className="w-5 h-5" /> },
-    { to: '/reels', label: 'Reels', icon: <Film className="w-5 h-5" /> },
+    { to: '/music', label: 'Music', icon: <Music className="w-5 h-5" /> },
+    { to: '/reels', label: 'Bytes', icon: <Film className="w-5 h-5" /> },
     { to: '/messages', label: 'Messages', icon: <MessageSquare className="w-5 h-5" /> },
     { to: '/notifications', label: 'Notifications', icon: <Bell className="w-5 h-5" /> },
     { to: '/user-manual', label: 'User Manual', icon: <BookOpen className="w-5 h-5" /> },

@@ -124,12 +124,20 @@ class ChatActivity : AppCompatActivity() {
         setupRecyclerView()
         setupSendButton()
         setupAttachmentButton()
+        setupEmojiButton()
         setupTypingListeners()
         setupRealtimeMessageListeners()
         setupTextWatcher()
 
         // Immediate offline storage load
         loadCachedMessages()
+
+        // Restore unsent message draft
+        val savedDraft = localChatStorage.getDraft(prefManager.userId, targetId, chatType)
+        if (savedDraft.isNotBlank()) {
+            binding.etMessage.setText(savedDraft)
+            binding.etMessage.setSelection(savedDraft.length)
+        }
 
         // Network sync
         loadMessages()
@@ -306,28 +314,46 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun setupTextWatcher() {
-        if (chatType != "direct") return
         binding.etMessage.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                if (!s.isNullOrBlank()) {
-                    if (!isEmittingTyping) {
-                        SocketManager.emitTypingStart(targetId)
-                        isEmittingTyping = true
-                    }
-                    stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
-                    stopTypingRunnable = Runnable {
+                val currentText = s?.toString() ?: ""
+                localChatStorage.saveDraft(prefManager.userId, targetId, chatType, currentText)
+
+                if (chatType == "direct") {
+                    if (!s.isNullOrBlank()) {
+                        if (!isEmittingTyping) {
+                            SocketManager.emitTypingStart(targetId)
+                            isEmittingTyping = true
+                        }
+                        stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
+                        stopTypingRunnable = Runnable {
+                            SocketManager.emitTypingStop(targetId)
+                            isEmittingTyping = false
+                        }.also { mainHandler.postDelayed(it, 3000) }
+                    } else {
+                        stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
                         SocketManager.emitTypingStop(targetId)
                         isEmittingTyping = false
-                    }.also { mainHandler.postDelayed(it, 3000) }
-                } else {
-                    stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
-                    SocketManager.emitTypingStop(targetId)
-                    isEmittingTyping = false
+                    }
                 }
             }
             override fun afterTextChanged(s: Editable?) {}
         })
+    }
+
+    private fun setupEmojiButton() {
+        binding.btnEmoji.setOnClickListener {
+            showEmojiPickerDialog()
+        }
+    }
+
+    private fun showEmojiPickerDialog() {
+        EmojiPickerDialogFragment { emoji ->
+            val start = binding.etMessage.selectionStart.coerceAtLeast(0)
+            val end = binding.etMessage.selectionEnd.coerceAtLeast(0)
+            binding.etMessage.text.replace(minOf(start, end), maxOf(start, end), emoji)
+        }.show(supportFragmentManager, "emoji_picker")
     }
 
     private fun setupSendButton() {
@@ -341,22 +367,22 @@ class ChatActivity : AppCompatActivity() {
 
     private fun setupAttachmentButton() {
         binding.btnAddAttachment.setOnClickListener {
-            showAttachmentBottomSheet()
+            showAttachmentOptionsBottomSheet()
         }
     }
 
-    private fun showAttachmentBottomSheet() {
+    private fun showAttachmentOptionsBottomSheet() {
         val bottomSheet = BottomSheetDialog(this)
-        val sheetView = LayoutInflater.from(this).inflate(R.layout.dialog_chat_attachments, null)
+        val sheetView = layoutInflater.inflate(R.layout.dialog_chat_attachments, null)
         bottomSheet.setContentView(sheetView)
 
-        // 1. Files / Storage
+        // 1. Files / Scoped Local Storage
         sheetView.findViewById<View>(R.id.btnAttachFile).setOnClickListener {
             bottomSheet.dismiss()
             filePickerLauncher.launch("*/*")
         }
 
-        // 2. Photos / Gallery
+        // 2. Photos / Gallery (Scoped Storage Photo Picker)
         sheetView.findViewById<View>(R.id.btnAttachGallery).setOnClickListener {
             bottomSheet.dismiss()
             galleryPickerLauncher.launch(
@@ -374,10 +400,10 @@ class ChatActivity : AppCompatActivity() {
             }
         }
 
-        // 4. Stickers
+        // 4. Stickers / Emojis
         sheetView.findViewById<View>(R.id.btnAttachStickers).setOnClickListener {
             bottomSheet.dismiss()
-            showStickerPickerDialog()
+            showEmojiPickerDialog()
         }
 
         // 5. GIFs
@@ -389,66 +415,10 @@ class ChatActivity : AppCompatActivity() {
         bottomSheet.show()
     }
 
-    private fun showStickerPickerDialog() {
-        val stickers = arrayOf(
-            "🔥", "❤️", "😂", "🎉", "🚀", "💯", "👍", "👏",
-            "🥳", "✨", "🤩", "💡", "💎", "🦾", "🌟", "🍕",
-            "☕", "🎮", "😎", "🙌", "🎯", "⚡", "🏆", "💖"
-        )
-
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_chat_attachments, null)
-        val grid = GridLayout(this).apply {
-            columnCount = 4
-            alignmentMode = GridLayout.ALIGN_BOUNDS
-            setPadding(24, 24, 24, 24)
-        }
-
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Send a Sticker ✨")
-            .setView(grid)
-            .setNegativeButton("Cancel", null)
-            .create()
-
-        for (sticker in stickers) {
-            val tv = TextView(this).apply {
-                text = sticker
-                textSize = 34f
-                setPadding(20, 20, 20, 20)
-                gravity = android.view.Gravity.CENTER
-                setBackgroundResource(android.R.drawable.list_selector_background)
-                setOnClickListener {
-                    sendMessage(sticker)
-                    dialog.dismiss()
-                }
-            }
-            grid.addView(tv)
-        }
-
-        dialog.show()
-    }
-
     private fun showGifPickerDialog() {
-        val gifOptions = arrayOf(
-            "🎉 Party Celebration! 🥳",
-            "🔥 Mind Blown! 🤯",
-            "😂 Rolling On The Floor Laughing! 🤣",
-            "👏 Standing Ovation & Applause! 🙌",
-            "🚀 To The Moon / Nexa Hype! 🌌",
-            "🤝 Deal Done / Handshake! 💼",
-            "😎 Cool Vibe / Super Smooth! ✨",
-            "🦾 Let's Go / Maximum Power! ⚡",
-            "💖 Sending Big Love! 🥰",
-            "☕ Relax & Grab Some Coffee ☕"
-        )
-
-        AlertDialog.Builder(this)
-            .setTitle("Send GIF / Animated Reaction 🎬")
-            .setItems(gifOptions) { _, which ->
-                val selected = gifOptions[which]
-                sendMessage("[GIF: $selected]")
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        GifPickerDialogFragment { gifUrl, _ ->
+            sendMessage("[GIF: $gifUrl]")
+        }.show(supportFragmentManager, "gif_picker")
     }
 
     private fun launchCameraCapture() {
@@ -621,6 +591,7 @@ class ChatActivity : AppCompatActivity() {
                     withContext(Dispatchers.Main) {
                         binding.btnSend.isEnabled = true
                         binding.etMessage.setText("")
+                        localChatStorage.clearDraft(currentUserId, targetId, chatType)
                         if (msg != null) {
                             val displayMsg = DisplayMessage(
                                 id = msg.messageId,
@@ -647,6 +618,7 @@ class ChatActivity : AppCompatActivity() {
                     withContext(Dispatchers.Main) {
                         binding.btnSend.isEnabled = true
                         binding.etMessage.setText("")
+                        localChatStorage.clearDraft(currentUserId, targetId, chatType)
                         if (msg != null) {
                             val displayMsg = DisplayMessage(
                                 id = msg.messageId,

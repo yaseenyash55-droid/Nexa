@@ -99,6 +99,21 @@ export class UserController {
     }
   }
 
+  async removeFollower(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      const targetUserId = Number(req.params.id);
+      const followerId = Number(req.params.followerId);
+      if (req.user.userId !== targetUserId) {
+        return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You can only remove followers from your own profile', details: [] } });
+      }
+      await userService.unfollowUser(followerId, targetUserId);
+      return sendSuccess(res, null, 'Follower removed successfully');
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getFollowing(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const targetUserId = Number(req.params.id);
@@ -113,7 +128,7 @@ export class UserController {
   async updateFcmToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
-      const { token, platform, deviceId } = req.body;
+      const { token } = req.body;
       if (!token) {
         return res.status(400).json({ error: 'FCM token is required' });
       }

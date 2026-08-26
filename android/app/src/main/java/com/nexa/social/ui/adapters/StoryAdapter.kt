@@ -54,7 +54,7 @@ class StoryAdapter(
 
     inner class StoryViewHolder(private val binding: ItemStoryBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bindYourStory(stories: List<Story>) {
-            binding.tvStoryUsername.text = "Your story"
+            binding.tvStoryUsername.text = "Your Cosmic"
             binding.tvAddBadge.visibility = View.VISIBLE
             val ownStory = stories.lastOrNull()
             val avatarUrl = MediaUrlResolver.resolve(ownStory?.author?.profileImageUrl)

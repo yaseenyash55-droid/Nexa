@@ -1,5 +1,6 @@
 package com.nexa.social.ui.fragments
 
+import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -13,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.nexa.social.R
 import com.nexa.social.databinding.FragmentExploreBinding
+import com.nexa.social.ui.MusicActivity
 import com.nexa.social.ui.adapters.UserAdapter
 import com.nexa.social.ui.viewmodels.ExploreUiState
 import com.nexa.social.ui.viewmodels.ExploreViewModel
@@ -36,7 +38,14 @@ class ExploreFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupRecyclerView()
         setupSearch()
+        setupMusicLounge()
         observeViewModel()
+    }
+
+    private fun setupMusicLounge() {
+        binding.llMusicLounge.setOnClickListener {
+            startActivity(Intent(requireContext(), MusicActivity::class.java))
+        }
     }
 
     private fun setupRecyclerView() {

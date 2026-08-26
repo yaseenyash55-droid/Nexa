@@ -1,5 +1,5 @@
 import { initializeApp, cert, getApps, App, ServiceAccount } from 'firebase-admin/app';
-import { getMessaging, Message, Messaging } from 'firebase-admin/messaging';
+import { getMessaging, Messaging } from 'firebase-admin/messaging';
 import { logger } from './logger.js';
 
 let firebaseApp: App | null = null;

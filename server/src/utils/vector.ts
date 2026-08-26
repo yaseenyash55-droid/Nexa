@@ -1,5 +1,4 @@
 import { Index } from '@upstash/vector';
-import { env } from '../config/env.js';
 import { logger } from './logger.js';
 
 let vectorIndexInstance: Index | null = null;

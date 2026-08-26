@@ -200,6 +200,7 @@ export class PostgresUserRepository implements IUserRepository {
   }
 
   async updateUser(userId: number, updates: {
+    username?: string;
     displayName?: string;
     bio?: string;
     profileImageUrl?: string;
@@ -211,6 +212,10 @@ export class PostgresUserRepository implements IUserRepository {
     const params: any[] = [userId];
     let paramIndex = 2;
 
+    if (updates.username !== undefined) {
+      fields.push(`username = $${paramIndex++}`);
+      params.push(updates.username);
+    }
     if (updates.displayName !== undefined) {
       fields.push(`display_name = $${paramIndex++}`);
       params.push(updates.displayName);
@@ -246,20 +251,37 @@ export class PostgresUserRepository implements IUserRepository {
   }
 
   async searchUsers(query: string, currentUserId?: number, limit = 10): Promise<User[]> {
-    const searchPattern = `%${query.toLowerCase().trim()}%`;
+    const trimmed = query.trim();
+    const searchPattern = `%${trimmed.toLowerCase()}%`;
+    const isNumeric = /^\d+$/.test(trimmed);
+    
+    const params: any[] = [searchPattern, limit];
+    let paramIndex = 3;
+    let userIdParamIndex: number | null = null;
+    let currentUserIdParamIndex: number | null = null;
+
+    if (isNumeric) {
+      userIdParamIndex = paramIndex++;
+      params.push(parseInt(trimmed, 10));
+    }
+    if (currentUserId) {
+      currentUserIdParamIndex = paramIndex++;
+      params.push(currentUserId);
+    }
+
     const sql = `
       SELECT u.user_id, u.username, u.email, u.display_name, u.bio, u.profile_image_url,
              u.cover_image_url, u.location, u.website_url, u.created_at, u.updated_at,
              (SELECT COUNT(*) FROM followers WHERE following_id = u.user_id) AS followers_count,
              (SELECT COUNT(*) FROM followers WHERE follower_id = u.user_id) AS following_count,
-             ${currentUserId ? `(SELECT COUNT(*) FROM followers WHERE follower_id = $3 AND following_id = u.user_id)` : '0'} AS is_following
+             ${currentUserIdParamIndex ? `(SELECT COUNT(*) FROM followers WHERE follower_id = $${currentUserIdParamIndex} AND following_id = u.user_id)` : '0'} AS is_following
       FROM users u
-      WHERE LOWER(u.username) LIKE $1 OR LOWER(u.display_name) LIKE $1
+      WHERE LOWER(u.username) LIKE $1 
+         OR LOWER(u.display_name) LIKE $1
+         ${userIdParamIndex ? `OR u.user_id = $${userIdParamIndex}` : ''}
       ORDER BY u.user_id ASC
       LIMIT $2
     `;
-    const params: any[] = [searchPattern, limit];
-    if (currentUserId) params.push(currentUserId);
 
     const res = await executePostgresSql<RawUserRow>(sql, params);
     return (res.rows || []).map((row) => this.mapRowToUser(row));

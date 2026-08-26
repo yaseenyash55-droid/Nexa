@@ -200,7 +200,7 @@
             </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Media Attachment Buttons Bar -->
+        <!-- Media Attachment Buttons Bar (Row 1) -->
         <LinearLayout
             android:id="@+id/attachmentBar"
             android:layout_width="match_parent"
@@ -213,7 +213,7 @@
                 android:id="@+id/btnGallery"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="44dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:paddingStart="8dp"
@@ -231,7 +231,7 @@
                 android:id="@+id/btnVideos"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="44dp"
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
@@ -250,7 +250,7 @@
                 android:id="@+id/btnCamera"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="44dp"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:paddingStart="8dp"
@@ -265,6 +265,52 @@
                 app:strokeWidth="1dp" />
         </LinearLayout>
 
+        <!-- Expressive Action Buttons (Row 2: Emojis & GIFs) -->
+        <LinearLayout
+            android:id="@+id/expressiveBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal"
+            app:layout_constraintTop_toBottomOf="@+id/attachmentBar">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnEmoji"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:text="Emoji 😀"
+                android:textColor="@color/text_white"
+                android:textSize="12sp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_sticker"
+                app:iconTint="#F59E0B"
+                app:strokeColor="@color/border_dark"
+                app:strokeWidth="1dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnGif"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:text="GIF 🎬"
+                android:textColor="@color/text_white"
+                android:textSize="12sp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_gif"
+                app:iconTint="#10B981"
+                app:strokeColor="@color/border_dark"
+                app:strokeWidth="1dp" />
+        </LinearLayout>
+
         <!-- Loading Progress Indicator -->
         <ProgressBar
             android:id="@+id/postProgressBar"
@@ -275,7 +321,7 @@
             android:visibility="gone"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/attachmentBar" />
+            app:layout_constraintTop_toBottomOf="@+id/expressiveBar" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>

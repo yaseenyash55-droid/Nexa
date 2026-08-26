@@ -55,14 +55,33 @@
         app:strokeColor="@color/brand_emerald" />
 
     <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/tilDisplayName"
+        android:id="@+id/tilUsername"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:hint="Display Name"
+        android:hint="Username"
+        app:prefixText="@"
         app:boxStrokeColor="@color/brand_emerald"
         app:layout_constraintTop_toBottomOf="@id/btnChooseProfileImage">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etUsername"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="textNoSuggestions"
+            android:textColor="@color/text_white" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilDisplayName"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:hint="Display Name"
+        app:boxStrokeColor="@color/brand_emerald"
+        app:layout_constraintTop_toBottomOf="@id/tilUsername">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etDisplayName"

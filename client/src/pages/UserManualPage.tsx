@@ -120,7 +120,7 @@ export const UserManualPage: React.FC = () => {
       bg: 'bg-purple-500/10 border-purple-500/20',
       summary: 'Stream images and videos with live percentage progress bars (0% -> 100%) and automatic duration detection.',
       targetRoute: '/reels',
-      actionLabel: 'Upload Reel / Video',
+      actionLabel: 'Upload Byte / Video',
       steps: [
         {
           title: 'Step 1: File Size & Format Validation',
@@ -135,8 +135,8 @@ export const UserManualPage: React.FC = () => {
           desc: 'When selecting a video file, the system inspects video metadata (`video.duration`):'
         },
         {
-          title: 'Short Reels (< 60 seconds)',
-          desc: 'Videos under 60 seconds are automatically labeled as "Short Reel" and formatted for vertical 9:16 viewing.'
+          title: 'Short Bytes (< 60 seconds)',
+          desc: 'Videos under 60 seconds are automatically labeled as "Short Byte" and formatted for vertical 9:16 viewing.'
         },
         {
           title: 'Long Videos (≥ 60 seconds)',
@@ -270,7 +270,7 @@ export const UserManualPage: React.FC = () => {
               <BookOpen className="w-4 h-4" /> Nexa User Manual & Project Viva Guide
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Nexa Project User Manual</h1>
-            <p className="text-sm text-slate-300 leading-relaxed">Learn how to use Nexa step by step. Explore guides on account setup, Instagram profile uploads, progress-tracked media streaming, short Reels vs Long Videos, TLS-encrypted messaging, group chats, broadcasts, and the Android mobile app.</p>
+            <p className="text-sm text-slate-300 leading-relaxed">Learn how to use Nexa step by step. Explore guides on account setup, Instagram profile uploads, progress-tracked media streaming, short Bytes vs Long Videos, TLS-encrypted messaging, group chats, broadcasts, and the Android mobile app.</p>
 
             {/* Search Box */}
             <div className="relative max-w-md pt-2">

@@ -22,6 +22,7 @@ router.delete('/fcm-token', requireAuth, (req, res, next) => notifController.rev
 router.post('/:id/follow', requireAuth, (req, res, next) => controller.followUser(req, res, next));
 router.delete('/:id/follow', requireAuth, (req, res, next) => controller.unfollowUser(req, res, next));
 router.get('/:id/followers', optionalAuth, (req, res, next) => controller.getFollowers(req, res, next));
+router.delete('/:id/followers/:followerId', requireAuth, (req, res, next) => controller.removeFollower(req, res, next));
 router.get('/:id/following', optionalAuth, (req, res, next) => controller.getFollowing(req, res, next));
 
 export default router;

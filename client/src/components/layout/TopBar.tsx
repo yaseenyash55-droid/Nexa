@@ -2,7 +2,6 @@ import React from 'react';
 import { Sparkles, Search, Settings, ShieldCheck, LogIn } from 'lucide-react';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.js';
-import { ANDROID_RELEASE } from '../../config/androidRelease.js';
 
 export const TopBar: React.FC = () => {
   const navigate = useNavigate();

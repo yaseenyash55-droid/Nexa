@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AppShell } from '../components/layout/AppShell.js';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { socialApi } from '../api/social.api.js';
@@ -7,7 +7,7 @@ import { groupsApi, Group, GroupMessage } from '../api/groups.api.js';
 import { broadcastsApi, Broadcast } from '../api/broadcasts.api.js';
 import { Message, User } from '../types/index.js';
 import { Avatar } from '../components/ui/Avatar.js';
-import { Send, MessageSquare, Search, CheckCheck, Check, Phone, Video, ShieldCheck, Users, Plus, Radio, Paperclip, FileText, Download, Sparkles, Image as ImageIcon, Smile } from 'lucide-react';
+import { Send, MessageSquare, Search, CheckCheck, Check, Phone, Video, ShieldCheck, Users, Plus, Radio, FileText, Download, Sparkles, Smile, Image as ImageIcon } from 'lucide-react';
 import { CallModal } from '../components/chat/CallModal.js';
 import { CreateGroupModal } from '../components/chat/CreateGroupModal.js';
 import { CreateBroadcastModal } from '../components/chat/CreateBroadcastModal.js';
@@ -19,16 +19,45 @@ import { useTheme } from '../contexts/ThemeContext.js';
 import { API_BASE_URL, getAccessToken } from '../api/client.js';
 import { decryptMessage, DecryptedMessageResult } from '../utils/e2ee.js';
 import { webFcmService } from '../services/fcm.service.js';
+import { EmojiPickerPopover } from '../components/ui/EmojiPickerPopover.js';
+import { GifPickerModal } from '../components/ui/GifPickerModal.js';
 
-const MessageContent: React.FC<{ content: string; isSelf: boolean }> = ({ content, isSelf }) => {
+const MessageContent: React.FC<{ content: string; isSelf?: boolean }> = ({ content }) => {
   // 1. Check if content has photo URL (e.g. 📷 [Photo] https://... or direct image URL)
   const photoMatch = content.match(/(?:📷\s*\[Photo\]\s*|(?:^|\s))(https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?|https?:\/\/\S*supabase\.co\S*|https?:\/\/\S*\/uploads\/\S+)/i);
   // 2. Check if content has video URL (e.g. 🎥 [Video] https://... or direct video URL)
   const videoMatch = content.match(/(?:🎥\s*\[Video\]\s*|(?:^|\s))(https?:\/\/\S+\.(?:mp4|webm|mov|3gp)(?:\?\S*)?)/i);
   // 3. Check if content has file URL (e.g. 📁 [File] https://... or general file URL)
   const fileMatch = content.match(/(?:📁\s*\[File\]\s*)(https?:\/\/\S+)/i);
-  // 4. Check for GIF badge
+  // 4. Check for GIF badge or animated GIF URL
   const gifMatch = content.match(/^\[GIF:\s*(.+?)\]$/i);
+  const gifUrl = gifMatch && (gifMatch[1].startsWith('http://') || gifMatch[1].startsWith('https://'))
+    ? gifMatch[1]
+    : !gifMatch && /(?:https?:\/\/\S+\.gif(?:\?\S*)?|https?:\/\/media\.giphy\.com\S*|https?:\/\/media\.tenor\.com\S*)/i.test(content)
+    ? content.match(/(https?:\/\/\S+(?:\.gif(?:\?\S*)?|giphy\.com\S*|tenor\.com\S*))/i)?.[1]
+    : null;
+
+  if (gifUrl) {
+    return (
+      <div className="space-y-1">
+        <div className="rounded-xl overflow-hidden max-w-[280px] border border-white/15 shadow-lg bg-black/40 group">
+          <img
+            src={gifUrl}
+            alt="GIF Animation"
+            className="w-full max-h-64 object-cover cursor-pointer hover:scale-[1.02] transition duration-200"
+            onClick={() => window.open(gifUrl, '_blank')}
+            loading="lazy"
+          />
+          <div className="px-2 py-0.5 bg-black/70 flex items-center justify-between text-[10px] font-bold text-slate-300">
+            <span className="flex items-center gap-1 text-emerald-400">
+              <Sparkles className="w-3 h-3" /> GIF
+            </span>
+            <span className="text-[9px] text-slate-400 font-normal">Click to expand</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (photoMatch) {
     const url = photoMatch[1];
@@ -118,6 +147,9 @@ export const MessagesPage: React.FC = () => {
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isCreateBroadcastOpen, setIsCreateBroadcastOpen] = useState(false);
 
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [isGifModalOpen, setIsGifModalOpen] = useState(false);
+
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [callModalState, setCallModalState] = useState<{
@@ -127,6 +159,21 @@ export const MessagesPage: React.FC = () => {
     callId?: string;
     targetUser?: User;
   }>({ isOpen: false, type: 'audio', direction: 'outgoing' });
+
+  // Sync draft from localStorage on active chat change
+  useEffect(() => {
+    try {
+      if (chatType === 'direct' && selectedUser) {
+        const draft = localStorage.getItem(`nexa_chat_draft_user_${selectedUser.userId}`) || '';
+        setMessageInput(draft);
+      } else if (chatType === 'groups' && selectedGroup) {
+        const draft = localStorage.getItem(`nexa_chat_draft_group_${selectedGroup.groupId}`) || '';
+        setMessageInput(draft);
+      } else {
+        setMessageInput('');
+      }
+    } catch (_e) {}
+  }, [chatType, selectedUser?.userId, selectedGroup?.groupId]);
 
   // Real-time Typing Indicator State
   const [isTyping, setIsTyping] = useState(false);
@@ -153,7 +200,12 @@ export const MessagesPage: React.FC = () => {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
 
-  // Fetch contacts (Direct Messages)
+  // Fetch contacts & conversations (Direct Messages)
+  const { data: conversations = [] } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: () => socialApi.getConversations()
+  });
+
   const { data: suggestions = [] } = useQuery({
     queryKey: ['chat-users'],
     queryFn: () => usersApi.getSuggestions()
@@ -204,15 +256,22 @@ export const MessagesPage: React.FC = () => {
   });
 
   // Send Direct Message (TLS-Protected)
-  const sendDirectMessageMutation = useMutation({
-    mutationFn: async () => {
-      if (!currentUser || !selectedUser || !messageInput.trim()) {
+  const sendDirectMessageMutation = useMutation<Message, Error, string | void>({
+    mutationFn: async (overrideContent) => {
+      const textToSend = (typeof overrideContent === 'string' ? overrideContent : messageInput).trim();
+      if (!currentUser || !selectedUser || !textToSend) {
         throw new Error('Invalid send message state');
       }
-      return socialApi.sendMessage(selectedUser.userId, messageInput.trim());
+      return socialApi.sendMessage(selectedUser.userId, textToSend);
     },
     onSuccess: (message) => {
       setMessageInput('');
+      if (selectedUser) {
+        try {
+          localStorage.removeItem(`nexa_chat_draft_user_${selectedUser.userId}`);
+        } catch (_e) {}
+      }
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.setQueryData<Message[]>(['messages', selectedUser?.userId], (current = []) =>
         current.some((item) => item.messageId === message.messageId) ? current : [...current, message]
       );
@@ -220,15 +279,21 @@ export const MessagesPage: React.FC = () => {
   });
 
   // Send Group Message
-  const sendGroupMessageMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedGroup || !messageInput.trim()) {
+  const sendGroupMessageMutation = useMutation<GroupMessage, Error, string | void>({
+    mutationFn: async (overrideContent) => {
+      const textToSend = (typeof overrideContent === 'string' ? overrideContent : messageInput).trim();
+      if (!selectedGroup || !textToSend) {
         throw new Error('Invalid group message state');
       }
-      return groupsApi.sendGroupMessage(selectedGroup.groupId, messageInput.trim());
+      return groupsApi.sendGroupMessage(selectedGroup.groupId, textToSend);
     },
     onSuccess: (msg) => {
       setMessageInput('');
+      if (selectedGroup) {
+        try {
+          localStorage.removeItem(`nexa_chat_draft_group_${selectedGroup.groupId}`);
+        } catch (_e) {}
+      }
       queryClient.setQueryData<GroupMessage[]>(['group-messages', selectedGroup?.groupId], (current = []) =>
         current.some((item) => item.messageId === msg.messageId) ? current : [...current, msg]
       );
@@ -286,18 +351,21 @@ export const MessagesPage: React.FC = () => {
 
     socket.on('message:created', (message: Message) => {
       const otherUserId = message.senderId === currentUser.userId ? message.receiverId : message.senderId;
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.setQueryData<Message[]>(['messages', otherUserId], (current = []) =>
         current.some((item) => item.messageId === message.messageId) ? current : [...current, message]
       );
     });
 
     socket.on('group:message:created', (msg: GroupMessage) => {
+      queryClient.invalidateQueries({ queryKey: ['user-groups'] });
       queryClient.setQueryData<GroupMessage[]>(['group-messages', msg.groupId], (current = []) =>
         current.some((item) => item.messageId === msg.messageId) ? current : [...current, msg]
       );
     });
 
     socket.on('message:read', ({ messageId }: { messageId: number }) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.setQueriesData<Message[]>({ queryKey: ['messages'] }, (current = []) =>
         current.map((message) => message.messageId === messageId ? { ...message, isRead: true } : message)
       );
@@ -435,6 +503,16 @@ export const MessagesPage: React.FC = () => {
     const value = e.target.value;
     setMessageInput(value);
 
+    try {
+      if (chatType === 'direct' && selectedUser) {
+        if (value) localStorage.setItem(`nexa_chat_draft_user_${selectedUser.userId}`, value);
+        else localStorage.removeItem(`nexa_chat_draft_user_${selectedUser.userId}`);
+      } else if (chatType === 'groups' && selectedGroup) {
+        if (value) localStorage.setItem(`nexa_chat_draft_group_${selectedGroup.groupId}`, value);
+        else localStorage.removeItem(`nexa_chat_draft_group_${selectedGroup.groupId}`);
+      }
+    } catch (_e) {}
+
     if (!selectedUser || !socketRef.current || chatType !== 'direct') return;
 
     if (value.trim().length > 0) {
@@ -482,10 +560,24 @@ export const MessagesPage: React.FC = () => {
     }
   };
 
-  const filteredUsers = suggestions.filter(u =>
-    u.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.username.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const displayDirectItems = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (conversations.length > 0) {
+      const filtered = conversations.filter(c =>
+        c.displayName.toLowerCase().includes(q) ||
+        c.username.toLowerCase().includes(q) ||
+        (c.lastMessage && c.lastMessage.toLowerCase().includes(q))
+      );
+      if (filtered.length > 0 || !q) {
+        return { type: 'conversations' as const, items: filtered };
+      }
+    }
+    const filteredSug = suggestions.filter(u =>
+      u.displayName.toLowerCase().includes(q) ||
+      u.username.toLowerCase().includes(q)
+    );
+    return { type: 'suggestions' as const, items: filteredSug };
+  }, [conversations, suggestions, searchQuery]);
 
   const filteredGroups = groups.filter(g =>
     g.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -585,7 +677,7 @@ export const MessagesPage: React.FC = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={
                   chatType === 'direct'
-                    ? "Search contacts..."
+                    ? "Search contacts or messages..."
                     : chatType === 'groups'
                     ? "Search groups..."
                     : "Search broadcasts..."
@@ -598,30 +690,95 @@ export const MessagesPage: React.FC = () => {
           {/* Conversation List */}
           <div className="flex-1 overflow-y-auto divide-y divide-slate-800/50">
             {chatType === 'direct' ? (
-              filteredUsers.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-400">No contacts found</div>
+              displayDirectItems.items.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400">No conversations found</div>
               ) : (
-                filteredUsers.map((u) => {
-                  const isSelected = selectedUser?.userId === u.userId;
-                  return (
-                    <div
-                      key={u.userId}
-                      onClick={() => setSelectedUser(u)}
-                      className={`p-3.5 flex items-center gap-3 cursor-pointer transition-colors ${
-                        isSelected ? 'bg-brand-600/15 border-l-4 border-brand-500' : 'hover:bg-slate-800/40'
-                      }`}
-                    >
-                      <Avatar src={u.profileImageUrl} name={u.displayName} size="md" />
-                      <div className="flex-1 truncate">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-bold text-white truncate flex items-center gap-1.5">
-                            {u.displayName}
-                          </p>
+                displayDirectItems.items.map((item: any) => {
+                  if (displayDirectItems.type === 'conversations') {
+                    const c = item;
+                    const isSelected = selectedUser?.userId === c.otherUserId;
+                    const targetUser: User = {
+                      userId: c.otherUserId,
+                      username: c.username,
+                      displayName: c.displayName,
+                      profileImageUrl: c.profileImageUrl,
+                      email: '',
+                      createdAt: '',
+                      updatedAt: ''
+                    };
+                    const lastMsg = c.lastMessage?.trim() || '';
+                    const formattedMsg = lastMsg.startsWith('[GIF:') || lastMsg.endsWith('.gif')
+                      ? '✨ GIF animation'
+                      : lastMsg.includes('[Photo]') || lastMsg.includes('📷')
+                      ? '📷 Photo attachment'
+                      : lastMsg.includes('[File]') || lastMsg.includes('📁')
+                      ? '📁 File attachment'
+                      : lastMsg || 'Started conversation';
+
+                    const formatTime = (iso: string | null) => {
+                      if (!iso) return '';
+                      try {
+                        const d = new Date(iso);
+                        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      } catch {
+                        return '';
+                      }
+                    };
+
+                    return (
+                      <div
+                        key={c.otherUserId}
+                        onClick={() => setSelectedUser(targetUser)}
+                        className={`p-3.5 flex items-center gap-3 cursor-pointer transition-colors ${
+                          isSelected ? 'bg-brand-600/15 border-l-4 border-brand-500' : 'hover:bg-slate-800/40'
+                        }`}
+                      >
+                        <Avatar src={c.profileImageUrl} name={c.displayName} size="md" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+                              {c.displayName}
+                              <span className="text-[11px] font-normal text-slate-400">@{c.username}</span>
+                            </p>
+                            {c.lastMessageAt && (
+                              <span className="text-[10px] text-slate-500 shrink-0">{formatTime(c.lastMessageAt)}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between gap-1 mt-0.5">
+                            <p className="text-[11px] text-slate-400 truncate flex-1">{formattedMsg}</p>
+                            {c.unreadCount > 0 && (
+                              <span className="px-1.5 py-0.2 text-[9px] font-bold bg-brand-600 text-white rounded-full shrink-0">
+                                {c.unreadCount > 99 ? '99+' : c.unreadCount}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-[11px] text-slate-400 truncate">@{u.username}</p>
                       </div>
-                    </div>
-                  );
+                    );
+                  } else {
+                    const u = item as User;
+                    const isSelected = selectedUser?.userId === u.userId;
+                    return (
+                      <div
+                        key={u.userId}
+                        onClick={() => setSelectedUser(u)}
+                        className={`p-3.5 flex items-center gap-3 cursor-pointer transition-colors ${
+                          isSelected ? 'bg-brand-600/15 border-l-4 border-brand-500' : 'hover:bg-slate-800/40'
+                        }`}
+                      >
+                        <Avatar src={u.profileImageUrl} name={u.displayName} size="md" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+                              {u.displayName}
+                              <span className="text-[11px] font-normal text-slate-400">@{u.username}</span>
+                            </p>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate mt-0.5">Tap to start chatting</p>
+                        </div>
+                      </div>
+                    );
+                  }
                 })
               )
             ) : chatType === 'groups' ? (
@@ -849,8 +1006,37 @@ export const MessagesPage: React.FC = () => {
               {/* Chat Input Form */}
               <form
                 onSubmit={handleSendMessageSubmit}
-                className="p-3 border-t border-slate-800/80 bg-background-card/60 flex items-center gap-2"
+                className="p-3 border-t border-slate-800/80 bg-background-card/60 flex items-center gap-2 relative"
               >
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+                    className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 rounded-xl transition"
+                    title="Add Emoji"
+                  >
+                    <Smile className="w-5 h-5" />
+                  </button>
+
+                  <EmojiPickerPopover
+                    isOpen={isEmojiPickerOpen}
+                    onClose={() => setIsEmojiPickerOpen(false)}
+                    onSelectEmoji={(emoji) => {
+                      setMessageInput((prev) => prev + emoji);
+                    }}
+                    position="top"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsGifModalOpen(true)}
+                  className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60 rounded-xl transition"
+                  title="Search & Send GIF"
+                >
+                  <ImageIcon className="w-5 h-5" />
+                </button>
+
                 <input
                   type="text"
                   value={messageInput}
@@ -936,8 +1122,37 @@ export const MessagesPage: React.FC = () => {
               {/* Group Chat Input Form */}
               <form
                 onSubmit={handleSendMessageSubmit}
-                className="p-3 border-t border-slate-800/80 bg-background-card/60 flex items-center gap-2"
+                className="p-3 border-t border-slate-800/80 bg-background-card/60 flex items-center gap-2 relative"
               >
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+                    className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 rounded-xl transition"
+                    title="Add Emoji"
+                  >
+                    <Smile className="w-5 h-5" />
+                  </button>
+
+                  <EmojiPickerPopover
+                    isOpen={isEmojiPickerOpen}
+                    onClose={() => setIsEmojiPickerOpen(false)}
+                    onSelectEmoji={(emoji) => {
+                      setMessageInput((prev) => prev + emoji);
+                    }}
+                    position="top"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsGifModalOpen(true)}
+                  className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60 rounded-xl transition"
+                  title="Search & Send GIF"
+                >
+                  <ImageIcon className="w-5 h-5" />
+                </button>
+
                 <input
                   type="text"
                   value={messageInput}
@@ -1026,6 +1241,19 @@ export const MessagesPage: React.FC = () => {
           socket={realtimeSocket}
         />
       )}
+
+      {/* GIF Picker Modal for Direct & Group Chats */}
+      <GifPickerModal
+        isOpen={isGifModalOpen}
+        onClose={() => setIsGifModalOpen(false)}
+        onSelectGif={(gifUrl) => {
+          if (chatType === 'direct' && selectedUser) {
+            sendDirectMessageMutation.mutate(`[GIF: ${gifUrl}]`);
+          } else if (chatType === 'groups' && selectedGroup) {
+            sendGroupMessageMutation.mutate(`[GIF: ${gifUrl}]`);
+          }
+        }}
+      />
     </AppShell>
   );
 };

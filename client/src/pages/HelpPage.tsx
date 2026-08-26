@@ -168,10 +168,10 @@ export const HelpPage: React.FC = () => {
       color: 'text-purple-400',
       bg: 'bg-purple-500/10 border-purple-500/20',
       steps: [
-        'Enjoy native Android bottom navigation across Home, Explore, Messages, Reels, and Profile.',
+        'Enjoy native Android bottom navigation across Home, Explore, Messages, Bytes, and Profile.',
         'Secure credentials are encrypted locally using Android Keystore and EncryptedSharedPreferences.',
         'Receive instant real-time message delivery and typing indicators over WebSocket.',
-        'Explore reels, stories, and global trends on any Android device.'
+        'Explore Bytes, Cosmic, and global trends on any Android device.'
       ],
       actionText: 'Download APK',
       actionTarget: ANDROID_RELEASE.downloadUrl

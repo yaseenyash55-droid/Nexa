@@ -58,8 +58,8 @@ class ConversationsActivity : AppCompatActivity() {
                 is ConversationItem.Direct -> {
                     val intent = Intent(this, ChatActivity::class.java).apply {
                         putExtra(ChatActivity.EXTRA_CHAT_TYPE, "direct")
-                        putExtra(ChatActivity.EXTRA_TARGET_ID, item.user.userId)
-                        putExtra(ChatActivity.EXTRA_TARGET_NAME, item.user.displayName)
+                        putExtra(ChatActivity.EXTRA_TARGET_ID, item.conversation.otherUserId)
+                        putExtra(ChatActivity.EXTRA_TARGET_NAME, item.conversation.resolvedDisplayName())
                     }
                     startActivity(intent)
                 }
@@ -83,6 +83,11 @@ class ConversationsActivity : AppCompatActivity() {
 
         binding.rvConversations.layoutManager = LinearLayoutManager(this)
         binding.rvConversations.adapter = adapter
+    }
+
+    override fun onResume() {
+        super.onResume()
+        loadData()
     }
 
     private fun setupTabLayout() {
@@ -118,9 +123,27 @@ class ConversationsActivity : AppCompatActivity() {
             try {
                 when (activeTab) {
                     0 -> {
-                        val res = NexaApiClient.userApi.getSuggestions()
-                        val users = res.body()?.data ?: emptyList()
-                        val items = users.map { ConversationItem.Direct(it) }
+                        val res = NexaApiClient.messageApi.getConversations()
+                        val conversations = res.body()?.data ?: emptyList()
+                        val items = if (conversations.isNotEmpty()) {
+                            conversations.map { ConversationItem.Direct(it) }
+                        } else {
+                            val sugRes = NexaApiClient.userApi.getSuggestions()
+                            val users = sugRes.body()?.data ?: emptyList()
+                            users.map { u ->
+                                ConversationItem.Direct(
+                                    com.nexa.social.data.models.Conversation(
+                                        otherUserId = u.userId,
+                                        username = u.username,
+                                        displayName = u.displayName,
+                                        profileImageUrl = u.profileImageUrl,
+                                        lastMessage = null,
+                                        lastMessageAt = null,
+                                        unreadCount = 0
+                                    )
+                                )
+                            }
+                        }
                         withContext(Dispatchers.Main) {
                             adapter.submitList(items)
                             binding.swipeRefresh.isRefreshing = false

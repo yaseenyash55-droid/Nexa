@@ -126,7 +126,7 @@ export const ProfilePage: React.FC = () => {
             }`}
           >
             <Film className="w-4 h-4 text-purple-300" />
-            <span>Uploaded Reels ({userReels.length})</span>
+            <span>Uploaded Bytes ({userReels.length})</span>
           </button>
         </div>
 
@@ -188,7 +188,7 @@ export const ProfilePage: React.FC = () => {
           isReelsLoading ? (
             <PostSkeleton />
           ) : userReels.length === 0 ? (
-            <EmptyState title="No uploaded reels" description="This user has not published any video reels yet." />
+            <EmptyState title="No uploaded bytes" description="This user has not published any Bytes yet." />
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {userReels.map((reel) => {
@@ -203,28 +203,28 @@ export const ProfilePage: React.FC = () => {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-between p-3">
                       <div className="flex items-center justify-between">
                         <span className="bg-purple-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <Play className="w-2.5 h-2.5 fill-current" /> Reel
+                          <Play className="w-2.5 h-2.5 fill-current" /> Byte
                         </span>
                         {currentUser &&
                           (currentUser.userId === reel.userId || currentUser.role === 'ADMIN' || currentUser.role === 'MODERATOR') && (
                             <button
                               type="button"
                               onClick={() => {
-                                if (window.confirm('Delete this reel from Oracle database?')) {
+                                if (window.confirm('Delete this Byte?')) {
                                   socialApi.deleteReel(reel.reelId).then(() => {
                                     queryClient.invalidateQueries({ queryKey: ['reels'] });
                                   });
                                 }
                               }}
                               className="p-1.5 bg-rose-600/90 hover:bg-rose-600 text-white rounded-lg transition-colors"
-                              title="Delete Reel"
+                              title="Delete Byte"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           )}
                       </div>
                       <div>
-                        <p className="text-xs text-white font-medium line-clamp-2">{reel.caption || 'Nexa Reel'}</p>
+                        <p className="text-xs text-white font-medium line-clamp-2">{reel.caption || 'Nexa Byte'}</p>
                         <div className="flex items-center gap-1 text-[10px] text-rose-400 mt-1">
                           <Heart className="w-3 h-3 fill-current" />
                           <span>{reel.likesCount || 0} likes</span>

@@ -102,4 +102,50 @@ class LocalChatStorage(context: Context) {
         val key = getStorageKey(currentUserId, targetId, chatType)
         prefs.edit().remove(key).apply()
     }
+
+    // Draft persistence
+    @Synchronized
+    fun saveDraft(currentUserId: Int, targetId: Int, chatType: String, draft: String) {
+        val key = "draft_${getStorageKey(currentUserId, targetId, chatType)}"
+        if (draft.isBlank()) {
+            prefs.edit().remove(key).apply()
+        } else {
+            prefs.edit().putString(key, draft).apply()
+        }
+    }
+
+    @Synchronized
+    fun getDraft(currentUserId: Int, targetId: Int, chatType: String): String {
+        val key = "draft_${getStorageKey(currentUserId, targetId, chatType)}"
+        return prefs.getString(key, "") ?: ""
+    }
+
+    @Synchronized
+    fun clearDraft(currentUserId: Int, targetId: Int, chatType: String) {
+        val key = "draft_${getStorageKey(currentUserId, targetId, chatType)}"
+        prefs.edit().remove(key).apply()
+    }
+
+    @Synchronized
+    fun savePostDraft(content: String, mediaUrl: String) {
+        prefs.edit()
+            .putString("post_draft_content", content)
+            .putString("post_draft_media_url", mediaUrl)
+            .apply()
+    }
+
+    @Synchronized
+    fun getPostDraft(): Pair<String, String> {
+        val content = prefs.getString("post_draft_content", "") ?: ""
+        val mediaUrl = prefs.getString("post_draft_media_url", "") ?: ""
+        return Pair(content, mediaUrl)
+    }
+
+    @Synchronized
+    fun clearPostDraft() {
+        prefs.edit()
+            .remove("post_draft_content")
+            .remove("post_draft_media_url")
+            .apply()
+    }
 }

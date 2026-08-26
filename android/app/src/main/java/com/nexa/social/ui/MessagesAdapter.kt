@@ -188,6 +188,7 @@ class MessagesAdapter(
 
         private val photoRegex = Regex("""(?:📷\s*\[Photo\]\s*|(?:^|\s))(https?://\S+\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?|https?://\S*supabase\.co\S*|https?://\S*/uploads/\S+)""", RegexOption.IGNORE_CASE)
         private val fileRegex = Regex("""(?:📁\s*\[File\]\s*)(https?://\S+)""", RegexOption.IGNORE_CASE)
+        private val gifRegex = Regex("""^\[GIF:\s*(https?://\S+?)\]$""", RegexOption.IGNORE_CASE)
 
         private fun bindMessageAttachments(
             content: String,
@@ -197,6 +198,26 @@ class MessagesAdapter(
             layoutFileAttachment: View?,
             tvFileName: TextView?
         ) {
+            val gifMatch = gifRegex.find(content.trim())
+            if (gifMatch != null) {
+                val gifUrl = gifMatch.groupValues[1]
+                cardMedia?.visibility = View.VISIBLE
+                imgMediaAttachment?.load(gifUrl) {
+                    crossfade(true)
+                    placeholder(R.drawable.bg_input_field)
+                    error(R.drawable.bg_input_field)
+                }
+                cardMedia?.setOnClickListener {
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(gifUrl))
+                        it.context.startActivity(intent)
+                    } catch (_: Exception) {}
+                }
+                layoutFileAttachment?.visibility = View.GONE
+                tvContent.visibility = View.GONE
+                return
+            }
+
             val photoMatch = photoRegex.find(content)
             val fileMatch = fileRegex.find(content)
 

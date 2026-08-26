@@ -41,16 +41,16 @@ export class OracleGroupRepository implements GroupRepository {
       );
 
       // 3. Add members
-      if (params.memberIds && params.memberIds.length > 0) {
-        for (const mId of params.memberIds) {
-          if (mId !== params.createdBy) {
-            await conn.execute(
-              `INSERT INTO GROUP_MEMBERS (GROUP_ID, USER_ID, ROLE, JOINED_AT)
-               VALUES (:1, :2, 'MEMBER', SYSTIMESTAMP)`,
-              [groupId, mId]
-            );
-          }
-        }
+      const uniqueMemberIds = Array.isArray(params.memberIds)
+        ? Array.from(new Set(params.memberIds.map(Number).filter((id) => !isNaN(id) && id > 0 && id !== params.createdBy)))
+        : [];
+
+      for (const mId of uniqueMemberIds) {
+        await conn.execute(
+          `INSERT INTO GROUP_MEMBERS (GROUP_ID, USER_ID, ROLE, JOINED_AT)
+           VALUES (:1, :2, 'MEMBER', SYSTIMESTAMP)`,
+          [groupId, mId]
+        );
       }
 
       return {
@@ -60,7 +60,7 @@ export class OracleGroupRepository implements GroupRepository {
         createdBy: params.createdBy,
         avatarUrl: params.avatarUrl || null,
         createdAt,
-        membersCount: 1 + (params.memberIds?.length || 0),
+        membersCount: 1 + uniqueMemberIds.length,
         lastMessage: null
       };
     });

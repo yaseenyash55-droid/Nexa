@@ -185,6 +185,12 @@
             android:name=".ui.StoryViewerActivity"
             android:exported="false" />
 
+        <!-- Native Jamendo Music Activity -->
+        <activity
+            android:name=".ui.MusicActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Firebase Cloud Messaging Service -->
         <service
             android:name=".service.NexaFirebaseMessagingService"

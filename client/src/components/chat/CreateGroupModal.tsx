@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User } from '../../types/index.js';
 import { Avatar } from '../ui/Avatar.js';
-import { X, Users, Search, Check } from 'lucide-react';
+import { X, Users, Search, Check, Loader2, UserPlus } from 'lucide-react';
 import { groupsApi, Group } from '../../api/groups.api.js';
+import { usersApi } from '../../api/users.api.js';
 
 interface CreateGroupModalProps {
   isOpen: boolean;
@@ -20,16 +21,102 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const [groupName, setGroupName] = useState('');
   const [description, setDescription] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<Map<number, User>>(new Map());
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Reset state when opening/closing
+  useEffect(() => {
+    if (!isOpen) {
+      setGroupName('');
+      setDescription('');
+      setSearchQuery('');
+      setSelectedUsers(new Map());
+      setSearchResults([]);
+      setIsSearching(false);
+      setError(null);
+    }
+  }, [isOpen]);
+
+  // Debounced dynamic user search
+  useEffect(() => {
+    if (!isOpen) return;
+    const query = searchQuery.trim();
+
+    if (!query) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    setIsSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await usersApi.search(query);
+        const combined = [...results];
+
+        // If numeric ID and not found in general search, try direct getById
+        if (combined.length === 0 && /^\d+$/.test(query)) {
+          try {
+            const userById = await usersApi.getById(parseInt(query, 10));
+            if (userById) {
+              combined.push(userById);
+            }
+          } catch {
+            // User ID not found, ignore
+          }
+        }
+
+        // Also merge any local contacts matching query if not already present
+        const localMatches = contacts.filter((c) =>
+          (c.displayName.toLowerCase().includes(query.toLowerCase()) ||
+           c.username.toLowerCase().includes(query.toLowerCase()) ||
+           c.userId.toString() === query) &&
+          !combined.some((u) => u.userId === c.userId)
+        );
+
+        setSearchResults([...combined, ...localMatches]);
+      } catch (err: any) {
+        console.warn('User search failed:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, isOpen, contacts]);
 
   if (!isOpen) return null;
 
-  const toggleUser = (userId: number) => {
-    setSelectedUserIds((prev) =>
-      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-    );
+  const toggleUser = (user: User) => {
+    setSelectedUsers((prev) => {
+      const next = new Map(prev);
+      if (next.has(user.userId)) {
+        next.delete(user.userId);
+      } else {
+        next.set(user.userId, user);
+      }
+      return next;
+    });
+  };
+
+  const removeUser = (userId: number) => {
+    setSelectedUsers((prev) => {
+      const next = new Map(prev);
+      next.delete(userId);
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,20 +126,19 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       return;
     }
 
+    const memberIds = Array.from(selectedUsers.keys());
+
     try {
       setIsSubmitting(true);
       setError(null);
       const newGroup = await groupsApi.createGroup({
         name: groupName.trim(),
         description: description.trim() || undefined,
-        memberIds: selectedUserIds
+        memberIds
       });
 
       onGroupCreated(newGroup);
       onClose();
-      setGroupName('');
-      setDescription('');
-      setSelectedUserIds([]);
     } catch (err: any) {
       setError(err.response?.data?.error?.message || 'Failed to create group');
     } finally {
@@ -60,10 +146,8 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     }
   };
 
-  const filteredContacts = contacts.filter((c) =>
-    c.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.username.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // When search query is empty, show initial suggestions/contacts; otherwise show searchResults
+  const displayList = searchQuery.trim().length > 0 ? searchResults : contacts;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -96,7 +180,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
               type="text"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              placeholder="e.g. Design Team / Project Hub"
+              placeholder="e.g. Engineering Squad / Design Hub"
               className="w-full bg-slate-950 border border-slate-800 focus:border-brand-500 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none"
               required
             />
@@ -114,37 +198,98 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
-              Select Members ({selectedUserIds.length} selected)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-slate-300">
+                Add Members ({selectedUsers.size} selected)
+              </label>
+              {selectedUsers.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedUsers(new Map())}
+                  className="text-[11px] text-slate-400 hover:text-red-400 transition"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+
+            {/* Selected Members Chips */}
+            {selectedUsers.size > 0 && (
+              <div className="flex flex-wrap gap-1.5 p-2 mb-2 bg-slate-950/80 border border-brand-500/20 rounded-xl max-h-24 overflow-y-auto">
+                {Array.from(selectedUsers.values()).map((user) => (
+                  <div
+                    key={user.userId}
+                    className="inline-flex items-center gap-1.5 px-2 py-1 bg-brand-600/20 border border-brand-500/40 rounded-lg text-[11px] text-brand-200"
+                  >
+                    <Avatar src={user.profileImageUrl} name={user.displayName} size="xs" />
+                    <span className="font-semibold truncate max-w-[90px]">{user.displayName}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeUser(user.userId)}
+                      className="text-brand-400 hover:text-white transition"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Search Input */}
             <div className="relative mb-2">
               <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search contacts..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                placeholder="Search by name, @username, or User ID..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-8 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
               />
+              {isSearching ? (
+                <Loader2 className="w-3.5 h-3.5 absolute right-3 top-3 text-brand-400 animate-spin" />
+              ) : searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              ) : null}
             </div>
 
+            {/* Users List */}
             <div className="max-h-48 overflow-y-auto divide-y divide-slate-800/60 border border-slate-800 rounded-xl bg-slate-950">
-              {filteredContacts.length === 0 ? (
-                <div className="p-4 text-center text-xs text-slate-500">No contacts found</div>
+              {displayList.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-500 space-y-1">
+                  {isSearching ? (
+                    <p>Searching users...</p>
+                  ) : searchQuery.trim() ? (
+                    <>
+                      <p>No users found matching &quot;{searchQuery}&quot;</p>
+                      <p className="text-[10px] text-slate-600">Try searching by full username or User ID</p>
+                    </>
+                  ) : (
+                    <p>Search users to add members</p>
+                  )}
+                </div>
               ) : (
-                filteredContacts.map((contact) => {
-                  const isSelected = selectedUserIds.includes(contact.userId);
+                displayList.map((contact) => {
+                  const isSelected = selectedUsers.has(contact.userId);
                   return (
                     <div
                       key={contact.userId}
-                      onClick={() => toggleUser(contact.userId)}
+                      onClick={() => toggleUser(contact)}
                       className={`p-2.5 flex items-center gap-3 cursor-pointer transition-colors ${
                         isSelected ? 'bg-brand-600/15' : 'hover:bg-slate-900'
                       }`}
                     >
                       <Avatar src={contact.profileImageUrl} name={contact.displayName} size="sm" />
                       <div className="flex-1 truncate">
-                        <p className="text-xs font-bold text-white truncate">{contact.displayName}</p>
+                        <p className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+                          {contact.displayName}
+                          <span className="text-[10px] font-normal text-slate-500">#{contact.userId}</span>
+                        </p>
                         <p className="text-[10px] text-slate-400 truncate">@{contact.username}</p>
                       </div>
                       <div
@@ -154,7 +299,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                             : 'border-slate-700 bg-slate-900'
                         }`}
                       >
-                        {isSelected && <Check className="w-3.5 h-3.5" />}
+                        {isSelected ? <Check className="w-3.5 h-3.5" /> : <UserPlus className="w-3 h-3 text-slate-500" />}
                       </div>
                     </div>
                   );
@@ -176,7 +321,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
               disabled={isSubmitting || !groupName.trim()}
               className="px-5 py-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-glow-brand transition-colors"
             >
-              {isSubmitting ? 'Creating...' : 'Create Group'}
+              {isSubmitting ? 'Creating...' : selectedUsers.size > 0 ? `Create Group (${selectedUsers.size + 1} members)` : 'Create Group'}
             </button>
           </div>
         </form>

@@ -82,6 +82,19 @@ class UserRepository {
         }
     }
 
+    suspend fun removeFollower(userId: Int, followerId: Int): Result<Unit> {
+        return try {
+            val response = NexaApiClient.userApi.removeFollower(userId, followerId)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Failed to remove follower"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun unfollowUser(userId: Int): Result<Unit> {
         return try {
             val response = NexaApiClient.userApi.unfollowUser(userId)

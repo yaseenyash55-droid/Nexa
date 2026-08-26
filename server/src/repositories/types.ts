@@ -26,6 +26,7 @@ export interface IUserRepository {
   updatePasswordHash(userId: number, passwordHash: string): Promise<void>;
   findById(userId: number, currentUserId?: number): Promise<User | null>;
   updateUser(userId: number, updates: {
+    username?: string;
     displayName?: string;
     bio?: string;
     profileImageUrl?: string;

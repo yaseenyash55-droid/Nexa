@@ -381,4 +381,70 @@ class ApiContractTest {
         assertEquals(2, response.body()?.data?.iceServers?.size)
         assertEquals("temporary-user", response.body()?.data?.iceServers?.get(1)?.username)
     }
+
+    @Test
+    fun `followers and following contract matches GET users id followers and following`() = runBlocking {
+        val followersJson = """
+            {
+                "data": [
+                    {
+                        "userId": 10,
+                        "username": "alex",
+                        "displayName": "Alex Rivera",
+                        "followersCount": 42,
+                        "followingCount": 12,
+                        "isFollowing": true
+                    }
+                ]
+            }
+        """.trimIndent()
+
+        mockServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(followersJson)
+        )
+
+        val followersResponse = userApi.getFollowers(id = 5)
+        val followersReq = mockServer.takeRequest()
+
+        assertEquals("GET", followersReq.method)
+        assertEquals("/users/5/followers", followersReq.path)
+        assertTrue(followersResponse.isSuccessful)
+        assertEquals(1, followersResponse.body()?.data?.size)
+        assertEquals("alex", followersResponse.body()?.data?.first()?.username)
+        assertTrue(followersResponse.body()?.data?.first()?.isFollowing == true)
+
+        mockServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(followersJson)
+        )
+
+        val followingResponse = userApi.getFollowing(id = 5)
+        val followingReq = mockServer.takeRequest()
+
+        assertEquals("GET", followingReq.method)
+        assertEquals("/users/5/following", followingReq.path)
+        assertTrue(followingResponse.isSuccessful)
+    }
+
+    @Test
+    fun `remove follower contract matches DELETE users id followers followerId`() = runBlocking {
+        mockServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"data": null, "message": "Follower removed successfully"}""")
+        )
+
+        val response = userApi.removeFollower(id = 1, followerId = 10)
+        val recordedReq = mockServer.takeRequest()
+
+        assertEquals("DELETE", recordedReq.method)
+        assertEquals("/users/1/followers/10", recordedReq.path)
+        assertTrue(response.isSuccessful)
+    }
 }

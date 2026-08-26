@@ -4,14 +4,16 @@ import { postsApi } from '../../api/posts.api.js';
 import { Avatar } from '../ui/Avatar.js';
 import { Button } from '../ui/Button.js';
 import { useAuth } from '../../contexts/AuthContext.js';
-import { Trash2, Send, LogIn } from 'lucide-react';
+import { Trash2, Send, LogIn, Smile } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Link } from 'react-router-dom';
+import { EmojiPickerPopover } from '../ui/EmojiPickerPopover.js';
 
 export const CommentList: React.FC<{ postId: number }> = ({ postId }) => {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
 
   const { data: commentsRes, isLoading } = useQuery({
     queryKey: ['comments', postId],
@@ -46,16 +48,32 @@ export const CommentList: React.FC<{ postId: number }> = ({ postId }) => {
             e.preventDefault();
             if (content.trim()) addCommentMutation.mutate();
           }}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 relative"
         >
           <Avatar src={currentUser.profileImageUrl} name={currentUser.displayName} size="sm" />
-          <input
-            type="text"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Write a comment..."
-            className="flex-1 bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500"
-          />
+          <div className="flex-1 relative flex items-center">
+            <input
+              type="text"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Write a comment..."
+              className="w-full bg-slate-900/80 border border-slate-800 rounded-xl pl-3 pr-9 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500"
+            />
+            <button
+              type="button"
+              onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+              className="absolute right-2.5 text-slate-400 hover:text-amber-400 transition"
+              title="Add Emoji"
+            >
+              <Smile className="w-4 h-4" />
+            </button>
+            <EmojiPickerPopover
+              isOpen={isEmojiPickerOpen}
+              onClose={() => setIsEmojiPickerOpen(false)}
+              onSelectEmoji={(emoji) => setContent((prev) => prev + emoji)}
+              position="top"
+            />
+          </div>
           <Button
             type="submit"
             size="sm"

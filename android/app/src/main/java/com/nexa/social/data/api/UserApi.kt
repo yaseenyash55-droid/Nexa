@@ -54,6 +54,12 @@ interface UserApi {
     @GET("users/{id}/followers")
     suspend fun getFollowers(@Path("id") id: Int): Response<ApiResponse<List<User>>>
 
+    @DELETE("users/{id}/followers/{followerId}")
+    suspend fun removeFollower(
+        @Path("id") id: Int,
+        @Path("followerId") followerId: Int
+    ): Response<ApiResponse<Map<String, Any>>>
+
     @GET("users/{id}/following")
     suspend fun getFollowing(@Path("id") id: Int): Response<ApiResponse<List<User>>>
 }
