@@ -33,6 +33,12 @@ export class AuthService {
     return sanitized;
   }
 
+  async getCurrentUser(userId: number): Promise<User | null> {
+    const user = await this.userRepo.findById(userId);
+    if (!user) return null;
+    return this.sanitizeUser(user);
+  }
+
   async register(data: {
     username: string;
     email: string;

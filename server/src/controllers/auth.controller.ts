@@ -118,12 +118,18 @@ export class AuthController {
 
   async me(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) {
+      if (!req.user?.userId) {
         return res.status(401).json({
           error: { code: 'UNAUTHORIZED', message: 'Not authenticated', details: [] }
         });
       }
-      return sendSuccess(res, req.user);
+      const user = await authService.getCurrentUser(req.user.userId);
+      if (!user) {
+        return res.status(404).json({
+          error: { code: 'USER_NOT_FOUND', message: 'User not found', details: [] }
+        });
+      }
+      return sendSuccess(res, user);
     } catch (err) {
       next(err);
     }

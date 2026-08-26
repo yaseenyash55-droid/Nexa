@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell.js';
 import { ProfileHeader } from '../components/profile/ProfileHeader.js';
 import { EditProfileModal } from '../components/profile/EditProfileModal.js';
@@ -17,6 +17,7 @@ import { User } from '../types/index.js';
 
 export const ProfilePage: React.FC = () => {
   const { username } = useParams<{ username: string }>();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user: currentUser, setUser } = useAuth();
 
@@ -47,10 +48,20 @@ export const ProfilePage: React.FC = () => {
     if (currentUser && currentUser.userId === updatedUser.userId) {
       setUser(updatedUser);
     }
-    queryClient.invalidateQueries({ queryKey: ['profile', username] });
+    // Seed new profile query cache immediately
+    queryClient.setQueryData(['profile', updatedUser.username], updatedUser);
     queryClient.invalidateQueries({ queryKey: ['profile'] });
+    queryClient.invalidateQueries({ queryKey: ['user-posts'] });
+    queryClient.invalidateQueries({ queryKey: ['posts'] });
+    queryClient.invalidateQueries({ queryKey: ['suggestions'] });
+
     setSuccessMsg('Profile updated successfully!');
     setTimeout(() => setSuccessMsg(null), 5000);
+
+    // If username changed, smoothly transition URL to the new username route
+    if (username && username.toLowerCase() !== updatedUser.username.toLowerCase()) {
+      navigate(`/profile/${updatedUser.username}`, { replace: true });
+    }
   };
 
   if (isUserLoading) {

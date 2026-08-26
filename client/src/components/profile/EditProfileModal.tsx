@@ -61,6 +61,20 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     type: 'avatar'
   });
 
+  React.useEffect(() => {
+    if (isOpen && user) {
+      setUsername(user.username || '');
+      setDisplayName(user.displayName || '');
+      setBio(user.bio || '');
+      setLocation(user.location || '');
+      setWebsiteUrl(user.websiteUrl || '');
+      setProfileImageUrl(user.profileImageUrl || '');
+      setCoverImageUrl(user.coverImageUrl || '');
+      setErrorMsg(null);
+      setSuccessMsg(null);
+    }
+  }, [isOpen, user]);
+
   if (!isOpen) return null;
 
   const handleAvatarFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {

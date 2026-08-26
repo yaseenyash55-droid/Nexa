@@ -48,6 +48,7 @@ import {
 
 export const SettingsPage: React.FC = () => {
   const { user, setUser, logout } = useAuth();
+  const queryClient = useQueryClient();
   const routerLoc = useLocation();
   const queryParams = new URLSearchParams(routerLoc.search);
   const initialTab = (queryParams.get('tab') as any) || 'account';
@@ -64,6 +65,17 @@ export const SettingsPage: React.FC = () => {
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [profileSuccessMsg, setProfileSuccessMsg] = useState<string | null>(null);
   const [profileErrorMsg, setProfileErrorMsg] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (user) {
+      setUsername(user.username || '');
+      setDisplayName(user.displayName || '');
+      setBio(user.bio || '');
+      setLocation(user.location || '');
+      setWebsiteUrl(user.websiteUrl || '');
+      setProfileImageUrl(user.profileImageUrl || '');
+    }
+  }, [user]);
 
   // Profile Picture Crop state
   const [selectedRawImage, setSelectedRawImage] = useState<string | null>(null);
@@ -137,17 +149,24 @@ export const SettingsPage: React.FC = () => {
 
       const res = await userApi.updateProfile(user.userId, {
         username: cleanUsername,
-        displayName,
-        bio,
-        location,
-        websiteUrl,
-        profileImageUrl
+        displayName: displayName.trim(),
+        bio: bio.trim(),
+        location: location.trim(),
+        websiteUrl: websiteUrl.trim(),
+        profileImageUrl: profileImageUrl.trim() || undefined
       });
 
-      setUser(res.data.data);
+      const updatedUser = res.data.data;
+      setUser(updatedUser);
+      queryClient.setQueryData(['profile', updatedUser.username], updatedUser);
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['user-posts'] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['suggestions'] });
+
       setProfileSuccessMsg('Profile settings and avatar updated successfully');
     } catch (err: any) {
-      setProfileErrorMsg(err.response?.data?.error?.message || 'Failed to update profile settings');
+      setProfileErrorMsg(err.response?.data?.error?.message || err.message || 'Failed to update profile settings');
     } finally {
       setIsUpdatingProfile(false);
     }

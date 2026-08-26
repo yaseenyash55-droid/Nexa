@@ -272,7 +272,21 @@ export class OracleUserRepository implements IUserRepository {
     fields.push('UPDATED_AT = SYSTIMESTAMP');
 
     const sql = `UPDATE USERS SET ${fields.join(', ')} WHERE USER_ID = :userId`;
-    await executeSql(sql, binds);
+    try {
+      await executeSql(sql, binds);
+    } catch (err: any) {
+      if (err.errorNum === 1 || (err.message && err.message.includes('ORA-00001'))) {
+        const msg = (err.message || '').toUpperCase();
+        if (msg.includes('UQ_USERS_USERNAME')) {
+          throw { statusCode: 409, code: 'USERNAME_TAKEN', message: 'Username is already registered' };
+        }
+        if (msg.includes('UQ_USERS_EMAIL')) {
+          throw { statusCode: 409, code: 'EMAIL_TAKEN', message: 'Email is already registered' };
+        }
+        throw { statusCode: 409, code: 'DUPLICATE_ENTRY', message: 'A user with this username or email already exists' };
+      }
+      throw err;
+    }
 
     const updated = await this.findById(userId);
     if (!updated) throw new Error('User not found after update');

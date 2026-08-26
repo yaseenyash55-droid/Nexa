@@ -138,4 +138,14 @@ describe('User Profile & Username Update Suite', () => {
       code: 'INVALID_USERNAME'
     });
   });
+
+  it('normalizes uppercase usernames to lowercase when updating profile', async () => {
+    const updated = await userService.updateProfile(1, {
+      username: 'ALICE_UPDATED'
+    });
+
+    expect(updated.username).toBe('alice_updated');
+    const persisted = await mockUserRepo.findById(1);
+    expect(persisted?.username).toBe('alice_updated');
+  });
 });
