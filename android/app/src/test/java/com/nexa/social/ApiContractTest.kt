@@ -447,4 +447,54 @@ class ApiContractTest {
         assertEquals("/users/1/followers/10", recordedReq.path)
         assertTrue(response.isSuccessful)
     }
+
+    @Test
+    fun `create group contract with 2+ memberIds correctly sends payload and parses membersCount`() = runBlocking {
+        val groupResponseBody = """
+            {
+                "data": {
+                    "groupId": 42,
+                    "name": "Frontend Architects",
+                    "description": "UI & Component Design",
+                    "createdBy": 1,
+                    "avatarUrl": null,
+                    "createdAt": "2026-08-26T12:00:00Z",
+                    "membersCount": 3
+                },
+                "message": "Group created"
+            }
+        """.trimIndent()
+
+        mockServer.enqueue(
+            MockResponse()
+                .setResponseCode(201)
+                .setHeader("Content-Type", "application/json")
+                .setBody(groupResponseBody)
+        )
+
+        val payload = mapOf(
+            "name" to "Frontend Architects",
+            "description" to "UI & Component Design",
+            "memberIds" to listOf(101, 102)
+        )
+
+        val response = groupApi.createGroup(payload)
+        val recordedReq = mockServer.takeRequest()
+
+        assertEquals("POST", recordedReq.method)
+        assertEquals("/groups", recordedReq.path)
+        assertTrue(response.isSuccessful)
+        assertNotNull(response.body()?.data)
+        assertEquals(42, response.body()?.data?.groupId)
+        assertEquals("Frontend Architects", response.body()?.data?.name)
+        assertEquals(3, response.body()?.data?.membersCount)
+
+        val bodyString = recordedReq.body.readUtf8()
+        val json = JSONObject(bodyString)
+        assertEquals("Frontend Architects", json.getString("name"))
+        val membersJsonArray = json.getJSONArray("memberIds")
+        assertEquals(2, membersJsonArray.length())
+        assertEquals(101, membersJsonArray.getInt(0))
+        assertEquals(102, membersJsonArray.getInt(1))
+    }
 }
