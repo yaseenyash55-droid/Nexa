@@ -342,21 +342,45 @@ export class AuthService {
   }
 
   async requestPasswordReset(email: string): Promise<{ message: string }> {
-    const user = await this.userRepo.findByEmail(email);
-    if (!user) {
-      // Prevent user enumeration attacks
+    const normalizedEmail = email?.trim().toLowerCase();
+    console.log('[AuthService.requestPasswordReset] Received request for:', normalizedEmail);
+    logger.info({ email: normalizedEmail }, '[AuthService.requestPasswordReset] Incoming request');
+
+    if (!normalizedEmail) {
       return { message: 'If an account with that email exists, password reset instructions have been sent.' };
     }
+
+    const user = await this.userRepo.findByEmail(normalizedEmail);
+    if (!user) {
+      console.warn(`[AuthService.requestPasswordReset] No user found with email "${normalizedEmail}". Returning generic response (enumeration defense).`);
+      logger.warn({ email: normalizedEmail }, '[AuthService.requestPasswordReset] User not found in DB');
+      return { message: 'If an account with that email exists, password reset instructions have been sent.' };
+    }
+
+    console.log(`[AuthService.requestPasswordReset] User found in DB: userId=${user.userId}, email=${user.email}`);
+    logger.info({ userId: user.userId, email: user.email }, '[AuthService.requestPasswordReset] User found in DB');
 
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = hashToken(rawToken);
     const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes TTL
     const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
 
-    await this.authRepo.savePasswordResetToken(user.userId, tokenHash, expiresAt);
+    try {
+      await this.authRepo.savePasswordResetToken(user.userId, tokenHash, expiresAt);
+      console.log(`[AuthService.requestPasswordReset] Saved password reset token to DB for userId=${user.userId}`);
+      logger.info({ userId: user.userId, expiresAt }, '[AuthService.requestPasswordReset] Token saved to DB');
+    } catch (dbErr: any) {
+      console.error('[AuthService.requestPasswordReset] DB Error saving reset token:', dbErr?.message || dbErr);
+      logger.error({ err: dbErr, userId: user.userId }, 'Failed to persist password reset token');
+      throw { statusCode: 500, code: 'DATABASE_ERROR', message: 'Failed to generate password reset request' };
+    }
 
     const clientOrigin = env.CLIENT_ORIGIN.replace(/\/+$/, '');
     const resetUrl = `${clientOrigin}/reset-password?token=${encodeURIComponent(rawToken)}`;
+
+    console.log(`[AuthService.requestPasswordReset] ABOUT TO SEND EMAIL to: ${user.email}, resetUrl: ${resetUrl}`);
+    logger.info({ to: user.email, resetUrl }, 'ABOUT TO SEND EMAIL');
+
     try {
       const emailProvider = getEmailProvider();
       await emailProvider.sendEmail({
@@ -364,7 +388,10 @@ export class AuthService {
         subject: 'Nexa Social Password Reset Request',
         body: `You requested a password reset. Open this link within 15 minutes: ${resetUrl}`
       });
-    } catch (emailErr) {
+      console.log(`[AuthService.requestPasswordReset] Password reset email dispatched successfully to: ${user.email}`);
+      logger.info({ to: user.email }, '[AuthService.requestPasswordReset] Email dispatched successfully');
+    } catch (emailErr: any) {
+      console.error('[AuthService.requestPasswordReset] FAILED TO DISPATCH EMAIL:', emailErr?.message || emailErr);
       logger.error({ err: emailErr, userId: user.userId }, 'Failed to dispatch password reset email');
     }
 
@@ -402,6 +429,7 @@ export class AuthService {
 
   async sendEmailVerification(userId: number, email?: string): Promise<{ message: string }> {
     const normalizedEmail = email?.trim().toLowerCase();
+    console.log('[AuthService.sendEmailVerification] Received request for userId:', userId, 'email:', normalizedEmail);
 
     const user = userId > 0
       ? await this.userRepo.findById(userId)
@@ -411,6 +439,7 @@ export class AuthService {
 
     const recipientEmail = normalizedEmail || user?.email;
     if (!recipientEmail || !user) {
+      console.warn('[AuthService.sendEmailVerification] User not found for verification, userId:', userId, 'email:', normalizedEmail);
       throw { statusCode: 404, code: 'USER_NOT_FOUND', message: 'User for verification not found' };
     }
 
@@ -422,6 +451,8 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
 
     await this.authRepo.saveEmailVerificationToken(user.userId, tokenHash, expiresAt);
+    console.log('[AuthService.sendEmailVerification] ABOUT TO SEND OTP EMAIL to:', recipientEmail, 'code:', verificationCode);
+    logger.info({ to: recipientEmail }, 'ABOUT TO SEND OTP EMAIL');
 
     const emailProvider = getEmailProvider();
     await emailProvider.sendEmail({
@@ -430,6 +461,7 @@ export class AuthService {
       body: `Welcome to Nexa! Your six-digit verification code is ${verificationCode}. It expires in 10 minutes. If you did not create this account, you can ignore this email.`
     });
 
+    console.log('[AuthService.sendEmailVerification] OTP email dispatched successfully to:', recipientEmail);
     return { message: 'A six-digit verification code has been sent to your email.' };
   }
 
