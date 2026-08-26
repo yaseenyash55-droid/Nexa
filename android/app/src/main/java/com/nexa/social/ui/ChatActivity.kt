@@ -175,11 +175,20 @@ class ChatActivity : AppCompatActivity() {
 
     private fun setupToolbar() {
         binding.toolbar.title = targetName
-        binding.toolbar.subtitle = if (chatType == "direct") "Direct Conversation" else "Group Conversation"
+        binding.toolbar.subtitle = if (chatType == "direct") "Direct Conversation" else "Group Conversation (Tap for info)"
         binding.toolbar.setNavigationOnClickListener { finish() }
+        if (chatType == "groups") {
+            binding.toolbar.setOnClickListener {
+                openGroupInfoBottomSheet()
+            }
+        }
         binding.toolbar.inflateMenu(R.menu.chat_call_menu)
         binding.toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                R.id.action_group_info -> {
+                    openGroupInfoBottomSheet()
+                    true
+                }
                 R.id.action_voice_call -> {
                     startActivity(CallActivity.outgoingIntent(this, targetId, targetName, "audio"))
                     true
@@ -199,6 +208,25 @@ class ChatActivity : AppCompatActivity() {
                 else -> false
             }
         }
+    }
+
+    private fun openGroupInfoBottomSheet() {
+        if (chatType != "groups") return
+        GroupInfoBottomSheetDialogFragment.newInstance(
+            groupId = targetId,
+            groupName = targetName,
+            onUpdated = { updatedGroup ->
+                targetName = updatedGroup.name
+                binding.toolbar.title = targetName
+                loadMessages()
+            },
+            onDeleted = {
+                finish()
+            },
+            onLeft = {
+                finish()
+            }
+        ).show(supportFragmentManager, "group_info")
     }
 
     private fun showThemePickerDialog() {
@@ -503,6 +531,8 @@ class ChatActivity : AppCompatActivity() {
                         }
                     }
                 } else {
+                    val groupResp = NexaApiClient.groupApi.getGroupById(targetId)
+                    val membersResp = NexaApiClient.groupApi.getGroupMembers(targetId)
                     val res = NexaApiClient.groupApi.getGroupMessages(targetId)
                     if (!res.isSuccessful) {
                         throw IllegalStateException(
@@ -522,10 +552,30 @@ class ChatActivity : AppCompatActivity() {
                         )
                     }
                     localChatStorage.saveMessages(currentUserId, targetId, chatType, displayList)
+
+                    val group = groupResp.body()?.data
+                    val members = membersResp.body()?.data ?: emptyList()
+                    val myRole = members.find { it.userId == currentUserId }?.role
+                    val isCreator = group?.createdBy == currentUserId
+                    val isAdmin = isCreator || myRole == "ADMIN"
+                    val isPostingDisabled = group?.onlyAdminsCanPost == true && !isAdmin
+
                     withContext(Dispatchers.Main) {
                         adapter.submitList(displayList)
                         if (displayList.isNotEmpty()) {
                             binding.rvMessages.scrollToPosition(displayList.size - 1)
+                        }
+
+                        if (isPostingDisabled) {
+                            binding.etMessage.isEnabled = false
+                            binding.etMessage.hint = "🔒 Only admins can post in this group"
+                            binding.btnSend.isEnabled = false
+                            binding.btnSend.alpha = 0.5f
+                        } else {
+                            binding.etMessage.isEnabled = true
+                            binding.etMessage.hint = "Type a secure message..."
+                            binding.btnSend.isEnabled = true
+                            binding.btnSend.alpha = 1.0f
                         }
                     }
                 }

@@ -8,9 +8,15 @@ export interface GroupRepository {
   getGroupById(groupId: number): Promise<Group | null>;
   getGroupMembers(groupId: number): Promise<GroupMember[]>;
   addGroupMember(groupId: number, userId: number, role?: 'ADMIN' | 'MEMBER'): Promise<void>;
+  removeGroupMember(groupId: number, userId: number): Promise<boolean>;
   getGroupMessages(groupId: number): Promise<GroupMessage[]>;
   sendGroupMessage(groupId: number, senderId: number, content: string): Promise<GroupMessage>;
+  updateGroupSettings(groupId: number, settings: { onlyAdminsCanPost?: boolean; name?: string; description?: string }): Promise<void>;
+  deleteGroup(groupId: number): Promise<boolean>;
 }
+
+// In-memory settings registry for runtime group flags
+const groupSettingsMap = new Map<number, { onlyAdminsCanPost?: boolean }>();
 
 export class OracleGroupRepository implements GroupRepository {
   async createGroup(params: CreateGroupParams): Promise<Group> {
@@ -53,6 +59,10 @@ export class OracleGroupRepository implements GroupRepository {
         );
       }
 
+      if (params.onlyAdminsCanPost !== undefined) {
+        groupSettingsMap.set(groupId, { onlyAdminsCanPost: Boolean(params.onlyAdminsCanPost) });
+      }
+
       return {
         groupId,
         name: params.name.trim(),
@@ -61,7 +71,8 @@ export class OracleGroupRepository implements GroupRepository {
         avatarUrl: params.avatarUrl || null,
         createdAt,
         membersCount: 1 + uniqueMemberIds.length,
-        lastMessage: null
+        lastMessage: null,
+        onlyAdminsCanPost: params.onlyAdminsCanPost || false
       };
     });
   }
@@ -78,15 +89,20 @@ export class OracleGroupRepository implements GroupRepository {
     );
 
     const rows = res.rows || [];
-    return rows.map((r: any) => ({
-      groupId: r.GROUP_ID,
-      name: r.NAME,
-      description: r.DESCRIPTION,
-      createdBy: r.CREATED_BY,
-      avatarUrl: r.AVATAR_URL,
-      createdAt: new Date(r.CREATED_AT).toISOString(),
-      membersCount: r.MEMBERS_COUNT
-    }));
+    return rows.map((r: any) => {
+      const gId = r.GROUP_ID;
+      const settings = groupSettingsMap.get(gId);
+      return {
+        groupId: gId,
+        name: r.NAME,
+        description: r.DESCRIPTION,
+        createdBy: r.CREATED_BY,
+        avatarUrl: r.AVATAR_URL,
+        createdAt: new Date(r.CREATED_AT).toISOString(),
+        membersCount: r.MEMBERS_COUNT,
+        onlyAdminsCanPost: settings?.onlyAdminsCanPost || false
+      };
+    });
   }
 
   async getGroupById(groupId: number): Promise<Group | null> {
@@ -101,6 +117,7 @@ export class OracleGroupRepository implements GroupRepository {
     const rows = res.rows || [];
     if (rows.length === 0) return null;
     const r = rows[0];
+    const settings = groupSettingsMap.get(groupId);
     return {
       groupId: r.GROUP_ID,
       name: r.NAME,
@@ -108,7 +125,8 @@ export class OracleGroupRepository implements GroupRepository {
       createdBy: r.CREATED_BY,
       avatarUrl: r.AVATAR_URL,
       createdAt: new Date(r.CREATED_AT).toISOString(),
-      membersCount: r.MEMBERS_COUNT
+      membersCount: r.MEMBERS_COUNT,
+      onlyAdminsCanPost: settings?.onlyAdminsCanPost || false
     };
   }
 
@@ -144,6 +162,37 @@ export class OracleGroupRepository implements GroupRepository {
        VALUES (:1, :2, :3, SYSTIMESTAMP)`,
       [groupId, userId, role]
     );
+  }
+
+  async removeGroupMember(groupId: number, userId: number): Promise<boolean> {
+    const res = await executeSql(
+      `DELETE FROM GROUP_MEMBERS WHERE GROUP_ID = :1 AND USER_ID = :2`,
+      [groupId, userId]
+    );
+    return Boolean(res.rowsAffected && res.rowsAffected > 0);
+  }
+
+  async updateGroupSettings(groupId: number, settings: { onlyAdminsCanPost?: boolean; name?: string; description?: string }): Promise<void> {
+    if (settings.onlyAdminsCanPost !== undefined) {
+      const current = groupSettingsMap.get(groupId) || {};
+      groupSettingsMap.set(groupId, { ...current, onlyAdminsCanPost: settings.onlyAdminsCanPost });
+    }
+    if (settings.name || settings.description !== undefined) {
+      await executeSql(
+        `UPDATE GROUPS SET NAME = COALESCE(:1, NAME), DESCRIPTION = COALESCE(:2, DESCRIPTION) WHERE GROUP_ID = :3`,
+        [settings.name || null, settings.description || null, groupId]
+      );
+    }
+  }
+
+  async deleteGroup(groupId: number): Promise<boolean> {
+    groupSettingsMap.delete(groupId);
+    return withTransaction(async (conn: any) => {
+      await conn.execute(`DELETE FROM GROUP_MESSAGES WHERE GROUP_ID = :1`, [groupId]);
+      await conn.execute(`DELETE FROM GROUP_MEMBERS WHERE GROUP_ID = :1`, [groupId]);
+      const res = await conn.execute(`DELETE FROM GROUPS WHERE GROUP_ID = :1`, [groupId]);
+      return Boolean(res.rowsAffected && res.rowsAffected > 0);
+    });
   }
 
   async getGroupMessages(groupId: number): Promise<GroupMessage[]> {

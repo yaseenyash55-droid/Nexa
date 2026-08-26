@@ -12,6 +12,10 @@
         android:title="Video call"
         app:showAsAction="always" />
     <item
+        android:id="@+id/action_group_info"
+        android:title="Group Info &amp; Settings ⚙️"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_change_theme"
         android:title="Chat Theme 🎨"
         app:showAsAction="never" />

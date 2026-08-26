@@ -133,6 +133,32 @@ export class PostgresGroupRepository implements GroupRepository {
     );
   }
 
+  async removeGroupMember(groupId: number, userId: number): Promise<boolean> {
+    const res = await executePostgresSql(
+      `DELETE FROM group_members WHERE group_id = $1 AND user_id = $2`,
+      [groupId, userId]
+    );
+    return Boolean(res.rowCount && res.rowCount > 0);
+  }
+
+  async updateGroupSettings(groupId: number, settings: { onlyAdminsCanPost?: boolean; name?: string; description?: string }): Promise<void> {
+    if (settings.name || settings.description !== undefined) {
+      await executePostgresSql(
+        `UPDATE groups SET name = COALESCE($1, name), description = COALESCE($2, description) WHERE group_id = $3`,
+        [settings.name || null, settings.description || null, groupId]
+      );
+    }
+  }
+
+  async deleteGroup(groupId: number): Promise<boolean> {
+    return withPostgresTransaction(async (conn) => {
+      await conn.query(`DELETE FROM group_messages WHERE group_id = $1`, [groupId]);
+      await conn.query(`DELETE FROM group_members WHERE group_id = $1`, [groupId]);
+      const res = await conn.query(`DELETE FROM groups WHERE group_id = $1`, [groupId]);
+      return Boolean(res.rowCount && res.rowCount > 0);
+    });
+  }
+
   async getGroupMessages(groupId: number): Promise<GroupMessage[]> {
     const res = await executePostgresSql(
       `SELECT gm.message_id, gm.group_id, gm.sender_id, gm.content, gm.created_at,

@@ -29,6 +29,8 @@ class ConversationAdapter(
     inner class ConversationViewHolder(private val binding: ItemConversationBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(conversation: Conversation) {
             binding.tvDisplayName.text = conversation.resolvedDisplayName()
+            binding.tvUsername.text = "@${conversation.resolvedUsername()}"
+            binding.tvUsername.visibility = View.VISIBLE
             binding.tvLastMessage.text = conversation.messagePreview()
             binding.tvTimestamp.text = conversation.lastMessageAt.orEmpty()
 

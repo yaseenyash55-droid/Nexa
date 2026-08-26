@@ -10,6 +10,7 @@ export interface Group {
   createdAt: string;
   membersCount?: number;
   lastMessage?: string | null;
+  onlyAdminsCanPost?: boolean;
 }
 
 export interface GroupMember {
@@ -35,7 +36,7 @@ export interface GroupMessage {
 }
 
 export const groupsApi = {
-  createGroup: async (data: { name: string; description?: string; avatarUrl?: string; memberIds?: number[] }): Promise<Group> => {
+  createGroup: async (data: { name: string; description?: string; avatarUrl?: string; memberIds?: number[]; onlyAdminsCanPost?: boolean }): Promise<Group> => {
     const res = await api.post('/groups', data);
     return res.data.data;
   },
@@ -57,6 +58,36 @@ export const groupsApi = {
 
   addGroupMembers: async (groupId: number, memberIds: number[]): Promise<GroupMember[]> => {
     const res = await api.post(`/groups/${groupId}/members`, { memberIds });
+    return res.data.data;
+  },
+
+  getGroupById: async (groupId: number): Promise<Group> => {
+    const res = await api.get(`/groups/${groupId}`);
+    return res.data.data;
+  },
+
+  getGroupMembers: async (groupId: number): Promise<GroupMember[]> => {
+    const res = await api.get(`/groups/${groupId}/members`);
+    return res.data.data;
+  },
+
+  removeGroupMember: async (groupId: number, userId: number): Promise<{ success: boolean; isSelf: boolean; removedUserId: number }> => {
+    const res = await api.delete(`/groups/${groupId}/members/${userId}`);
+    return res.data.data;
+  },
+
+  leaveGroup: async (groupId: number): Promise<{ success: boolean }> => {
+    const res = await api.post(`/groups/${groupId}/leave`);
+    return res.data.data;
+  },
+
+  updateGroupSettings: async (groupId: number, settings: { onlyAdminsCanPost?: boolean; name?: string; description?: string }): Promise<Group> => {
+    const res = await api.patch(`/groups/${groupId}/settings`, settings);
+    return res.data.data;
+  },
+
+  deleteGroup: async (groupId: number): Promise<{ success: boolean; deletedGroupId: number }> => {
+    const res = await api.delete(`/groups/${groupId}`);
     return res.data.data;
   }
 };

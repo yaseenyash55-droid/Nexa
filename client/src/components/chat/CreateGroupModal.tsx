@@ -23,12 +23,13 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<Map<number, User>>(new Map());
   const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [localSuggestions, setLocalSuggestions] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Reset state when opening/closing
+  // Reset state when opening/closing and fetch suggestions if empty
   useEffect(() => {
     if (!isOpen) {
       setGroupName('');
@@ -38,8 +39,14 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       setSearchResults([]);
       setIsSearching(false);
       setError(null);
+    } else if (!contacts || contacts.length === 0) {
+      usersApi.getSuggestions().then((suggs) => {
+        if (suggs && suggs.length > 0) {
+          setLocalSuggestions(suggs);
+        }
+      }).catch(() => {});
     }
-  }, [isOpen]);
+  }, [isOpen, contacts]);
 
   // Debounced dynamic user search
   useEffect(() => {
@@ -59,26 +66,29 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     setIsSearching(true);
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        const results = await usersApi.search(query);
+        const cleanQuery = query.replace(/^[@#]+/, '').trim();
+        const results = await usersApi.search(cleanQuery || query);
         const combined = [...results];
 
         // If numeric ID and not found in general search, try direct getById
-        if (combined.length === 0 && /^\d+$/.test(query)) {
+        const numericId = parseInt(cleanQuery, 10);
+        if (!isNaN(numericId) && numericId > 0 && !combined.some((u) => u.userId === numericId)) {
           try {
-            const userById = await usersApi.getById(parseInt(query, 10));
-            if (userById) {
-              combined.push(userById);
+            const userById = await usersApi.getById(numericId);
+            if (userById && !combined.some((u) => u.userId === userById.userId)) {
+              combined.unshift(userById);
             }
           } catch {
             // User ID not found, ignore
           }
         }
 
-        // Also merge any local contacts matching query if not already present
-        const localMatches = contacts.filter((c) =>
-          (c.displayName.toLowerCase().includes(query.toLowerCase()) ||
-           c.username.toLowerCase().includes(query.toLowerCase()) ||
-           c.userId.toString() === query) &&
+        // Also merge any local contacts or suggestions matching query if not already present
+        const sourceContacts = contacts && contacts.length > 0 ? contacts : localSuggestions;
+        const localMatches = sourceContacts.filter((c) =>
+          (c.displayName.toLowerCase().includes(cleanQuery.toLowerCase()) ||
+           c.username.toLowerCase().includes(cleanQuery.toLowerCase()) ||
+           c.userId.toString() === cleanQuery) &&
           !combined.some((u) => u.userId === c.userId)
         );
 
@@ -88,14 +98,14 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       } finally {
         setIsSearching(false);
       }
-    }, 300);
+    }, 250);
 
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchQuery, isOpen, contacts]);
+  }, [searchQuery, isOpen, contacts, localSuggestions]);
 
   if (!isOpen) return null;
 
@@ -147,7 +157,9 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   };
 
   // When search query is empty, show initial suggestions/contacts; otherwise show searchResults
-  const displayList = searchQuery.trim().length > 0 ? searchResults : contacts;
+  const displayList = searchQuery.trim().length > 0
+    ? searchResults
+    : (contacts && contacts.length > 0 ? contacts : localSuggestions);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">

@@ -7,10 +7,11 @@ import { groupsApi, Group, GroupMessage } from '../api/groups.api.js';
 import { broadcastsApi, Broadcast } from '../api/broadcasts.api.js';
 import { Message, User } from '../types/index.js';
 import { Avatar } from '../components/ui/Avatar.js';
-import { Send, MessageSquare, Search, CheckCheck, Check, Phone, Video, ShieldCheck, Users, Plus, Radio, FileText, Download, Sparkles, Smile, Image as ImageIcon } from 'lucide-react';
+import { Send, MessageSquare, Search, CheckCheck, Check, Phone, Video, ShieldCheck, Users, Plus, Radio, FileText, Download, Sparkles, Smile, Image as ImageIcon, Settings } from 'lucide-react';
 import { CallModal } from '../components/chat/CallModal.js';
 import { CreateGroupModal } from '../components/chat/CreateGroupModal.js';
 import { CreateBroadcastModal } from '../components/chat/CreateBroadcastModal.js';
+import { GroupInfoModal } from '../components/chat/GroupInfoModal.js';
 import { useAuth } from '../contexts/AuthContext.js';
 import { formatDistanceToNow } from 'date-fns';
 import { io, Socket } from 'socket.io-client';
@@ -255,6 +256,20 @@ export const MessagesPage: React.FC = () => {
     enabled: !!selectedGroup?.groupId && chatType === 'groups'
   });
 
+  // Fetch active Group members for permissions
+  const { data: selectedGroupMembers = [] } = useQuery({
+    queryKey: ['group-members', selectedGroup?.groupId],
+    queryFn: () => (selectedGroup ? groupsApi.getGroupMembers(selectedGroup.groupId) : Promise.resolve([])),
+    enabled: !!selectedGroup?.groupId && chatType === 'groups'
+  });
+
+  const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
+  const isCurrentGroupAdmin = selectedGroup
+    ? selectedGroup.createdBy === currentUser?.userId ||
+      selectedGroupMembers.some((m) => m.userId === currentUser?.userId && m.role === 'ADMIN')
+    : false;
+  const isPostingDisabled = Boolean(selectedGroup?.onlyAdminsCanPost && !isCurrentGroupAdmin);
+
   // Send Direct Message (TLS-Protected)
   const sendDirectMessageMutation = useMutation<Message, Error, string | void>({
     mutationFn: async (overrideContent) => {
@@ -362,6 +377,32 @@ export const MessagesPage: React.FC = () => {
       queryClient.setQueryData<GroupMessage[]>(['group-messages', msg.groupId], (current = []) =>
         current.some((item) => item.messageId === msg.messageId) ? current : [...current, msg]
       );
+    });
+
+    socket.on('group:settings:updated', (updatedGroup: Group) => {
+      queryClient.invalidateQueries({ queryKey: ['user-groups'] });
+      if (selectedGroup?.groupId === updatedGroup.groupId) {
+        setSelectedGroup(updatedGroup);
+      }
+    });
+
+    socket.on('group:deleted', ({ groupId }: { groupId: number }) => {
+      queryClient.invalidateQueries({ queryKey: ['user-groups'] });
+      if (selectedGroup?.groupId === groupId) {
+        setSelectedGroup(null);
+      }
+    });
+
+    socket.on('group:removed', ({ groupId }: { groupId: number }) => {
+      queryClient.invalidateQueries({ queryKey: ['user-groups'] });
+      if (selectedGroup?.groupId === groupId) {
+        setSelectedGroup(null);
+      }
+    });
+
+    socket.on('group:members:updated', ({ groupId }: { groupId: number }) => {
+      queryClient.invalidateQueries({ queryKey: ['group-members', groupId] });
+      queryClient.invalidateQueries({ queryKey: ['user-groups'] });
     });
 
     socket.on('message:read', ({ messageId }: { messageId: number }) => {
@@ -1058,26 +1099,50 @@ export const MessagesPage: React.FC = () => {
             <>
               {/* Group Chat Header */}
               <div className="p-3.5 border-b border-slate-800/80 bg-background-card/40 flex items-center justify-between">
-                <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center gap-3 cursor-pointer group"
+                  onClick={() => setIsGroupInfoOpen(true)}
+                  title="View group info & settings"
+                >
                   <button
-                    onClick={() => setSelectedGroup(null)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedGroup(null);
+                    }}
                     className="md:hidden text-xs text-brand-400 font-semibold pr-2"
                   >
                     ← Back
                   </button>
-                  <div className="w-9 h-9 rounded-full bg-brand-600/30 border border-brand-500/30 flex items-center justify-center text-brand-300 font-bold">
+                  <div className="w-9 h-9 rounded-full bg-brand-600/30 border border-brand-500/30 flex items-center justify-center text-brand-300 font-bold group-hover:scale-105 transition">
                     <Users className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2 group-hover:text-brand-300 transition">
                       {selectedGroup.name}
                     </h3>
                     <p className="text-[10px] text-slate-400 font-medium">
-                      {selectedGroup.membersCount || 1} members {selectedGroup.description ? `• ${selectedGroup.description}` : ''}
+                      {selectedGroupMembers.length || selectedGroup.membersCount || 1} members {selectedGroup.description ? `• ${selectedGroup.description}` : ''}
                     </p>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsGroupInfoOpen(true)}
+                  className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800/60 transition"
+                  title="Group Info & Settings"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
               </div>
+
+              {/* Announcement Mode Banner */}
+              {selectedGroup.onlyAdminsCanPost && (
+                <div className="px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-[11px] text-amber-300 flex items-center justify-between">
+                  <span>📢 Announcement Mode: Only admins can send messages.</span>
+                  {isCurrentGroupAdmin && <span className="font-bold text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded">You are Admin</span>}
+                </div>
+              )}
 
               {/* Group Messages Stream */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -1120,55 +1185,61 @@ export const MessagesPage: React.FC = () => {
               </div>
 
               {/* Group Chat Input Form */}
-              <form
-                onSubmit={handleSendMessageSubmit}
-                className="p-3 border-t border-slate-800/80 bg-background-card/60 flex items-center gap-2 relative"
-              >
-                <div className="relative">
+              {isPostingDisabled ? (
+                <div className="p-4 border-t border-slate-800/80 bg-slate-900/60 text-center text-xs text-slate-400 font-medium">
+                  🔒 Only group admins can send messages in this group.
+                </div>
+              ) : (
+                <form
+                  onSubmit={handleSendMessageSubmit}
+                  className="p-3 border-t border-slate-800/80 bg-background-card/60 flex items-center gap-2 relative"
+                >
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+                      className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 rounded-xl transition"
+                      title="Add Emoji"
+                    >
+                      <Smile className="w-5 h-5" />
+                    </button>
+
+                    <EmojiPickerPopover
+                      isOpen={isEmojiPickerOpen}
+                      onClose={() => setIsEmojiPickerOpen(false)}
+                      onSelectEmoji={(emoji) => {
+                        setMessageInput((prev) => prev + emoji);
+                      }}
+                      position="top"
+                    />
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-                    className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 rounded-xl transition"
-                    title="Add Emoji"
+                    onClick={() => setIsGifModalOpen(true)}
+                    className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60 rounded-xl transition"
+                    title="Search & Send GIF"
                   >
-                    <Smile className="w-5 h-5" />
+                    <ImageIcon className="w-5 h-5" />
                   </button>
 
-                  <EmojiPickerPopover
-                    isOpen={isEmojiPickerOpen}
-                    onClose={() => setIsEmojiPickerOpen(false)}
-                    onSelectEmoji={(emoji) => {
-                      setMessageInput((prev) => prev + emoji);
-                    }}
-                    position="top"
+                  <input
+                    type="text"
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    placeholder={`Message #${selectedGroup.name}...`}
+                    className="flex-1 bg-slate-900 border border-slate-800 focus:border-brand-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
                   />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsGifModalOpen(true)}
-                  className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60 rounded-xl transition"
-                  title="Search & Send GIF"
-                >
-                  <ImageIcon className="w-5 h-5" />
-                </button>
-
-                <input
-                  type="text"
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  placeholder={`Message #${selectedGroup.name}...`}
-                  className="flex-1 bg-slate-900 border border-slate-800 focus:border-brand-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={!messageInput.trim() || sendGroupMessageMutation.isPending}
-                  className="p-2.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white rounded-xl shadow-glow-brand transition-all flex items-center justify-center"
-                  title="Send Group Message"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
+                  <button
+                    type="submit"
+                    disabled={!messageInput.trim() || sendGroupMessageMutation.isPending}
+                    className="p-2.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white rounded-xl shadow-glow-brand transition-all flex items-center justify-center"
+                    title="Send Group Message"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </form>
+              )}
             </>
           ) : chatType === 'broadcasts' && selectedBroadcast ? (
             <div className="flex-1 flex flex-col bg-background-card/20 p-6 space-y-4">
@@ -1216,6 +1287,24 @@ export const MessagesPage: React.FC = () => {
           setSelectedGroup(newGroup);
         }}
       />
+
+      {/* Group Info & Management Modal */}
+      {selectedGroup && (
+        <GroupInfoModal
+          isOpen={isGroupInfoOpen}
+          onClose={() => setIsGroupInfoOpen(false)}
+          group={selectedGroup}
+          onGroupUpdated={(updated) => setSelectedGroup(updated)}
+          onGroupDeleted={() => {
+            setSelectedGroup(null);
+            queryClient.invalidateQueries({ queryKey: ['user-groups'] });
+          }}
+          onGroupLeft={() => {
+            setSelectedGroup(null);
+            queryClient.invalidateQueries({ queryKey: ['user-groups'] });
+          }}
+        />
+      )}
 
       {/* Broadcast Creation Modal */}
       <CreateBroadcastModal
