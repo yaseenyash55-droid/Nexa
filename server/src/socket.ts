@@ -7,17 +7,28 @@ import { fcmNotificationService } from './services/fcm.service.js';
 import { logger } from './utils/logger.js';
 
 export function setupSocketCluster(io: Server): void {
-  const redisUrl = process.env.REDIS_URL;
+  const rawUrl = process.env.REDIS_URL?.trim();
 
-  if (!redisUrl) {
-    logger.warn('REDIS_URL not detected. Running in single-instance memory mode.');
+  const isInvalid =
+    !rawUrl ||
+    rawUrl === '' ||
+    rawUrl.includes('your-redis-host') ||
+    rawUrl.includes('example.com') ||
+    rawUrl.includes('placeholder');
+
+  if (isInvalid) {
+    logger.info('REDIS_URL not configured or using placeholder. Running Socket.IO in single-instance memory mode.');
     return;
   }
 
-  const pubClient = new Redis(redisUrl, {
-    maxRetriesPerRequest: null,
+  const isTls = rawUrl.startsWith('rediss://');
+
+  const pubClient = new Redis(rawUrl, {
+    maxRetriesPerRequest: 3,
+    connectTimeout: 5000,
     enableReadyCheck: false,
-    lazyConnect: true
+    lazyConnect: true,
+    tls: isTls ? { rejectUnauthorized: false } : undefined
   });
   const subClient = pubClient.duplicate();
 
@@ -27,7 +38,7 @@ export function setupSocketCluster(io: Server): void {
       logger.info('Redis Pub/Sub adapter attached to Socket.io cluster.');
     })
     .catch((err) => {
-      logger.error({ err }, 'Failed to connect Redis adapter, falling back to memory mode.');
+      logger.warn({ err: err?.message || err }, 'Failed to connect Redis adapter, falling back to memory mode.');
     });
 }
 

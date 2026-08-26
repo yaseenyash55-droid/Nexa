@@ -18,6 +18,7 @@ import org.webrtc.MediaConstraints
 import org.webrtc.MediaStream
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
+import org.webrtc.RendererCommon
 import org.webrtc.RtpReceiver
 import org.webrtc.RtpTransceiver
 import org.webrtc.SdpObserver
@@ -54,10 +55,31 @@ class WebRtcCallManager(
     private var audioTrack: AudioTrack? = null
     private var videoSource: VideoSource? = null
     private var videoTrack: VideoTrack? = null
+    private var remoteVideoTrack: VideoTrack? = null
     private var videoCapturer: VideoCapturer? = null
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
     private val pendingCandidates = mutableListOf<IceCandidate>()
     private var remoteDescriptionSet = false
+    private var isLocalRendererInitialized = false
+    private var isRemoteRendererInitialized = false
+    private var isCapturing = false
+
+    private fun attachRemoteVideoTrack(track: VideoTrack?) {
+        track ?: return
+        if (remoteVideoTrack == track) return
+        try {
+            remoteVideoTrack?.removeSink(remoteRenderer)
+        } catch (e: Exception) {
+            Log.w("WebRtcCallManager", "Error detaching previous remote video sink", e)
+        }
+        remoteVideoTrack = track
+        try {
+            track.addSink(remoteRenderer)
+            Log.i("WebRtcCallManager", "Attached remote video track sink successfully")
+        } catch (e: Exception) {
+            Log.e("WebRtcCallManager", "Failed to attach remote video sink", e)
+        }
+    }
 
     private val peerObserver = object : PeerConnection.Observer {
         override fun onSignalingChange(state: PeerConnection.SignalingState?) = Unit
@@ -72,28 +94,21 @@ class WebRtcCallManager(
         }
         override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) = Unit
         override fun onAddStream(stream: MediaStream?) {
-            try {
-                stream?.videoTracks?.firstOrNull()?.addSink(remoteRenderer)
-            } catch (e: Exception) {
-                Log.w("WebRtcCallManager", "Error adding remote sink to stream", e)
-            }
+            stream?.videoTracks?.firstOrNull()?.let(::attachRemoteVideoTrack)
         }
-        override fun onRemoveStream(stream: MediaStream?) = Unit
+        override fun onRemoveStream(stream: MediaStream?) {
+            try {
+                remoteVideoTrack?.removeSink(remoteRenderer)
+                remoteVideoTrack = null
+            } catch (_: Exception) {}
+        }
         override fun onDataChannel(channel: DataChannel?) = Unit
         override fun onRenegotiationNeeded() = Unit
         override fun onAddTrack(receiver: RtpReceiver?, mediaStreams: Array<out MediaStream>?) {
-            try {
-                (receiver?.track() as? VideoTrack)?.addSink(remoteRenderer)
-            } catch (e: Exception) {
-                Log.w("WebRtcCallManager", "Error adding remote sink to track", e)
-            }
+            (receiver?.track() as? VideoTrack)?.let(::attachRemoteVideoTrack)
         }
         override fun onTrack(transceiver: RtpTransceiver?) {
-            try {
-                (transceiver?.receiver?.track() as? VideoTrack)?.addSink(remoteRenderer)
-            } catch (e: Exception) {
-                Log.w("WebRtcCallManager", "Error adding remote sink to transceiver", e)
-            }
+            (transceiver?.receiver?.track() as? VideoTrack)?.let(::attachRemoteVideoTrack)
         }
         override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
             newState?.let(listener::onConnectionStateChanged)
@@ -111,19 +126,30 @@ class WebRtcCallManager(
             Log.w("WebRtcCallManager", "PeerConnectionFactory.initialize warning", e)
         }
 
-        try {
-            localRenderer.init(eglBase.eglBaseContext, null)
-            localRenderer.setMirror(true)
-            localRenderer.setEnableHardwareScaler(true)
-        } catch (e: Exception) {
-            Log.w("WebRtcCallManager", "localRenderer init warning", e)
+        // Initialize local Picture-in-Picture renderer with hardware overlay z-ordering
+        if (!isLocalRendererInitialized) {
+            try {
+                localRenderer.setZOrderMediaOverlay(true)
+                localRenderer.init(eglBase.eglBaseContext, null)
+                localRenderer.setMirror(true)
+                localRenderer.setEnableHardwareScaler(true)
+                localRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+                isLocalRendererInitialized = true
+            } catch (e: Exception) {
+                Log.w("WebRtcCallManager", "localRenderer init warning", e)
+            }
         }
 
-        try {
-            remoteRenderer.init(eglBase.eglBaseContext, null)
-            remoteRenderer.setEnableHardwareScaler(true)
-        } catch (e: Exception) {
-            Log.w("WebRtcCallManager", "remoteRenderer init warning", e)
+        // Initialize full-screen remote renderer
+        if (!isRemoteRendererInitialized) {
+            try {
+                remoteRenderer.init(eglBase.eglBaseContext, null)
+                remoteRenderer.setEnableHardwareScaler(true)
+                remoteRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+                isRemoteRendererInitialized = true
+            } catch (e: Exception) {
+                Log.w("WebRtcCallManager", "remoteRenderer init warning", e)
+            }
         }
 
         factory = PeerConnectionFactory.builder()
@@ -187,6 +213,7 @@ class WebRtcCallManager(
                     surfaceTextureHelper = createdSurfaceHelper
                     createdVideoCapturer.initialize(createdSurfaceHelper, appContext, createdVideoSource.capturerObserver)
                     createdVideoCapturer.startCapture(1280, 720, 30)
+                    isCapturing = true
                     val createdVideoTrack = factory.createVideoTrack("NEXA_VIDEO", createdVideoSource).apply {
                         setEnabled(true)
                         addSink(localRenderer)
@@ -197,6 +224,30 @@ class WebRtcCallManager(
             } catch (camErr: Exception) {
                 Log.w("WebRtcCallManager", "Camera capture initialization fallback to audio", camErr)
             }
+        }
+    }
+
+    fun pauseVideo() {
+        if (!videoEnabled) return
+        try {
+            if (isCapturing) {
+                videoCapturer?.stopCapture()
+                isCapturing = false
+            }
+        } catch (e: Exception) {
+            Log.w("WebRtcCallManager", "Error pausing video capture", e)
+        }
+    }
+
+    fun resumeVideo() {
+        if (!videoEnabled) return
+        try {
+            if (!isCapturing && videoCapturer != null) {
+                videoCapturer?.startCapture(1280, 720, 30)
+                isCapturing = true
+            }
+        } catch (e: Exception) {
+            Log.w("WebRtcCallManager", "Error resuming video capture", e)
         }
     }
 
@@ -258,8 +309,19 @@ class WebRtcCallManager(
     }
 
     fun release() {
-        try { videoCapturer?.stopCapture() } catch (_: Exception) {}
+        try {
+            if (isCapturing) {
+                videoCapturer?.stopCapture()
+                isCapturing = false
+            }
+        } catch (_: Exception) {}
+
         try { videoTrack?.removeSink(localRenderer) } catch (_: Exception) {}
+        try {
+            remoteVideoTrack?.removeSink(remoteRenderer)
+            remoteVideoTrack = null
+        } catch (_: Exception) {}
+
         try { videoCapturer?.dispose() } catch (_: Exception) {}
         try { surfaceTextureHelper?.dispose() } catch (_: Exception) {}
         try { videoSource?.dispose() } catch (_: Exception) {}
@@ -267,8 +329,17 @@ class WebRtcCallManager(
         try { peerConnection.close() } catch (_: Exception) {}
         try { peerConnection.dispose() } catch (_: Exception) {}
         try { factory.dispose() } catch (_: Exception) {}
-        try { localRenderer.release() } catch (_: Exception) {}
-        try { remoteRenderer.release() } catch (_: Exception) {}
+
+        if (isLocalRendererInitialized) {
+            try { localRenderer.release() } catch (_: Exception) {}
+            isLocalRendererInitialized = false
+        }
+
+        if (isRemoteRendererInitialized) {
+            try { remoteRenderer.release() } catch (_: Exception) {}
+            isRemoteRendererInitialized = false
+        }
+
         try { eglBase.release() } catch (_: Exception) {}
         try {
             audioManager.mode = previousAudioMode

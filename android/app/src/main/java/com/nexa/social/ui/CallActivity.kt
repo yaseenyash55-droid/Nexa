@@ -618,12 +618,14 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
         super.onResume()
         if (accepted && !ended) {
             proximitySensorManager?.start(allowScreenOff = callType == "audio" || !cameraEnabled)
+            callManager?.resumeVideo()
         }
     }
 
     override fun onPause() {
         super.onPause()
         proximitySensorManager?.stop()
+        callManager?.pauseVideo()
     }
 
     override fun onDestroy() {

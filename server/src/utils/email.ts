@@ -94,11 +94,25 @@ export class BrevoEmailProvider implements IEmailProvider {
       });
 
       if (!response.ok) {
-        throw new Error(`Brevo email API request failed with status ${response.status}`);
+        const errorText = await response.text().catch(() => '');
+        console.error(`[BrevoEmailProvider] HTTP ${response.status} Error from Brevo API:`, errorText);
+        logger.error(
+          { status: response.status, body: errorText, to: message.to, subject: message.subject },
+          '[BrevoEmailProvider] Brevo email API request failed'
+        );
+        throw new Error(`Brevo email API request failed with status ${response.status}: ${errorText}`);
       }
 
-      logger.info({ to: message.to, subject: message.subject }, '[BrevoEmailProvider] Email delivered successfully');
+      const responseData = await response.json().catch(() => ({}));
+      console.log('[BrevoEmailProvider] Email accepted by Brevo API:', responseData);
+      logger.info(
+        { to: message.to, subject: message.subject, messageId: responseData?.messageId },
+        '[BrevoEmailProvider] Email delivered successfully'
+      );
       return true;
+    } catch (err: any) {
+      console.error('[BrevoEmailProvider] Dispatch exception:', err?.message || err);
+      throw err;
     } finally {
       clearTimeout(timeout);
     }
@@ -169,15 +183,36 @@ export class ProductionEmailProvider implements IEmailProvider {
         html: message.html || undefined
       });
 
+      console.log('SMTP response:', result.response);
+      console.log('Message accepted:', result.accepted, 'rejected:', result.rejected);
+
       const accepted = result.accepted.length > 0;
       if (accepted) {
-        logger.info({ to: message.to, subject: message.subject }, '[ProductionEmailProvider] SMTP email delivered');
+        logger.info(
+          { to: message.to, subject: message.subject, response: result.response, accepted: result.accepted },
+          '[ProductionEmailProvider] SMTP email delivered successfully'
+        );
       } else {
-        logger.warn({ to: message.to, subject: message.subject, result }, '[ProductionEmailProvider] SMTP email rejected');
+        logger.warn(
+          { to: message.to, subject: message.subject, response: result.response, rejected: result.rejected },
+          '[ProductionEmailProvider] SMTP email was rejected by server'
+        );
       }
       return accepted;
-    } catch (err) {
-      logger.error({ err, to: message.to, subject: message.subject }, '[ProductionEmailProvider] Failed to dispatch SMTP email');
+    } catch (err: any) {
+      console.error('SMTP SEND FAILED:', err);
+      logger.error(
+        {
+          err,
+          code: err?.code,
+          command: err?.command,
+          response: err?.response,
+          responseCode: err?.responseCode,
+          to: message.to,
+          subject: message.subject
+        },
+        '[ProductionEmailProvider] Failed to dispatch SMTP email'
+      );
       throw err;
     }
   }
@@ -186,8 +221,11 @@ export class ProductionEmailProvider implements IEmailProvider {
 export function getEmailProvider(): IEmailProvider {
   if (process.env.BREVO_API_KEY) {
     try {
-      return new BrevoEmailProvider();
+      const provider = new BrevoEmailProvider();
+      console.log('[EmailProvider] Active email provider: BrevoEmailProvider (HTTP API)');
+      return provider;
     } catch (err) {
+      console.warn('[EmailProvider] Failed to initialize BrevoEmailProvider, falling back to SMTP/Fake:', err);
       logger.warn({ err }, 'Failed to initialize BrevoEmailProvider, falling back to SMTP/Fake');
     }
   }
@@ -199,22 +237,30 @@ export function getEmailProvider(): IEmailProvider {
   if (env.NODE_ENV === 'test' || env.NODE_ENV === 'development') {
     if (isConfigured) {
       try {
-        return new ProductionEmailProvider();
-      } catch {
+        const provider = new ProductionEmailProvider();
+        console.log('[EmailProvider] Active email provider: ProductionEmailProvider (SMTP)');
+        return provider;
+      } catch (err) {
+        console.warn('[EmailProvider] Failed to initialize ProductionEmailProvider:', err);
         return new FakeEmailProvider();
       }
     }
+    console.log('[EmailProvider] Active email provider: FakeEmailProvider (In-Memory Dev/Test)');
     return new FakeEmailProvider();
   }
 
   if (isConfigured) {
     try {
-      return new ProductionEmailProvider();
+      const provider = new ProductionEmailProvider();
+      console.log('[EmailProvider] Active email provider: ProductionEmailProvider (SMTP)');
+      return provider;
     } catch (err) {
+      console.error('[EmailProvider] Failed to initialize ProductionEmailProvider:', err);
       logger.error({ err }, 'Failed to initialize ProductionEmailProvider');
       return new FakeEmailProvider();
     }
   }
 
+  console.log('[EmailProvider] Active email provider: FakeEmailProvider (No SMTP/Brevo configured)');
   return new FakeEmailProvider();
 }

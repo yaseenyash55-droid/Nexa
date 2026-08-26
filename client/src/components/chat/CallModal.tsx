@@ -6,6 +6,7 @@ import { startScreenSharing, ScreenShareController } from '../../utils/screenSha
 import { enableBackgroundBlur, BackgroundBlurController } from '../../utils/backgroundBlur.js';
 import { ringtoneAudio } from '../../utils/ringtoneAudio.js';
 import { createTelemetryMonitor, WebRtcStreamMetrics } from '../../utils/webrtcTelemetry.js';
+import { formatWebRtcError, safeGetUserMedia, validateIceServers } from '../../utils/webrtcManager.js';
 import { User } from '../../types/index.js';
 import { Avatar } from '../ui/Avatar.js';
 
@@ -98,32 +99,44 @@ export const CallModal: React.FC<CallModalProps> = ({
     const callId = callIdRef.current;
 
     const fail = (error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Unable to start the call';
-      setStatus(message.toLowerCase().includes('configured') ? 'unavailable' : 'error');
+      const message = formatWebRtcError(error);
+      setStatus(message.toLowerCase().includes('configured') || message.toLowerCase().includes('not configured') ? 'unavailable' : 'error');
       setErrorMessage(message);
     };
 
     const getConfiguration = async (): Promise<IceConfiguration> => {
       if (iceConfigurationRef.current) return iceConfigurationRef.current;
-      const configuration = await callsApi.getIceConfiguration();
-      if (!configuration.enabled || configuration.iceServers.length === 0) {
-        throw new Error(configuration.reason || 'Calling is not configured');
+      try {
+        const configuration = await callsApi.getIceConfiguration();
+        if (!configuration.enabled || configuration.iceServers.length === 0) {
+          throw new Error(configuration.reason || 'Calling is not configured on the server');
+        }
+        validateIceServers(configuration.iceServers);
+        iceConfigurationRef.current = configuration;
+        return configuration;
+      } catch (err) {
+        throw new Error(err instanceof Error ? err.message : 'Unable to retrieve call relay configuration');
       }
-      iceConfigurationRef.current = configuration;
-      return configuration;
     };
 
     const flushCandidates = async () => {
       const peer = peerRef.current;
       if (!peer?.remoteDescription) return;
       const candidates = pendingCandidatesRef.current.splice(0);
-      for (const candidate of candidates) await peer.addIceCandidate(candidate);
+      for (const candidate of candidates) {
+        try {
+          await peer.addIceCandidate(candidate);
+        } catch (candidateErr) {
+          console.warn('[WebRTC] Non-fatal ICE candidate buffering error:', candidateErr);
+        }
+      }
     };
 
     const initializePeer = async (): Promise<RTCPeerConnection> => {
       if (peerRef.current) return peerRef.current;
       const configuration = await getConfiguration();
-      const stream = await navigator.mediaDevices.getUserMedia({
+
+      const stream = await safeGetUserMedia({
         audio: true,
         video: callType === 'video'
           ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -133,7 +146,13 @@ export const CallModal: React.FC<CallModalProps> = ({
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
       const peer = new RTCPeerConnection({ iceServers: configuration.iceServers });
-      stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+      stream.getTracks().forEach((track) => {
+        try {
+          peer.addTrack(track, stream);
+        } catch (trackErr) {
+          console.warn('[WebRTC] Track addition failed:', trackErr);
+        }
+      });
       peer.onicecandidate = (event) => {
         if (event.candidate) {
           socket.emit('call:ice-candidate', {
