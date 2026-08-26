@@ -21,13 +21,9 @@ describe('User Profile & Username Update Suite', () => {
       bio: 'Hello world',
       followersCount: 10,
       followingCount: 5,
-      postsCount: 2,
-      isVerified: false,
       role: 'USER',
-      isEmailVerified: true,
-      emailNotifications: true,
-      pushNotifications: true,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
 
     usersStore.set(2, {
@@ -38,13 +34,9 @@ describe('User Profile & Username Update Suite', () => {
       bio: 'Developer',
       followersCount: 3,
       followingCount: 8,
-      postsCount: 1,
-      isVerified: false,
       role: 'USER',
-      isEmailVerified: true,
-      emailNotifications: true,
-      pushNotifications: true,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
 
     mockUserRepo = {
