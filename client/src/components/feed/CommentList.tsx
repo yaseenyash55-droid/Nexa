@@ -4,16 +4,18 @@ import { postsApi } from '../../api/posts.api.js';
 import { Avatar } from '../ui/Avatar.js';
 import { Button } from '../ui/Button.js';
 import { useAuth } from '../../contexts/AuthContext.js';
-import { Trash2, Send, LogIn, Smile } from 'lucide-react';
+import { Trash2, Send, LogIn, Smile, Image as ImageIcon } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { EmojiPickerPopover } from '../ui/EmojiPickerPopover.js';
+import { GifPickerModal } from '../ui/GifPickerModal.js';
 
 export const CommentList: React.FC<{ postId: number }> = ({ postId }) => {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [isGifModalOpen, setIsGifModalOpen] = useState(false);
 
   const { data: commentsRes, isLoading } = useQuery({
     queryKey: ['comments', postId],
@@ -56,17 +58,27 @@ export const CommentList: React.FC<{ postId: number }> = ({ postId }) => {
               type="text"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Write a comment..."
-              className="w-full bg-slate-900/80 border border-slate-800 rounded-xl pl-3 pr-9 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500"
+              placeholder="Write a comment or insert GIF..."
+              className="w-full bg-slate-900/80 border border-slate-800 rounded-xl pl-3 pr-16 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500"
             />
-            <button
-              type="button"
-              onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-              className="absolute right-2.5 text-slate-400 hover:text-amber-400 transition"
-              title="Add Emoji"
-            >
-              <Smile className="w-4 h-4" />
-            </button>
+            <div className="absolute right-2 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setIsGifModalOpen(true)}
+                className="text-slate-400 hover:text-cyan-400 transition p-0.5"
+                title="Add GIF"
+              >
+                <ImageIcon className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+                className="text-slate-400 hover:text-amber-400 transition p-0.5"
+                title="Add Emoji"
+              >
+                <Smile className="w-4 h-4" />
+              </button>
+            </div>
             <EmojiPickerPopover
               isOpen={isEmojiPickerOpen}
               onClose={() => setIsEmojiPickerOpen(false)}
@@ -82,6 +94,15 @@ export const CommentList: React.FC<{ postId: number }> = ({ postId }) => {
           >
             <Send className="w-3.5 h-3.5" />
           </Button>
+
+          <GifPickerModal
+            isOpen={isGifModalOpen}
+            onClose={() => setIsGifModalOpen(false)}
+            onSelectGif={(gifUrl) => {
+              setContent((prev) => (prev ? `${prev} ${gifUrl}` : gifUrl));
+              setIsGifModalOpen(false);
+            }}
+          />
         </form>
       ) : (
         <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-center justify-between gap-3 text-xs">

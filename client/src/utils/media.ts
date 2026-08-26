@@ -3,7 +3,7 @@ import { API_BASE_URL } from '../api/client.js';
 export function getMediaUrl(url: string | null | undefined): string | null {
   if (!url || typeof url !== 'string') return null;
 
-  const trimmed = url.trim();
+  const trimmed = url.trim().replace(/\\/g, '/');
   if (!trimmed) return null;
 
   // Handle data URIs or blob URLs

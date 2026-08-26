@@ -19,10 +19,12 @@ class CropImageDialogFragment : DialogFragment() {
     companion object {
         fun newInstance(
             sourceUri: Uri,
+            aspectRatio: Float = 1f,
             onCropped: (Uri) -> Unit
         ): CropImageDialogFragment {
             return CropImageDialogFragment().apply {
                 this.sourceUri = sourceUri
+                this.targetAspectRatio = aspectRatio
                 this.onCroppedCallback = onCropped
             }
         }
@@ -32,6 +34,7 @@ class CropImageDialogFragment : DialogFragment() {
     private val binding get() = _binding!!
 
     private var sourceUri: Uri? = null
+    private var targetAspectRatio: Float = 1f
     private var onCroppedCallback: ((Uri) -> Unit)? = null
     private var currentBitmap: Bitmap? = null
     private var rotationDegrees: Float = 0f
@@ -82,17 +85,30 @@ class CropImageDialogFragment : DialogFragment() {
         binding.btnApplyCrop.setOnClickListener {
             val bmp = currentBitmap ?: return@setOnClickListener
             try {
-                // Crop to 1:1 square centered
+                // Crop according to targetAspectRatio
                 val width = bmp.width
                 val height = bmp.height
-                val dimension = minOf(width, height)
-                val startX = (width - dimension) / 2
-                val startY = (height - dimension) / 2
+                val currentAspect = width.toFloat() / height.toFloat()
 
-                val croppedBmp = Bitmap.createBitmap(bmp, startX, startY, dimension, dimension)
+                val targetW: Int
+                val targetH: Int
+                if (currentAspect > targetAspectRatio) {
+                    targetH = height
+                    targetW = (height * targetAspectRatio).toInt()
+                } else {
+                    targetW = width
+                    targetH = (width / targetAspectRatio).toInt()
+                }
+
+                val startX = maxOf(0, (width - targetW) / 2)
+                val startY = maxOf(0, (height - targetH) / 2)
+                val cropW = minOf(targetW, width - startX)
+                val cropH = minOf(targetH, height - startY)
+
+                val croppedBmp = Bitmap.createBitmap(bmp, startX, startY, cropW, cropH)
 
                 // Save to cache file
-                val tempFile = File.createTempFile("cropped_avatar_", ".jpg", requireContext().cacheDir)
+                val tempFile = File.createTempFile("cropped_image_", ".jpg", requireContext().cacheDir)
                 FileOutputStream(tempFile).use { out ->
                     croppedBmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
                 }

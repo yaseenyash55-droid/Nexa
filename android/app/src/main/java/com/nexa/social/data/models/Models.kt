@@ -155,14 +155,14 @@ data class ConversationParticipant(
 )
 
 data class Conversation(
-    @SerializedName(value = "otherUserId", alternate = ["partnerId"]) val otherUserId: Int,
-    @SerializedName("username") val username: String? = null,
-    @SerializedName("displayName") val displayName: String? = null,
-    @SerializedName("profileImageUrl") val profileImageUrl: String? = null,
-    @SerializedName("lastMessage") val lastMessage: String? = null,
-    @SerializedName("lastMessageAt") val lastMessageAt: String? = null,
-    @SerializedName("unreadCount") val unreadCount: Int = 0,
-    @SerializedName("user") val participant: ConversationParticipant? = null
+    @SerializedName(value = "otherUserId", alternate = ["partnerId", "OTHER_USER_ID", "userId", "targetUserId"]) val otherUserId: Int,
+    @SerializedName(value = "username", alternate = ["USERNAME", "handle", "userHandle"]) val username: String? = null,
+    @SerializedName(value = "displayName", alternate = ["DISPLAY_NAME", "name", "fullName"]) val displayName: String? = null,
+    @SerializedName(value = "profileImageUrl", alternate = ["PROFILE_IMAGE_URL", "avatarUrl", "avatar"]) val profileImageUrl: String? = null,
+    @SerializedName(value = "lastMessage", alternate = ["LAST_MESSAGE", "content", "preview"]) val lastMessage: String? = null,
+    @SerializedName(value = "lastMessageAt", alternate = ["LAST_MESSAGE_AT", "createdAt", "timestamp"]) val lastMessageAt: String? = null,
+    @SerializedName(value = "unreadCount", alternate = ["UNREAD_COUNT", "unread_count"]) val unreadCount: Int = 0,
+    @SerializedName(value = "user", alternate = ["participant", "otherUser"]) val participant: ConversationParticipant? = null
 ) {
     fun resolvedUsername(): String =
         username?.trim()?.takeIf { it.isNotEmpty() }
@@ -191,14 +191,30 @@ data class Conversation(
 }
 
 data class Group(
-    @SerializedName("groupId") val groupId: Int,
-    @SerializedName("name") val name: String,
-    @SerializedName("description") val description: String?,
-    @SerializedName("createdBy") val createdBy: Int,
-    @SerializedName("avatarUrl") val avatarUrl: String?,
-    @SerializedName("createdAt") val createdAt: String?,
-    @SerializedName("membersCount") val membersCount: Int = 1,
-    @SerializedName("lastMessage") val lastMessage: String?
+    @SerializedName(value = "groupId", alternate = ["GROUP_ID"]) val groupId: Int,
+    @SerializedName(value = "name", alternate = ["NAME"]) val name: String,
+    @SerializedName(value = "description", alternate = ["DESCRIPTION"]) val description: String?,
+    @SerializedName(value = "createdBy", alternate = ["CREATED_BY"]) val createdBy: Int,
+    @SerializedName(value = "avatarUrl", alternate = ["AVATAR_URL"]) val avatarUrl: String?,
+    @SerializedName(value = "createdAt", alternate = ["CREATED_AT"]) val createdAt: String?,
+    @SerializedName(value = "membersCount", alternate = ["MEMBERS_COUNT"]) val membersCount: Int = 1,
+    @SerializedName(value = "lastMessage", alternate = ["LAST_MESSAGE"]) val lastMessage: String?,
+    @SerializedName(value = "onlyAdminsCanPost", alternate = ["ONLY_ADMINS_CAN_POST"]) val onlyAdminsCanPost: Boolean = false
+)
+
+data class GroupMemberUser(
+    @SerializedName(value = "userId", alternate = ["USER_ID"]) val userId: Int,
+    @SerializedName(value = "username", alternate = ["USERNAME"]) val username: String,
+    @SerializedName(value = "displayName", alternate = ["DISPLAY_NAME"]) val displayName: String,
+    @SerializedName(value = "profileImageUrl", alternate = ["PROFILE_IMAGE_URL"]) val profileImageUrl: String? = null
+)
+
+data class GroupMember(
+    @SerializedName(value = "groupId", alternate = ["GROUP_ID"]) val groupId: Int,
+    @SerializedName(value = "userId", alternate = ["USER_ID"]) val userId: Int,
+    @SerializedName(value = "role", alternate = ["ROLE"]) val role: String = "MEMBER",
+    @SerializedName(value = "joinedAt", alternate = ["JOINED_AT"]) val joinedAt: String? = null,
+    @SerializedName("user") val user: GroupMemberUser? = null
 )
 
 data class GroupSender(

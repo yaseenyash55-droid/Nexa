@@ -137,6 +137,7 @@ export interface Group {
   createdAt: string;
   membersCount?: number;
   lastMessage?: string | null;
+  onlyAdminsCanPost?: boolean;
 }
 
 export interface GroupMember {
@@ -172,6 +173,7 @@ export interface CreateGroupParams {
   avatarUrl?: string;
   createdBy: number;
   memberIds?: number[];
+  onlyAdminsCanPost?: boolean;
 }
 
 export interface Broadcast {
