@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AboutPage } from '../pages/AboutPage';
 import { ContactPage } from '../pages/ContactPage';
 import { PrivacyPage } from '../pages/PrivacyPage';
-import { DocsPage } from '../pages/DocsPage';
+
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 expect.extend(matchers);
@@ -37,7 +37,7 @@ describe('Accessibility Checks for Sub-Prompt 4', () => {
     { name: 'AboutPage', Component: AboutPage },
     { name: 'ContactPage', Component: ContactPage },
     { name: 'PrivacyPage', Component: PrivacyPage },
-    { name: 'DocsPage', Component: DocsPage },
+
     { name: 'NotFoundPage', Component: NotFoundPage }
   ];
 

@@ -136,7 +136,7 @@ app.get('/llms.txt', (req, res) => {
 > Nexa is a modern social media application.
 
 ## API Documentation
-The API documentation is available at /api-docs and the OpenAPI spec is at /openapi.json.
+The OpenAPI spec is at /openapi.json.
 
 ## When to use this
 - **Get Public Profile**: Use \`GET /api/users/username/{username}\` to resolve a user's handle to their internal ID, follower counts, and public profile data.
@@ -158,31 +158,7 @@ app.get('/openapi.json', (req, res) => {
   }
 });
 
-app.get('/api-docs', (req, res) => {
-  res.header('Content-Type', 'text/html');
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <title>Nexa API Docs</title>
-      <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" >
-    </head>
-    <body>
-      <div id="swagger-ui"></div>
-      <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"> </script>
-      <script>
-        window.onload = function() {
-          window.ui = SwaggerUIBundle({
-            url: "/openapi.json",
-            dom_id: '#swagger-ui',
-          });
-        }
-      </script>
-    </body>
-    </html>
-  `);
-});
+
 
 // Serve client static assets
 const __filename = fileURLToPath(import.meta.url);
@@ -216,7 +192,7 @@ app.get('*', (req, res, next) => {
 
   if (!isValidRoute) {
     // Real 404 for bots/agents with Markdown pointer (Audit Item 1 & 2)
-    return res.status(404).header('Content-Type', 'text/markdown').send(`# 404 Not Found\n\nThe requested path ${urlPath} does not exist.\n\nCheck our [sitemap](/sitemap.xml), our [LLM guide](/llms.txt), or the [API Docs](/api-docs) for valid endpoints.`);
+    return res.status(404).header('Content-Type', 'text/markdown').send(`# 404 Not Found\n\nThe requested path ${urlPath} does not exist.\n\nCheck our [sitemap](/sitemap.xml) or our [LLM guide](/llms.txt) for valid endpoints.`);
   }
 
   // Markdown Negotiation (Audit Item 4)
@@ -293,7 +269,7 @@ app.get('*', (req, res, next) => {
           <li><strong>Email Support:</strong> [NEEDS DEVELOPER INFO]</li>
           <li><strong>Country:</strong> [NEEDS DEVELOPER INFO]</li>
         </ul>
-        <p>Our typical response time is within 24-48 hours. If you are a developer with API-related questions, please consult our <a href="/api-docs">API Documentation</a> first before contacting support.</p>`;
+        <p>Our typical response time is within 24-48 hours. If you are a developer with API-related questions, please consult our OpenAPI specification at /openapi.json first before contacting support.</p>`;
     } else if (urlPath === '/privacy') {
       ssrContent += `
         <h1>Nexa Privacy Policy</h1>
@@ -306,7 +282,7 @@ app.get('*', (req, res, next) => {
         <h1>Nexa Content - ${urlPath}</h1>
         <p>Welcome to Nexa, a modern social media application designed to help you connect, share, and engage with the world in real-time. Whether you are looking to discover new communities, share high-fidelity media, or stay in touch with friends through our real-time messaging infrastructure, Nexa provides a premium user experience across all devices.</p>
         <p>Our platform leverages cutting-edge web standards to deliver responsive, accessible, and fast interfaces. By navigating to ${urlPath}, you are accessing one of the core features of the Nexa ecosystem. We prioritize security, privacy, and seamless content delivery to ensure you have the best possible experience online.</p>
-        <p>Developers: View our <a href="/api-docs">API Documentation</a> for information on our public endpoints and data models.</p>
+        <p>Developers: View our OpenAPI specification at /openapi.json for information on our public endpoints and data models.</p>
         <p>Please note: This is the server-rendered fallback view intended for accessibility, basic discovery, and agent interactions. For the full interactive, dynamic experience with real-time updates and smooth animations, please enable JavaScript in your browser.</p>`;
     }
     

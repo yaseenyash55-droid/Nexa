@@ -22,7 +22,7 @@ import { NotFoundPage } from '../pages/NotFoundPage.js';
 import { AboutPage } from '../pages/AboutPage.js';
 import { ContactPage } from '../pages/ContactPage.js';
 import { PrivacyPage } from '../pages/PrivacyPage.js';
-import { DocsPage } from '../pages/DocsPage.js';
+
 import { initializeLiveUpdates } from '../utils/capacitorLiveUpdates.js';
 import { webFcmService } from '../services/fcm.service.js';
 import { MusicProvider } from '../contexts/MusicContext.js';
@@ -104,7 +104,7 @@ export const App: React.FC = () => {
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/contact" element={<ContactPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
-                <Route path="/docs" element={<DocsPage />} />
+
 
                 <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
                 <Route path="/bookmarks" element={<ProtectedRoute><Navigate to="/settings?tab=bookmarks" replace /></ProtectedRoute>} />

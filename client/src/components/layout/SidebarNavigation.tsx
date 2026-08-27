@@ -27,7 +27,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onOpenComp
     { to: '/messages', label: 'Messages', icon: <MessageSquare className="w-5 h-5" /> },
     { to: '/notifications', label: 'Notifications', icon: <Bell className="w-5 h-5" /> },
     { to: '/user-manual', label: 'User Manual', icon: <BookOpen className="w-5 h-5" /> },
-    { to: '/api-docs', label: 'API Docs', icon: <BookOpen className="w-5 h-5" /> },
+
     { to: user ? `/profile/${user.username}` : '/login', label: 'Profile', icon: <UserIcon className="w-5 h-5" /> },
     { to: '/settings', label: 'Settings', icon: <SettingsIcon className="w-5 h-5" /> }
   ];
