@@ -110,8 +110,11 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
         <Link to={`/profile/${post.author.username}`} className="flex items-center gap-3 group">
           <Avatar src={getMediaUrl(post.author.profileImageUrl)} name={post.author.displayName} size="md" />
           <div>
-            <h4 className="text-sm font-bold text-white group-hover:text-brand-400 transition-colors">
+            <h4 className="text-sm font-bold text-white group-hover:text-brand-400 transition-colors flex items-center gap-1.5">
               {post.author.displayName}
+              {post.isMock && (
+                <span className="px-1.5 py-0.5 bg-slate-800 text-slate-400 text-[9px] rounded font-bold tracking-wide uppercase">Mock Content</span>
+              )}
             </h4>
             <div className="flex items-center gap-1.5 text-xs text-slate-400">
               <span>@{post.author.username}</span>
@@ -125,7 +128,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setIsOptionsOpen(true)}
+            onClick={() => {
+              if (post.isMock) {
+                alert('This is a preview post. Options are disabled.');
+                return;
+              }
+              setIsOptionsOpen(true);
+            }}
             title="Post options & edit dialogue"
             className="p-2 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-xl transition-all border border-slate-800 flex items-center justify-center group shadow-sm"
           >
@@ -172,7 +181,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       <div className="mt-4 flex items-center justify-between pt-2 text-slate-400 text-xs border-t border-slate-800/50">
         <div className="flex items-center gap-6">
           <button
-            onClick={() => requireAuth(() => likeMutation.mutate(), 'Log in to like posts.')}
+            onClick={() => {
+              if (post.isMock) {
+                alert('This is a preview post. Likes are disabled.');
+                return;
+              }
+              requireAuth(() => likeMutation.mutate(), 'Log in to like posts.');
+            }}
             className={`flex items-center gap-1.5 transition-colors ${
               isLiked ? 'text-rose-500 font-semibold' : 'hover:text-rose-400'
             }`}
@@ -182,7 +197,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
           </button>
 
           <button
-            onClick={() => setShowComments(!showComments)}
+            onClick={() => {
+              if (post.isMock) {
+                alert('This is a preview post. Comments are disabled.');
+                return;
+              }
+              setShowComments(!showComments);
+            }}
             className="flex items-center gap-1.5 hover:text-brand-400 transition-colors"
           >
             <MessageSquare className="w-4 h-4" />
@@ -204,7 +225,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
           </button>
 
           <button
-            onClick={() => requireAuth(() => bookmarkMutation.mutate(), 'Log in to save posts.')}
+            onClick={() => {
+              if (post.isMock) {
+                alert('This is a preview post. Bookmarks are disabled.');
+                return;
+              }
+              requireAuth(() => bookmarkMutation.mutate(), 'Log in to save posts.');
+            }}
             className={`p-1.5 rounded-lg transition-colors ${
               isBookmarked ? 'text-brand-400' : 'hover:text-brand-400'
             }`}

@@ -120,6 +120,7 @@ CREATE TABLE IF NOT EXISTS messages (
   receiver_id             BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   content                 VARCHAR(4000) NOT NULL,
   read_at                 TIMESTAMPTZ,
+  is_unsent               BOOLEAN DEFAULT FALSE NOT NULL,
   created_at              TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   CONSTRAINT chk_messages_participants CHECK (sender_id <> receiver_id),
   CONSTRAINT chk_messages_content CHECK (LENGTH(TRIM(content)) BETWEEN 1 AND 4000)
@@ -134,6 +135,7 @@ CREATE TABLE IF NOT EXISTS stories (
   user_id                 BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   media_url               VARCHAR(1000) NOT NULL,
   caption                 VARCHAR(1000),
+  music_track_id          VARCHAR(255),
   created_at              TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   expires_at              TIMESTAMPTZ DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours') NOT NULL,
   CONSTRAINT chk_stories_expiry CHECK (expires_at > created_at)

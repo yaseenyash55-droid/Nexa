@@ -1,4 +1,4 @@
-import { getPostRepository, getCommentRepository, getNotificationRepository } from '../repositories/factory.js';
+import { getPostRepository, getCommentRepository, getNotificationRepository, getPrivacyRepository, getUserRepository } from '../repositories/factory.js';
 import { Post, Comment, PaginatedResult } from '../types/index.js';
 
 import fs from 'fs';
@@ -86,6 +86,13 @@ export class PostService {
     if (!post) {
       throw { statusCode: 404, code: 'POST_NOT_FOUND', message: 'Post not found' };
     }
+    const privacySettings = await getPrivacyRepository().getPrivacySettings(post.userId);
+    if (privacySettings?.isPrivate && post.userId !== currentUserId) {
+      const isFollowing = currentUserId ? await getUserRepository().isFollowing(currentUserId, post.userId) : false;
+      if (!isFollowing) {
+        throw { statusCode: 403, code: 'PRIVATE_ACCOUNT', message: 'This account is private. Follow the user to view their content.' };
+      }
+    }
     return post;
   }
 
@@ -137,7 +144,19 @@ export class PostService {
   }
 
   async getGlobalFeed(currentUserId?: number, cursor?: number, limit = 10): Promise<PaginatedResult<Post>> {
-    return this.postRepo.getGlobalFeed(currentUserId, cursor, limit);
+    const result = await this.postRepo.getGlobalFeed(currentUserId, cursor, limit);
+    const filteredData: Post[] = [];
+    const privacyRepo = getPrivacyRepository();
+    const userRepo = getUserRepository();
+    for (const post of result.data) {
+      const privacySettings = await privacyRepo.getPrivacySettings(post.userId);
+      if (privacySettings?.isPrivate && post.userId !== currentUserId) {
+        const isFollowing = currentUserId ? await userRepo.isFollowing(currentUserId, post.userId) : false;
+        if (!isFollowing) continue;
+      }
+      filteredData.push(post);
+    }
+    return { data: filteredData, nextCursor: result.nextCursor, hasMore: result.hasMore };
   }
 
   async getFollowingFeed(userId: number, cursor?: number, limit = 10): Promise<PaginatedResult<Post>> {
@@ -145,6 +164,13 @@ export class PostService {
   }
 
   async getUserPosts(userId: number, currentUserId?: number, cursor?: number, limit = 10): Promise<PaginatedResult<Post>> {
+    const privacySettings = await getPrivacyRepository().getPrivacySettings(userId);
+    if (privacySettings?.isPrivate && userId !== currentUserId) {
+      const isFollowing = currentUserId ? await getUserRepository().isFollowing(currentUserId, userId) : false;
+      if (!isFollowing) {
+        return { data: [], hasMore: false };
+      }
+    }
     return this.postRepo.getUserPosts(userId, currentUserId, cursor, limit);
   }
 

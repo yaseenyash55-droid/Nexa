@@ -16,6 +16,7 @@ export interface User {
   followersCount?: number;
   followingCount?: number;
   isFollowing?: boolean;
+  isPrivate?: boolean;
   role?: 'ADMIN' | 'MODERATOR' | 'USER';
   failedLoginAttempts?: number;
   firstFailedAttemptAt?: string | null;
@@ -39,6 +40,7 @@ export interface Post {
   commentsCount: number;
   isLiked?: boolean;
   isBookmarked?: boolean;
+  isMock?: boolean;
 }
 
 export interface Comment {
@@ -83,6 +85,7 @@ export interface Story {
   };
   mediaUrl: string;
   caption?: string | null;
+  musicTrackId?: string | null;
   createdAt: string;
   expiresAt: string;
 }
@@ -100,6 +103,7 @@ export interface Reel {
   caption?: string | null;
   likesCount: number;
   isLiked?: boolean;
+  isMock?: boolean;
   createdAt: string;
 }
 
@@ -115,6 +119,7 @@ export interface Message {
   };
   content: string;
   isRead: boolean;
+  isUnsent?: boolean;
   createdAt: string;
 }
 

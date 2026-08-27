@@ -107,7 +107,16 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user, onEditClick 
       {/* User Details */}
       <div className="px-4 sm:px-6 space-y-3">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">{user.displayName}</h2>
+          <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+            {user.displayName}
+            {user.isPrivate !== undefined && (
+              <span className={`px-1.5 py-0.5 text-[9px] rounded font-bold tracking-wide uppercase ${
+                user.isPrivate ? 'bg-slate-800 text-amber-400 border border-amber-500/20' : 'bg-slate-800 text-emerald-400 border border-emerald-500/20'
+              }`}>
+                {user.isPrivate ? 'Private Profile' : 'Public Profile'}
+              </span>
+            )}
+          </h2>
           <p className="text-xs text-slate-400">@{user.username}</p>
         </div>
 

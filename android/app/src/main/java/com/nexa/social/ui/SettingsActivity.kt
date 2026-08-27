@@ -134,6 +134,22 @@ class SettingsActivity : AppCompatActivity() {
                 .show()
         }
 
+        binding.btnClearMediaCache.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle("Clear Cached Media")
+                .setMessage("This will clear all locally stored images, videos, and music/audio files. They will be re-downloaded when you open a chat.")
+                .setPositiveButton("Clear") { _, _ ->
+                    val success = com.nexa.social.utils.MediaCacheManager.clearCache(this)
+                    if (success) {
+                        Toast.makeText(this, "Local media cache cleared", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "Failed to clear media cache", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
         binding.btnLogout.setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle("Log Out")

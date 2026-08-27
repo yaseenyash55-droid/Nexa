@@ -14,7 +14,7 @@ export const BookmarksPage: React.FC = () => {
     queryFn: () => postsApi.getBookmarks()
   });
 
-  const posts = bookmarksRes?.data || [];
+  const posts = (bookmarksRes?.data || []).filter(p => !p.isMock);
 
   return (
     <AppShell>

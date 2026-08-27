@@ -1,4 +1,4 @@
-import { getUserRepository, getNotificationRepository } from '../repositories/factory.js';
+import { getUserRepository, getNotificationRepository, getPrivacyRepository } from '../repositories/factory.js';
 import { IUserRepository, INotificationRepository } from '../repositories/types.js';
 import { User } from '../types/index.js';
 
@@ -51,6 +51,17 @@ export class UserService {
     if (!user) {
       throw { statusCode: 404, code: 'USER_NOT_FOUND', message: 'User not found' };
     }
+    const privacySettings = await getPrivacyRepository().getPrivacySettings(user.userId);
+    user.isPrivate = privacySettings.isPrivate;
+    const isOwner = currentUserId === user.userId;
+    const isFollowing = currentUserId ? await this.userRepo.isFollowing(currentUserId, user.userId) : false;
+    user.isFollowing = isFollowing;
+    if (privacySettings.isPrivate && !isOwner && !isFollowing) {
+      user.bio = "";
+      user.websiteUrl = "";
+      user.location = "";
+      user.coverImageUrl = "";
+    }
     return this.toPublicUser(user);
   }
 
@@ -59,8 +70,16 @@ export class UserService {
     if (!user) {
       throw { statusCode: 404, code: 'USER_NOT_FOUND', message: 'User not found' };
     }
-    if (currentUserId) {
-      user.isFollowing = await this.userRepo.isFollowing(currentUserId, user.userId);
+    const privacySettings = await getPrivacyRepository().getPrivacySettings(user.userId);
+    user.isPrivate = privacySettings.isPrivate;
+    const isOwner = currentUserId === user.userId;
+    const isFollowing = currentUserId ? await this.userRepo.isFollowing(currentUserId, user.userId) : false;
+    user.isFollowing = isFollowing;
+    if (privacySettings.isPrivate && !isOwner && !isFollowing) {
+      user.bio = "";
+      user.websiteUrl = "";
+      user.location = "";
+      user.coverImageUrl = "";
     }
     return this.toPublicUser(user);
   }
@@ -110,7 +129,18 @@ export class UserService {
   async searchUsers(query: string, currentUserId?: number, limit = 10): Promise<User[]> {
     if (!query || !query.trim()) return [];
     const users = await this.userRepo.searchUsers(query, currentUserId, limit);
-    return users.map((user) => this.toPublicUser(user));
+    const filtered: User[] = [];
+    const privacyRepo = getPrivacyRepository();
+    for (const u of users) {
+      const settings = await privacyRepo.getPrivacySettings(u.userId);
+      if (settings?.isPrivate && u.userId !== currentUserId) {
+        const isFollowing = currentUserId ? await this.userRepo.isFollowing(currentUserId, u.userId) : false;
+        if (!isFollowing) continue;
+      }
+      u.isPrivate = settings?.isPrivate;
+      filtered.push(this.toPublicUser(u));
+    }
+    return filtered;
   }
 
   async getSuggestions(currentUserId: number, limit = 5): Promise<User[]> {

@@ -32,7 +32,7 @@ export const HomePage: React.FC = () => {
     getNextPageParam: (lastPage) => (lastPage.meta?.hasMore ? (lastPage.meta.nextCursor as number) : undefined)
   });
 
-  const posts = data?.pages.flatMap((page) => page.data) || [];
+  const posts = (data?.pages.flatMap((page) => page.data) || []).filter(p => !p.isMock);
 
   return (
     <AppShell>

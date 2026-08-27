@@ -100,6 +100,31 @@ class PostAdapter(
                         binding.btnLike.animate().scaleX(1.45f).scaleY(1.45f).setDuration(120).withEndAction {
                             binding.btnLike.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
                         }.start()
+
+                        binding.ivHeartOverlay.apply {
+                            visibility = View.VISIBLE
+                            alpha = 0f
+                            scaleX = 0f
+                            scaleY = 0f
+                            animate()
+                                .alpha(1f)
+                                .scaleX(1.3f)
+                                .scaleY(1.3f)
+                                .setDuration(250)
+                                .withEndAction {
+                                    animate()
+                                        .alpha(0f)
+                                        .scaleX(0.8f)
+                                        .scaleY(0.8f)
+                                        .setDuration(250)
+                                        .setStartDelay(150)
+                                        .withEndAction {
+                                            visibility = View.GONE
+                                        }
+                                        .start()
+                                }
+                                .start()
+                        }
                         return true
                     }
                 })

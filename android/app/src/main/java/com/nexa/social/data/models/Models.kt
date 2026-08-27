@@ -118,13 +118,15 @@ data class Story(
     @SerializedName("author") val author: User,
     @SerializedName("mediaUrl") val mediaUrl: String,
     @SerializedName("caption") val caption: String?,
+    @SerializedName("musicTrackId") val musicTrackId: String? = null,
     @SerializedName("createdAt") val createdAt: String?,
     @SerializedName("expiresAt") val expiresAt: String?
 )
 
 data class CreateStoryRequest(
     @SerializedName("mediaUrl") val mediaUrl: String,
-    @SerializedName("caption") val caption: String? = null
+    @SerializedName("caption") val caption: String? = null,
+    @SerializedName("musicTrackId") val musicTrackId: String? = null
 )
 
 data class Message(

@@ -290,6 +290,17 @@
                     app:strokeColor="#D97706" />
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnClearMediaCache"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="10dp"
+                    android:text="Clear Cached Media"
+                    android:textColor="#06B6D4"
+                    app:cornerRadius="8dp"
+                    app:strokeColor="#0891B2" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnLogout"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"

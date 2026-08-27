@@ -28,7 +28,7 @@ export const socialApi = {
     return res.data.data;
   },
 
-  createStory: async (data: { mediaUrl: string; caption?: string }): Promise<Story> => {
+  createStory: async (data: { mediaUrl: string; caption?: string; musicTrackId?: string }): Promise<Story> => {
     const res = await api.post<ApiResponse<Story>>('/stories', data);
     return res.data.data;
   },

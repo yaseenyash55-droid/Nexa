@@ -7,6 +7,7 @@ interface RawStoryRow {
   user_id: number | string;
   media_url: string;
   caption?: string | null;
+  music_track_id?: string | null;
   created_at: Date | string;
   expires_at: Date | string;
   author_username: string;
@@ -27,15 +28,16 @@ export class PostgresStoryRepository implements IStoryRepository {
       },
       mediaUrl: row.media_url,
       caption: row.caption ?? undefined,
+      musicTrackId: row.music_track_id ?? undefined,
       createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
       expiresAt: row.expires_at ? new Date(row.expires_at).toISOString() : new Date().toISOString()
     };
   }
 
-  async createStory(story: { userId: number; mediaUrl: string; caption?: string }): Promise<Story> {
+  async createStory(story: { userId: number; mediaUrl: string; caption?: string; musicTrackId?: string }): Promise<Story> {
     const sql = `
-      INSERT INTO stories (user_id, media_url, caption, expires_at)
-      VALUES ($1, $2, $3, CURRENT_TIMESTAMP + INTERVAL '24 hours')
+      INSERT INTO stories (user_id, media_url, caption, music_track_id, expires_at)
+      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP + INTERVAL '24 hours')
       RETURNING story_id, created_at, expires_at
     `;
 
@@ -46,7 +48,8 @@ export class PostgresStoryRepository implements IStoryRepository {
     }>(sql, [
       story.userId,
       story.mediaUrl,
-      story.caption || null
+      story.caption || null,
+      story.musicTrackId || null
     ]);
 
     const createdRow = res.rows[0];
@@ -77,6 +80,7 @@ export class PostgresStoryRepository implements IStoryRepository {
       },
       mediaUrl: story.mediaUrl,
       caption: story.caption,
+      musicTrackId: story.musicTrackId,
       createdAt: new Date(createdRow.created_at).toISOString(),
       expiresAt: new Date(createdRow.expires_at).toISOString()
     };
@@ -84,7 +88,7 @@ export class PostgresStoryRepository implements IStoryRepository {
 
   async getFeedStories(userId?: number): Promise<Story[]> {
     const sql = `
-      SELECT s.story_id, s.user_id, s.media_url, s.caption, s.created_at, s.expires_at,
+      SELECT s.story_id, s.user_id, s.media_url, s.caption, s.music_track_id, s.created_at, s.expires_at,
              u.username AS author_username, u.display_name AS author_display_name, u.profile_image_url AS author_profile_image
       FROM stories s
       JOIN users u ON s.user_id = u.user_id

@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { aiAndMediaRateLimiter } from '../middleware/rateLimit.middleware.js';
-import { getStoryRepository, getReelRepository, getMessageRepository } from '../repositories/factory.js';
+import { getStoryRepository, getReelRepository, getMessageRepository, getPrivacyRepository, getUserRepository } from '../repositories/factory.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { realtimeServer } from '../socket.js';
 import { validateMagicBytes } from '../services/media.service.js';
@@ -49,7 +49,7 @@ function saveBase64StoryImageToDisk(base64Data: string, userId: number): string 
 
 socialRouter.post('/stories', requireAuth, aiAndMediaRateLimiter, async (req: any, res, next) => {
   try {
-    const { caption } = req.body;
+    const { caption, musicTrackId } = req.body;
     let { mediaUrl } = req.body;
     if (!mediaUrl) {
       return sendError(res, 'INVALID_INPUT', 'Media URL or image data is required', 400);
@@ -62,7 +62,8 @@ socialRouter.post('/stories', requireAuth, aiAndMediaRateLimiter, async (req: an
     const story = await getStoryRepository().createStory({
       userId: req.user.userId,
       mediaUrl,
-      caption
+      caption,
+      musicTrackId
     });
     return sendSuccess(res, story, 'Story created successfully', undefined, 201);
   } catch (err) {
@@ -212,6 +213,15 @@ socialRouter.post('/messages', requireAuth, async (req: any, res, next) => {
     if (!parsedReceiverId || !content || !String(content).trim()) {
       return sendError(res, 'INVALID_INPUT', 'Receiver ID and content are required', 400);
     }
+
+    const privacySettings = await getPrivacyRepository().getPrivacySettings(parsedReceiverId);
+    if (privacySettings?.isPrivate) {
+      const isFollowing = await getUserRepository().isFollowing(parsedReceiverId, req.user.userId);
+      if (!isFollowing) {
+        return sendError(res, 'PRIVATE_ACCOUNT_DM_BLOCKED', 'You cannot message a private account unless they follow you.', 403);
+      }
+    }
+
     const msg = await getMessageRepository().sendMessage({
       senderId: req.user.userId,
       receiverId: parsedReceiverId,

@@ -11,6 +11,7 @@ interface RawStoryRow {
   PROFILE_IMAGE_URL?: string | null;
   MEDIA_URL: string;
   CAPTION?: string | null;
+  MUSIC_TRACK_ID?: string | null;
   CREATED_AT: Date;
   EXPIRES_AT: Date;
 }
@@ -28,21 +29,23 @@ export class OracleStoryRepository implements IStoryRepository {
       },
       mediaUrl: row.MEDIA_URL,
       caption: row.CAPTION,
+      musicTrackId: row.MUSIC_TRACK_ID,
       createdAt: row.CREATED_AT.toISOString(),
       expiresAt: row.EXPIRES_AT.toISOString()
     };
   }
 
-  async createStory(story: { userId: number; mediaUrl: string; caption?: string }): Promise<Story> {
+  async createStory(story: { userId: number; mediaUrl: string; caption?: string; musicTrackId?: string }): Promise<Story> {
     const storyId = await withTransaction(async (connection) => {
       const result = await connection.execute(
-        `INSERT INTO STORIES (USER_ID, MEDIA_URL, CAPTION, EXPIRES_AT)
-         VALUES (:userId, :mediaUrl, :caption, SYSTIMESTAMP + INTERVAL '24' HOUR)
+        `INSERT INTO STORIES (USER_ID, MEDIA_URL, CAPTION, MUSIC_TRACK_ID, EXPIRES_AT)
+         VALUES (:userId, :mediaUrl, :caption, :musicTrackId, SYSTIMESTAMP + INTERVAL '24' HOUR)
          RETURNING STORY_ID INTO :storyId`,
         {
           userId: story.userId,
           mediaUrl: story.mediaUrl,
           caption: story.caption?.trim() || null,
+          musicTrackId: story.musicTrackId || null,
           storyId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
         }
       );
@@ -51,7 +54,7 @@ export class OracleStoryRepository implements IStoryRepository {
 
     const result = await executeSql<RawStoryRow>(
       `SELECT s.STORY_ID, s.USER_ID, u.USERNAME, u.DISPLAY_NAME, u.PROFILE_IMAGE_URL,
-              s.MEDIA_URL, s.CAPTION, s.CREATED_AT, s.EXPIRES_AT
+              s.MEDIA_URL, s.CAPTION, s.MUSIC_TRACK_ID, s.CREATED_AT, s.EXPIRES_AT
        FROM STORIES s JOIN USERS u ON u.USER_ID = s.USER_ID
        WHERE s.STORY_ID = :storyId`,
       { storyId }
@@ -63,7 +66,7 @@ export class OracleStoryRepository implements IStoryRepository {
   async getFeedStories(userId?: number): Promise<Story[]> {
     const result = await executeSql<RawStoryRow>(
       `SELECT s.STORY_ID, s.USER_ID, u.USERNAME, u.DISPLAY_NAME, u.PROFILE_IMAGE_URL,
-              s.MEDIA_URL, s.CAPTION, s.CREATED_AT, s.EXPIRES_AT
+              s.MEDIA_URL, s.CAPTION, s.MUSIC_TRACK_ID, s.CREATED_AT, s.EXPIRES_AT
        FROM STORIES s JOIN USERS u ON u.USER_ID = s.USER_ID
        WHERE s.EXPIRES_AT > SYSTIMESTAMP
          AND (:userId IS NULL OR s.USER_ID = :userId OR EXISTS (

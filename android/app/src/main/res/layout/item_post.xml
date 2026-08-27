@@ -65,17 +65,35 @@
             app:layout_constraintTop_toTopOf="parent"
             app:tint="@color/text_secondary" />
 
-        <!-- Post Image -->
-        <ImageView
-            android:id="@+id/ivPostImage"
+        <!-- Post Image with Heart Overlay Wrapper -->
+        <FrameLayout
+            android:id="@+id/postImageWrapper"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:adjustViewBounds="true"
-            android:maxHeight="500dp"
-            android:scaleType="fitCenter"
-            android:visibility="gone"
-            app:layout_constraintTop_toBottomOf="@id/ivAvatar" />
+            app:layout_constraintTop_toBottomOf="@id/ivAvatar">
+
+            <ImageView
+                android:id="@+id/ivPostImage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:adjustViewBounds="true"
+                android:maxHeight="500dp"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/ivHeartOverlay"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_heart"
+                app:tint="#10B981"
+                android:alpha="0"
+                android:scaleX="0"
+                android:scaleY="0"
+                android:visibility="gone" />
+        </FrameLayout>
 
         <!-- Post Content (Text) -->
         <TextView
@@ -87,7 +105,7 @@
             android:layout_marginEnd="12dp"
             android:textColor="@color/text_white"
             android:textSize="14sp"
-            app:layout_constraintTop_toBottomOf="@id/ivPostImage" />
+            app:layout_constraintTop_toBottomOf="@id/postImageWrapper" />
 
         <!-- Actions -->
         <LinearLayout

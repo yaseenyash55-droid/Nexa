@@ -88,7 +88,7 @@ export interface INotificationRepository {
 }
 
 export interface IStoryRepository {
-  createStory(story: { userId: number; mediaUrl: string; caption?: string }): Promise<Story>;
+  createStory(story: { userId: number; mediaUrl: string; caption?: string; musicTrackId?: string }): Promise<Story>;
   getFeedStories(userId?: number): Promise<Story[]>;
   deleteStory(storyId: number, userId: number): Promise<boolean>;
 }
@@ -106,6 +106,7 @@ export interface IMessageRepository {
   getMessagesBetweenUsers(userA: number, userB: number): Promise<Message[]>;
   markMessageAsRead(messageId: number, receiverUserId: number): Promise<{ rowsAffected: number; readAt: Date | null; senderId: number | null }>;
   getConversations(userId: number): Promise<ConversationSummary[]>;
+  unsendMessage(messageId: number, senderId: number): Promise<{ success: boolean; receiverId: number }>;
 }
 
 export interface IAuthRepository {

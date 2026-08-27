@@ -23,6 +23,109 @@ import { webFcmService } from '../services/fcm.service.js';
 import { EmojiPickerPopover } from '../components/ui/EmojiPickerPopover.js';
 import { GifPickerModal } from '../components/ui/GifPickerModal.js';
 
+import { mediaCache } from '../utils/mediaCache.js';
+
+const CachedMedia: React.FC<{
+  url: string;
+  type: 'image' | 'video' | 'gif';
+  className?: string;
+  onClick?: () => void;
+  controls?: boolean;
+}> = ({ url, type, className, onClick, controls }) => {
+  const [src, setSrc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    let localUrl: string | null = null;
+
+    async function load() {
+      try {
+        setLoading(true);
+        const cached = await mediaCache.getMedia(url);
+        if (cached && active) {
+          setSrc(cached.objectUrl);
+          localUrl = cached.objectUrl;
+          setLoading(false);
+          return;
+        }
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Fetch failed');
+        const blob = await res.blob();
+        if (active) {
+          const objUrl = URL.createObjectURL(blob);
+          setSrc(objUrl);
+          localUrl = objUrl;
+          setLoading(false);
+        }
+        await mediaCache.saveMedia(url, blob, res.headers.get('content-type') || '');
+      } catch (err) {
+        console.error('Failed to load cached media:', err);
+        if (active) {
+          setError(true);
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      active = false;
+      if (localUrl) {
+        URL.revokeObjectURL(localUrl);
+      }
+    };
+  }, [url]);
+
+  if (loading) {
+    return (
+      <div className={`${className} flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl min-h-[160px] animate-pulse`}>
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-[10px] text-slate-500 font-semibold">Loading media...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !src) {
+    return (
+      <div className={`${className} flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl min-h-[160px]`}>
+        <span className="text-xs text-rose-400">Failed to load media</span>
+      </div>
+    );
+  }
+
+  if (type === 'image' || type === 'gif') {
+    return (
+      <img
+        src={src}
+        alt="Media"
+        className={className}
+        onClick={onClick}
+        loading="lazy"
+      />
+    );
+  }
+
+  if (type === 'video') {
+    return (
+      <video
+        src={src}
+        controls={controls}
+        playsInline
+        className={className}
+        preload="metadata"
+      />
+    );
+  }
+
+  return null;
+};
+
 const MessageContent: React.FC<{ content: string; isSelf?: boolean }> = ({ content }) => {
   // 1. Check if content has photo URL (e.g. 📷 [Photo] https://... or direct image URL)
   const photoMatch = content.match(/(?:📷\s*\[Photo\]\s*|(?:^|\s))(https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?|https?:\/\/\S*supabase\.co\S*|https?:\/\/\S*\/uploads\/\S+)/i);
@@ -42,12 +145,11 @@ const MessageContent: React.FC<{ content: string; isSelf?: boolean }> = ({ conte
     return (
       <div className="space-y-1">
         <div className="rounded-xl overflow-hidden max-w-[280px] border border-white/15 shadow-lg bg-black/40 group">
-          <img
-            src={gifUrl}
-            alt="GIF Animation"
+          <CachedMedia
+            url={gifUrl}
+            type="gif"
             className="w-full max-h-64 object-cover cursor-pointer hover:scale-[1.02] transition duration-200"
             onClick={() => window.open(gifUrl, '_blank')}
-            loading="lazy"
           />
           <div className="px-2 py-0.5 bg-black/70 flex items-center justify-between text-[10px] font-bold text-slate-300">
             <span className="flex items-center gap-1 text-emerald-400">
@@ -66,12 +168,11 @@ const MessageContent: React.FC<{ content: string; isSelf?: boolean }> = ({ conte
     return (
       <div className="space-y-1.5">
         <div className="rounded-xl overflow-hidden max-w-[280px] border border-white/10 shadow-md bg-black/20">
-          <img
-            src={url}
-            alt="Attached Photo"
+          <CachedMedia
+            url={url}
+            type="image"
             className="w-full max-h-64 object-cover cursor-pointer hover:scale-[1.02] transition duration-200"
             onClick={() => window.open(url, '_blank')}
-            loading="lazy"
           />
         </div>
         {cleanText && <p className="leading-relaxed whitespace-pre-line text-xs">{cleanText}</p>}
@@ -85,12 +186,11 @@ const MessageContent: React.FC<{ content: string; isSelf?: boolean }> = ({ conte
     return (
       <div className="space-y-1.5">
         <div className="rounded-xl overflow-hidden max-w-[300px] border border-white/10 shadow-md bg-black/40">
-          <video
-            src={url}
+          <CachedMedia
+            url={url}
+            type="video"
             controls
-            playsInline
             className="w-full max-h-64 rounded-xl"
-            preload="metadata"
           />
         </div>
         {cleanText && <p className="leading-relaxed whitespace-pre-line text-xs">{cleanText}</p>}

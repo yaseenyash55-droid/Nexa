@@ -12,11 +12,13 @@ interface RawMessageRow {
   PROFILE_IMAGE_URL?: string | null;
   CONTENT: string;
   READ_AT?: Date | null;
+  IS_UNSENT: number;
   CREATED_AT: Date;
 }
 
 export class OracleMessageRepository implements IMessageRepository {
   private mapRowToMessage(row: RawMessageRow): Message {
+    const isUnsent = row.IS_UNSENT === 1;
     return {
       messageId: row.MESSAGE_ID,
       senderId: row.SENDER_ID,
@@ -27,8 +29,9 @@ export class OracleMessageRepository implements IMessageRepository {
         displayName: row.DISPLAY_NAME || 'User',
         profileImageUrl: row.PROFILE_IMAGE_URL
       },
-      content: row.CONTENT,
+      content: isUnsent ? 'Message unsent' : row.CONTENT,
       isRead: Boolean(row.READ_AT),
+      isUnsent,
       createdAt: row.CREATED_AT ? row.CREATED_AT.toISOString() : new Date().toISOString()
     };
   }
@@ -36,7 +39,7 @@ export class OracleMessageRepository implements IMessageRepository {
   async getMessagesBetweenUsers(userA: number, userB: number): Promise<Message[]> {
     const sql = `
       SELECT m.MESSAGE_ID, m.SENDER_ID, m.RECEIVER_ID, u.USERNAME, u.DISPLAY_NAME, u.PROFILE_IMAGE_URL,
-             m.CONTENT, m.READ_AT, m.CREATED_AT
+             m.CONTENT, m.READ_AT, m.IS_UNSENT, m.CREATED_AT
       FROM MESSAGES m
       JOIN USERS u ON m.SENDER_ID = u.USER_ID
       WHERE (m.SENDER_ID = :userA AND m.RECEIVER_ID = :userB)
@@ -154,6 +157,7 @@ export class OracleMessageRepository implements IMessageRepository {
           u.display_name,
           u.profile_image_url,
           m.content AS last_message,
+          m.is_unsent,
           m.created_at AS last_message_at,
           (SELECT COUNT(*) FROM MESSAGES WHERE SENDER_ID = other_user_id AND RECEIVER_ID = :userId AND READ_AT IS NULL) AS unread_count
       FROM (
@@ -174,9 +178,52 @@ export class OracleMessageRepository implements IMessageRepository {
       username: row.USERNAME,
       displayName: row.DISPLAY_NAME,
       profileImageUrl: row.PROFILE_IMAGE_URL,
-      lastMessage: row.LAST_MESSAGE,
+      lastMessage: Number(row.IS_UNSENT) === 1 ? 'Message unsent' : row.LAST_MESSAGE,
       lastMessageAt: row.LAST_MESSAGE_AT ? row.LAST_MESSAGE_AT.toISOString() : null,
       unreadCount: Number(row.UNREAD_COUNT || 0)
     }));
+  }
+
+  async unsendMessage(messageId: number, senderId: number): Promise<{ success: boolean; receiverId: number }> {
+    return withTransaction(async (conn) => {
+      const selectSql = `
+        SELECT SENDER_ID, RECEIVER_ID, CREATED_AT, IS_UNSENT
+        FROM MESSAGES
+        WHERE MESSAGE_ID = :messageId
+      `;
+      const selectRes = await conn.execute(selectSql, { messageId });
+      const row = selectRes.rows?.[0] as any;
+      if (!row) {
+        throw { statusCode: 404, code: 'MESSAGE_NOT_FOUND', message: 'Message not found' };
+      }
+
+      const dbSenderId = Number(row.SENDER_ID || row[0]);
+      const dbReceiverId = Number(row.RECEIVER_ID || row[1]);
+      const dbCreatedAt = row.CREATED_AT || row[2];
+      const dbIsUnsent = Number(row.IS_UNSENT || row[3]);
+
+      if (dbSenderId !== senderId) {
+        throw { statusCode: 403, code: 'FORBIDDEN', message: 'You can only unsend your own messages' };
+      }
+
+      if (dbIsUnsent === 1) {
+        return { success: true, receiverId: dbReceiverId };
+      }
+
+      // Time window check (1 hour)
+      const messageTime = new Date(dbCreatedAt).getTime();
+      const oneHourAgo = Date.now() - 60 * 60 * 1000;
+      if (messageTime < oneHourAgo) {
+        throw { statusCode: 400, code: 'UNSEND_WINDOW_EXPIRED', message: 'You can only unsend messages within 1 hour of sending.' };
+      }
+
+      const updateSql = `
+        UPDATE MESSAGES
+        SET IS_UNSENT = 1
+        WHERE MESSAGE_ID = :messageId
+      `;
+      await conn.execute(updateSql, { messageId });
+      return { success: true, receiverId: dbReceiverId };
+    });
   }
 }

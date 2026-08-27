@@ -1,14 +1,90 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext.js';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { socialApi } from '../../api/social.api.js';
 import { mediaApi } from '../../api/media.api.js';
+import { api } from '../../api/client.js';
 import { Story } from '../../types/index.js';
 import { Avatar } from '../ui/Avatar.js';
-import { Plus, X, Upload, Sparkles, ChevronLeft, ChevronRight, Eye, Users, Loader2 } from 'lucide-react';
+import { Plus, X, Upload, Sparkles, ChevronLeft, ChevronRight, Eye, Users, Loader2, Music, Volume2, VolumeX, Search } from 'lucide-react';
 import { Modal } from '../ui/Modal.js';
 import { Button } from '../ui/Button.js';
 import { getMediaUrl, handleImageError } from '../../utils/media.js';
+import { StoryEditor } from './StoryEditor.js';
+
+const StoryMusicOverlay: React.FC<{ musicTrackId: string }> = ({ musicTrackId }) => {
+  const [track, setTrack] = useState<any | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    async function fetchTrack() {
+      try {
+        const res = await api.get(`/music/spotify/track/${musicTrackId}`);
+        setTrack(res.data.data);
+      } catch (err) {
+        console.error('Failed to load track details:', err);
+      }
+    }
+    fetchTrack();
+  }, [musicTrackId]);
+
+  useEffect(() => {
+    if (!track?.preview_url) return;
+
+    const audio = new Audio(track.preview_url);
+    audio.loop = true;
+    audio.muted = isMuted;
+    audioRef.current = audio;
+
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        console.warn('Audio autoplay prevented:', err);
+      });
+    }
+
+    return () => {
+      audio.pause();
+      audioRef.current = null;
+    };
+  }, [track]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.muted = isMuted;
+    }
+  }, [isMuted]);
+
+  if (!track) return null;
+
+  return (
+    <div className="absolute top-20 left-4 right-4 z-40 flex items-center justify-between p-2.5 bg-black/60 backdrop-blur-md rounded-2xl border border-white/10 shadow-lg pointer-events-auto">
+      <div className="flex items-center gap-2.5 min-w-0">
+        {track.album.images?.[0]?.url ? (
+          <img src={track.album.images[0].url} alt="Album Art" className="w-9 h-9 rounded-xl object-cover border border-white/10 shrink-0" />
+        ) : (
+          <div className="w-9 h-9 bg-slate-800 rounded-xl flex items-center justify-center shrink-0">
+            <Music className="w-4 h-4 text-brand-400" />
+          </div>
+        )}
+        <div className="text-left min-w-0">
+          <p className="text-[11px] font-bold text-white truncate">{track.name}</p>
+          <p className="text-[9px] text-brand-300 truncate">{track.artists.map((a: any) => a.name).join(', ')}</p>
+        </div>
+      </div>
+      {track.preview_url && (
+        <button
+          type="button"
+          onClick={() => setIsMuted(!isMuted)}
+          className="p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors shrink-0"
+        >
+          {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+        </button>
+      )}
+    </div>
+  );
+};
 
 export const StoriesBar: React.FC = () => {
   const { user } = useAuth();
@@ -23,6 +99,13 @@ export const StoriesBar: React.FC = () => {
   const [reactedEmoji, setReactedEmoji] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
 
+  const [selectedMusicTrack, setSelectedMusicTrack] = useState<any | null>(null);
+  const [isMusicSearchOpen, setIsMusicSearchOpen] = useState(false);
+  const [musicSearchQuery, setMusicSearchQuery] = useState('');
+  const [musicSearchResults, setMusicSearchResults] = useState<any[]>([]);
+  const [isSearchingMusic, setIsSearchingMusic] = useState(false);
+  const [isEditingMedia, setIsEditingMedia] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: stories = [] } = useQuery({
@@ -30,6 +113,20 @@ export const StoriesBar: React.FC = () => {
     queryFn: () => socialApi.getFeedStories(),
     refetchInterval: 30000
   });
+
+  const handleMusicSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!musicSearchQuery.trim()) return;
+    try {
+      setIsSearchingMusic(true);
+      const res = await api.get(`/music/spotify/search`, { params: { q: musicSearchQuery } });
+      setMusicSearchResults(res.data.data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSearchingMusic(false);
+    }
+  };
 
   const createStoryMutation = useMutation({
     mutationFn: async () => {
@@ -43,7 +140,11 @@ export const StoriesBar: React.FC = () => {
       });
 
       // 2. Create story record with permanent media URL
-      return socialApi.createStory({ mediaUrl: uploadedUrl, caption: caption.trim() || undefined });
+      return socialApi.createStory({
+        mediaUrl: uploadedUrl,
+        caption: caption.trim() || undefined,
+        musicTrackId: selectedMusicTrack?.id || undefined
+      });
     },
     onSuccess: () => {
       if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
@@ -53,6 +154,7 @@ export const StoriesBar: React.FC = () => {
       setIsCloseFriendsOnly(false);
       setIsAddStoryOpen(false);
       setUploadProgress(0);
+      setSelectedMusicTrack(null);
       queryClient.invalidateQueries({ queryKey: ['stories'] });
     },
     onError: (err: any) => {
@@ -71,6 +173,9 @@ export const StoriesBar: React.FC = () => {
 
     setSelectedFile(file);
     setLocalPreviewUrl(URL.createObjectURL(file));
+    if (file.type.startsWith('image/')) {
+      setIsEditingMedia(true);
+    }
   };
 
   const handleCloseAddModal = () => {
@@ -175,7 +280,16 @@ export const StoriesBar: React.FC = () => {
               {selectedFile?.type.startsWith('video/') ? (
                 <video src={localPreviewUrl} controls autoPlay muted loop className="w-full max-h-72 object-contain" />
               ) : (
-                <img src={localPreviewUrl} alt="Cosmic preview" className="w-full max-h-72 object-contain" />
+                <>
+                  <img src={localPreviewUrl} alt="Cosmic preview" className="w-full max-h-72 object-contain" />
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingMedia(true)}
+                    className="absolute bottom-2 left-2 px-3 py-1.5 bg-brand-600 hover:bg-brand-550 text-white rounded-lg text-xs font-semibold shadow-md transition"
+                  >
+                    Edit Image
+                  </button>
+                </>
               )}
               <button
                 type="button"
@@ -208,6 +322,35 @@ export const StoriesBar: React.FC = () => {
             placeholder="Add a Cosmic caption..."
             className="w-full bg-slate-900 border border-slate-800 focus:border-brand-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
           />
+
+          {/* Spotify Music Sticker Picker */}
+          <div className="space-y-2">
+            {selectedMusicTrack ? (
+              <div className="flex items-center justify-between p-3 bg-brand-500/10 border border-brand-500/30 rounded-xl text-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {selectedMusicTrack.album.images?.[0]?.url && (
+                    <img src={selectedMusicTrack.album.images[0].url} alt="Album Art" className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                  )}
+                  <div className="text-left min-w-0">
+                    <p className="font-semibold text-white truncate">{selectedMusicTrack.name}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{selectedMusicTrack.artists.map((a: any) => a.name).join(', ')}</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setSelectedMusicTrack(null)} className="text-rose-400 hover:text-rose-300 p-1">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsMusicSearchOpen(true)}
+                className="w-full py-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-center gap-1.5 transition"
+              >
+                <Music className="w-4 h-4 text-brand-400" />
+                <span>Attach Song from Spotify</span>
+              </button>
+            )}
+          </div>
 
           {/* Close Friends Audience Toggle */}
           <div className="flex items-center justify-between p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-xs">
@@ -297,6 +440,9 @@ export const StoriesBar: React.FC = () => {
 
             {/* Story Media Background */}
             <div className="relative w-full h-full bg-black flex items-center justify-center">
+              {currentStory.musicTrackId && (
+                <StoryMusicOverlay musicTrackId={currentStory.musicTrackId} />
+              )}
               {(() => {
                 const resolvedStoryUrl = getMediaUrl(currentStory.mediaUrl) || '';
                 const isVideoStory =
@@ -372,6 +518,72 @@ export const StoriesBar: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Spotify Music Search Modal */}
+      <Modal isOpen={isMusicSearchOpen} onClose={() => setIsMusicSearchOpen(false)} title="Search Spotify Tracks">
+        <div className="space-y-4 text-slate-100">
+          <form onSubmit={handleMusicSearch} className="flex gap-2">
+            <input
+              type="text"
+              value={musicSearchQuery}
+              onChange={(e) => setMusicSearchQuery(e.target.value)}
+              placeholder="Search by song name or artist..."
+              className="flex-1 bg-slate-900 border border-slate-800 focus:border-brand-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+            />
+            <Button type="submit" size="sm" isLoading={isSearchingMusic} leftIcon={<Search className="w-3.5 h-3.5" />}>
+              Search
+            </Button>
+          </form>
+
+          {isSearchingMusic ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 text-brand-500 animate-spin" />
+            </div>
+          ) : musicSearchResults.length === 0 ? (
+            <p className="text-xs text-slate-500 text-center py-4">No tracks found. Search for a popular song or artist.</p>
+          ) : (
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {musicSearchResults.map((track) => (
+                <div
+                  key={track.id}
+                  onClick={() => {
+                    setSelectedMusicTrack(track);
+                    setIsMusicSearchOpen(false);
+                    setMusicSearchQuery('');
+                    setMusicSearchResults([]);
+                  }}
+                  className="flex items-center gap-3 p-2 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800/80 rounded-xl cursor-pointer transition"
+                >
+                  {track.album.images?.[0]?.url ? (
+                    <img src={track.album.images[0].url} alt="Cover Art" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                  ) : (
+                    <div className="w-9 h-9 bg-slate-800 rounded-lg flex items-center justify-center shrink-0">
+                      <Music className="w-4 h-4 text-slate-500" />
+                    </div>
+                  )}
+                  <div className="text-left min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-white truncate">{track.name}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{track.artists.map((a: any) => a.name).join(', ')}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {isEditingMedia && selectedFile && (
+        <StoryEditor
+          file={selectedFile}
+          onCancel={() => setIsEditingMedia(false)}
+          onSave={(editedFile) => {
+            setSelectedFile(editedFile);
+            if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+            setLocalPreviewUrl(URL.createObjectURL(editedFile));
+            setIsEditingMedia(false);
+          }}
+        />
       )}
     </div>
   );

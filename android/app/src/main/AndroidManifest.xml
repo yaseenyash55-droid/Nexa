@@ -185,6 +185,11 @@
             android:name=".ui.StoryViewerActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ui.StoryEditorActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
         <!-- Native Jamendo Music Activity -->
         <activity
             android:name=".ui.MusicActivity"

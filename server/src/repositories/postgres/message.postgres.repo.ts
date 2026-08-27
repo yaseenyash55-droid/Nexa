@@ -8,6 +8,7 @@ interface RawMessageRow {
   receiver_id: number | string;
   content: string;
   read_at?: Date | string | null;
+  is_unsent: boolean;
   created_at: Date | string;
   sender_username: string;
   sender_display_name: string;
@@ -16,6 +17,7 @@ interface RawMessageRow {
 
 export class PostgresMessageRepository implements IMessageRepository {
   private mapRowToMessage(row: RawMessageRow): Message {
+    const isUnsent = Boolean(row.is_unsent);
     return {
       messageId: Number(row.message_id),
       senderId: Number(row.sender_id),
@@ -26,8 +28,9 @@ export class PostgresMessageRepository implements IMessageRepository {
         displayName: row.sender_display_name,
         profileImageUrl: row.sender_profile_image ?? undefined
       },
-      content: row.content,
+      content: isUnsent ? 'Message unsent' : row.content,
       isRead: Boolean(row.read_at),
+      isUnsent,
       createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString()
     };
   }
@@ -83,7 +86,7 @@ export class PostgresMessageRepository implements IMessageRepository {
 
   async getMessagesBetweenUsers(userA: number, userB: number): Promise<Message[]> {
     const sql = `
-      SELECT m.message_id, m.sender_id, m.receiver_id, m.content, m.read_at, m.created_at,
+      SELECT m.message_id, m.sender_id, m.receiver_id, m.content, m.read_at, m.is_unsent, m.created_at,
              u.username AS sender_username, u.display_name AS sender_display_name, u.profile_image_url AS sender_profile_image
       FROM messages m
       JOIN users u ON m.sender_id = u.user_id
@@ -125,7 +128,7 @@ export class PostgresMessageRepository implements IMessageRepository {
   async getConversations(userId: number): Promise<ConversationSummary[]> {
     const sql = `
       WITH ranked_messages AS (
-        SELECT m.message_id, m.sender_id, m.receiver_id, m.content, m.read_at, m.created_at,
+        SELECT m.message_id, m.sender_id, m.receiver_id, m.content, m.read_at, m.is_unsent, m.created_at,
                CASE WHEN m.sender_id = $1 THEN m.receiver_id ELSE m.sender_id END AS partner_id,
                ROW_NUMBER() OVER (
                  PARTITION BY CASE WHEN m.sender_id = $1 THEN m.receiver_id ELSE m.sender_id END
@@ -134,7 +137,7 @@ export class PostgresMessageRepository implements IMessageRepository {
         FROM messages m
         WHERE m.sender_id = $1 OR m.receiver_id = $1
       )
-      SELECT rm.partner_id, rm.content AS last_message, rm.created_at AS last_message_at,
+      SELECT rm.partner_id, rm.content AS last_message, rm.is_unsent, rm.created_at AS last_message_at,
              rm.sender_id AS last_message_sender_id,
              u.username, u.display_name, u.profile_image_url,
              (SELECT COUNT(*) FROM messages WHERE sender_id = rm.partner_id AND receiver_id = $1 AND read_at IS NULL) AS unread_count
@@ -149,9 +152,19 @@ export class PostgresMessageRepository implements IMessageRepository {
       username: row.username,
       displayName: row.display_name,
       profileImageUrl: row.profile_image_url ?? null,
-      lastMessage: row.last_message,
+      lastMessage: row.is_unsent ? 'Message unsent' : row.last_message,
       lastMessageAt: row.last_message_at ? new Date(row.last_message_at).toISOString() : null,
       unreadCount: Number(row.unread_count || 0)
     }));
+  }
+
+  async unsendMessage(messageId: number, senderId: number): Promise<boolean> {
+    const sql = `
+      UPDATE messages
+      SET is_unsent = TRUE
+      WHERE message_id = $1 AND sender_id = $2 AND is_unsent = FALSE
+    `;
+    const res = await executePostgresSql(sql, [messageId, senderId]);
+    return res.rowCount > 0;
   }
 }

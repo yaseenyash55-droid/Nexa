@@ -5,6 +5,7 @@ import { getUserRepository } from '../repositories/factory.js';
 import { comparePassword } from '../utils/hash.js';
 import { sendSuccess } from '../utils/response.js';
 import { AuthenticatedRequest } from '../types/index.js';
+import { generateBase32Secret, generateRecoveryCodes, encryptTotpSeed, decryptTotpSeed, verifyTotp } from '../utils/mfa.js';
 
 export const securityRouter = Router();
 
@@ -43,7 +44,29 @@ securityRouter.post('/reauthenticate', requireAuth, async (req, res, next) => {
 
 securityRouter.post('/mfa/setup', requireAuth, async (req, res, next) => {
   try {
-    throw { statusCode: 503, code: 'MFA_NOT_CONFIGURED', message: 'MFA is unavailable until a verified TOTP provider and encryption key are configured' };
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user!.userId;
+    const repo = getSecurityRepository();
+
+    const secret = generateBase32Secret();
+    const { rawCodes, hashedCodes } = generateRecoveryCodes(8);
+    const encrypted = encryptTotpSeed(secret);
+    const serialized = JSON.stringify({
+      ciphertext: encrypted.ciphertext,
+      iv: encrypted.iv,
+      authTag: encrypted.authTag,
+      recoveryCodes: hashedCodes
+    });
+
+    await repo.updateSecuritySettings(userId, {
+      mfaEnabled: false,
+      totpSecretCiphertext: serialized
+    });
+
+    sendSuccess(res, {
+      secret,
+      recoveryCodes: rawCodes
+    });
   } catch (err) {
     next(err);
   }
@@ -51,7 +74,39 @@ securityRouter.post('/mfa/setup', requireAuth, async (req, res, next) => {
 
 securityRouter.post('/mfa/confirm', requireAuth, async (req, res, next) => {
   try {
-    throw { statusCode: 503, code: 'MFA_NOT_CONFIGURED', message: 'MFA confirmation is unavailable until server-side TOTP verification is configured' };
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user!.userId;
+    const { token } = req.body;
+    if (!token) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Verification token is required' };
+    }
+
+    const repo = getSecurityRepository();
+    const settings = await repo.getSecuritySettings(userId);
+    if (!settings || !settings.totpSecretCiphertext) {
+      throw { statusCode: 400, code: 'MFA_NOT_SETUP', message: 'MFA setup has not been initiated' };
+    }
+
+    const parsed = JSON.parse(settings.totpSecretCiphertext);
+    const secret = decryptTotpSeed({
+      ciphertext: parsed.ciphertext,
+      iv: parsed.iv,
+      authTag: parsed.authTag
+    });
+
+    const isValid = verifyTotp(token, secret);
+    if (!isValid) {
+      throw { statusCode: 400, code: 'INVALID_TOKEN', message: 'Verification token is invalid or expired' };
+    }
+
+    await repo.updateSecuritySettings(userId, {
+      mfaEnabled: true
+    });
+
+    sendSuccess(res, {
+      confirmed: true,
+      message: 'MFA successfully enabled'
+    });
   } catch (err) {
     next(err);
   }

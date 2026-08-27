@@ -7,6 +7,8 @@ import { hashToken } from '../utils/hash.js';
 import { getEmailProvider } from '../utils/email.js';
 import { env } from '../config/env.js';
 import { AuthTokens, User } from '../types/index.js';
+import { getSecurityRepository } from '../repositories/factory.js';
+import { decryptTotpSeed, verifyTotp } from '../utils/mfa.js';
 
 type ChallengeRow = {
   challengeId: string;
@@ -134,9 +136,44 @@ export class EmailOtpService {
     if (new Date(row.expiresAt).getTime() <= Date.now()) throw { statusCode: 400, code: 'OTP_EXPIRED', message: 'Verification code expired. Sign in again.' };
     if (row.attempts >= 5) throw { statusCode: 429, code: 'OTP_ATTEMPTS_EXCEEDED', message: 'Too many incorrect codes. Sign in again.' };
 
-    const expected = Buffer.from(row.otpHash, 'hex');
-    const supplied = Buffer.from(this.otpHash(challengeId, code), 'hex');
-    if (expected.length !== supplied.length || !crypto.timingSafeEqual(expected, supplied)) {
+    const securityRepo = getSecurityRepository();
+    const settings = await securityRepo.getSecuritySettings(row.userId);
+    let isCodeValid = false;
+
+    if (settings && settings.mfaEnabled && settings.totpSecretCiphertext) {
+      const parsed = JSON.parse(settings.totpSecretCiphertext);
+      const secret = decryptTotpSeed({
+        ciphertext: parsed.ciphertext,
+        iv: parsed.iv,
+        authTag: parsed.authTag
+      });
+      
+      // 1. Check TOTP
+      if (verifyTotp(code, secret)) {
+        isCodeValid = true;
+      } else {
+        // 2. Check Recovery codes
+        const hashedInput = crypto.createHash('sha256').update(code.trim().toUpperCase()).digest('hex');
+        const recoveryCodes: string[] = parsed.recoveryCodes || [];
+        const matchedIndex = recoveryCodes.indexOf(hashedInput);
+        if (matchedIndex !== -1) {
+          isCodeValid = true;
+          // Consume recovery code
+          recoveryCodes.splice(matchedIndex, 1);
+          parsed.recoveryCodes = recoveryCodes;
+          await securityRepo.updateSecuritySettings(row.userId, {
+            totpSecretCiphertext: JSON.stringify(parsed)
+          });
+        }
+      }
+    } else {
+      // Fallback to Email OTP
+      const expected = Buffer.from(row.otpHash, 'hex');
+      const supplied = Buffer.from(this.otpHash(challengeId, code), 'hex');
+      isCodeValid = expected.length === supplied.length && crypto.timingSafeEqual(expected, supplied);
+    }
+
+    if (!isCodeValid) {
       if (env.DATABASE_PROVIDER === 'postgres') {
         await executePostgresSql(
           `UPDATE login_otp_challenges SET attempts = attempts + 1

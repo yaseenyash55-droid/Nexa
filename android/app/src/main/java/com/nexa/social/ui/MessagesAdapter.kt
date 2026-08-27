@@ -14,6 +14,8 @@ import com.nexa.social.R
 import com.nexa.social.data.models.DisplayMessage
 import com.nexa.social.utils.ChatTheme
 
+import com.nexa.social.utils.MediaCacheManager
+
 class MessagesAdapter(
     private val currentUserId: Int,
     private var chatTheme: ChatTheme = ChatTheme.INDIGO_DEFAULT,
@@ -198,14 +200,29 @@ class MessagesAdapter(
             layoutFileAttachment: View?,
             tvFileName: TextView?
         ) {
+            val context = tvContent.context
             val gifMatch = gifRegex.find(content.trim())
             if (gifMatch != null) {
                 val gifUrl = gifMatch.groupValues[1]
                 cardMedia?.visibility = View.VISIBLE
-                imgMediaAttachment?.load(gifUrl) {
-                    crossfade(true)
-                    placeholder(R.drawable.bg_input_field)
-                    error(R.drawable.bg_input_field)
+                
+                // Show placeholder/loading state first
+                imgMediaAttachment?.setImageResource(R.drawable.bg_input_field)
+                
+                MediaCacheManager.getCachedFileOrDownload(context, gifUrl) { localFile ->
+                    if (localFile != null) {
+                        imgMediaAttachment?.load(localFile) {
+                            crossfade(true)
+                            placeholder(R.drawable.bg_input_field)
+                            error(R.drawable.bg_input_field)
+                        }
+                    } else {
+                        imgMediaAttachment?.load(gifUrl) {
+                            crossfade(true)
+                            placeholder(R.drawable.bg_input_field)
+                            error(R.drawable.bg_input_field)
+                        }
+                    }
                 }
                 cardMedia?.setOnClickListener {
                     try {
@@ -226,10 +243,24 @@ class MessagesAdapter(
                 val cleanText = content.replace(photoMatch.value, "").trim()
 
                 cardMedia?.visibility = View.VISIBLE
-                imgMediaAttachment?.load(url) {
-                    crossfade(true)
-                    placeholder(R.drawable.ic_gallery)
-                    error(R.drawable.ic_gallery)
+                
+                // Show placeholder/loading state first
+                imgMediaAttachment?.setImageResource(R.drawable.ic_gallery)
+
+                MediaCacheManager.getCachedFileOrDownload(context, url) { localFile ->
+                    if (localFile != null) {
+                        imgMediaAttachment?.load(localFile) {
+                            crossfade(true)
+                            placeholder(R.drawable.ic_gallery)
+                            error(R.drawable.ic_gallery)
+                        }
+                    } else {
+                        imgMediaAttachment?.load(url) {
+                            crossfade(true)
+                            placeholder(R.drawable.ic_gallery)
+                            error(R.drawable.ic_gallery)
+                        }
+                    }
                 }
                 cardMedia?.setOnClickListener {
                     try {
@@ -255,11 +286,32 @@ class MessagesAdapter(
 
                 layoutFileAttachment?.visibility = View.VISIBLE
                 tvFileName?.text = Uri.decode(fileName)
+                
                 layoutFileAttachment?.setOnClickListener {
-                    try {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                        it.context.startActivity(intent)
-                    } catch (_: Exception) {}
+                    // Start checking cache or download file to open
+                    MediaCacheManager.getCachedFileOrDownload(context, url) { localFile ->
+                        try {
+                            val uri = if (localFile != null) {
+                                // Fallback to content URI if needed, or open directly
+                                Uri.fromFile(localFile)
+                            } else {
+                                Uri.parse(url)
+                            }
+                            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                                if (localFile != null) {
+                                    setDataAndType(uri, context.contentResolver.getType(uri) ?: "*/*")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                            }
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            // Fallback to opening raw URL in browser
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        }
+                    }
                 }
 
                 cardMedia?.visibility = View.GONE

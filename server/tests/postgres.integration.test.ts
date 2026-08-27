@@ -16,6 +16,15 @@ describe('PostgreSQL Migration Verification Pass (DATABASE_PROVIDER=postgres)', 
     (env as any).DATABASE_PROVIDER = 'postgres';
     vi.spyOn(dbIndex, 'withDatabaseTransaction').mockImplementation(async (cb: any) => cb(null));
     vi.spyOn(postgresPool, 'withPostgresTransaction').mockImplementation(async (cb: any) => cb(null));
+    vi.spyOn(postgresRepositoryManager.userRepo, 'isFollowing').mockResolvedValue(false);
+    vi.spyOn(postgresRepositoryManager.privacyRepo, 'getPrivacySettings').mockResolvedValue({
+      isPrivate: false,
+      whoCanMessage: 'EVERYONE',
+      whoCanComment: 'EVERYONE',
+      activityStatusVisible: true,
+      readReceiptsEnabled: true,
+      hideLikeCounts: false
+    });
   });
 
   afterEach(() => {

@@ -16,6 +16,7 @@ import { userApi, authApi, api } from '../api/client.js';
 import { mediaApi } from '../api/media.api.js';
 import { postsApi } from '../api/posts.api.js';
 import { privacyApi } from '../api/privacy.api.js';
+import { mediaCache } from '../utils/mediaCache.js';
 import {
   User,
   ShieldCheck,
@@ -167,9 +168,124 @@ export const SettingsPage: React.FC = () => {
   const [hideLikeCounts, setHideLikeCounts] = useState(false);
   const [closeFriendsOnly, setCloseFriendsOnly] = useState(false);
 
+  const { data: privacySettings } = useQuery({
+    queryKey: ['privacy-settings'],
+    queryFn: () => privacyApi.getPrivacySettings()
+  });
+
+  const [isPrivate, setIsPrivate] = useState(false);
+
+  React.useEffect(() => {
+    if (privacySettings?.data) {
+      setIsPrivate(!!privacySettings.data.isPrivate);
+      setHideLikeCounts(!!privacySettings.data.hideLikeCounts);
+    } else if (privacySettings) {
+      setIsPrivate(!!(privacySettings as any).isPrivate);
+      setHideLikeCounts(!!(privacySettings as any).hideLikeCounts);
+    }
+  }, [privacySettings]);
+
+  const togglePrivateMode = async () => {
+    const nextVal = !isPrivate;
+    setIsPrivate(nextVal);
+    try {
+      await privacyApi.updatePrivacySettings({ isPrivate: nextVal });
+      queryClient.invalidateQueries({ queryKey: ['privacy-settings'] });
+    } catch (err) {
+      console.error(err);
+      setIsPrivate(!nextVal);
+    }
+  };
+
+  // MFA Setup/Disable states
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaSecret, setMfaSecret] = useState<string | null>(null);
+  const [mfaRecoveryCodes, setMfaRecoveryCodes] = useState<string[]>([]);
+  const [mfaVerificationCode, setMfaVerificationCode] = useState('');
+  const [mfaSuccessMsg, setMfaSuccessMsg] = useState<string | null>(null);
+  const [mfaErrorMsg, setMfaErrorMsg] = useState<string | null>(null);
+  const [isSettingUpMfa, setIsSettingUpMfa] = useState(false);
+
+  const { data: securityStatus, refetch: refetchSecurity } = useQuery({
+    queryKey: ['security-status'],
+    queryFn: async () => {
+      const res = await api.get('/security/status');
+      return res.data;
+    }
+  });
+
+  React.useEffect(() => {
+    if (securityStatus?.data) {
+      setMfaEnabled(!!securityStatus.data.mfaEnabled);
+    } else if (securityStatus) {
+      setMfaEnabled(!!(securityStatus as any).mfaEnabled);
+    }
+  }, [securityStatus]);
+
+  const handleMfaSetupStart = async () => {
+    setMfaErrorMsg(null);
+    setMfaSuccessMsg(null);
+    try {
+      setIsSettingUpMfa(true);
+      const res = await api.post('/security/mfa/setup');
+      const data = res.data?.data || res.data;
+      setMfaSecret(data.secret);
+      setMfaRecoveryCodes(data.recoveryCodes || []);
+    } catch (err: any) {
+      setMfaErrorMsg(err.response?.data?.error?.message || err.message || 'Failed to initiate 2FA setup');
+    } finally {
+      setIsSettingUpMfa(false);
+    }
+  };
+
+  const handleMfaSetupConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMfaErrorMsg(null);
+    setMfaSuccessMsg(null);
+    try {
+      const res = await api.post('/security/mfa/confirm', { token: mfaVerificationCode });
+      setMfaEnabled(true);
+      setMfaSecret(null);
+      setMfaVerificationCode('');
+      setMfaSuccessMsg('2FA verified and enabled successfully!');
+      refetchSecurity();
+    } catch (err: any) {
+      setMfaErrorMsg(err.response?.data?.error?.message || err.message || 'Incorrect verification code');
+    }
+  };
+
+  const handleMfaDisable = async () => {
+    setMfaErrorMsg(null);
+    setMfaSuccessMsg(null);
+    try {
+      await api.delete('/security/mfa');
+      setMfaEnabled(false);
+      setMfaSecret(null);
+      setMfaSuccessMsg('2FA disabled successfully');
+      refetchSecurity();
+    } catch (err: any) {
+      setMfaErrorMsg(err.response?.data?.error?.message || err.message || 'Failed to disable 2FA');
+    }
+  };
+
   // Deactivation Modal
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
+  const [isClearingMedia, setIsClearingMedia] = useState(false);
+  const [mediaCacheCleared, setMediaCacheCleared] = useState(false);
+
+  const handleClearMediaCache = async () => {
+    try {
+      setIsClearingMedia(true);
+      await mediaCache.clearCache();
+      setMediaCacheCleared(true);
+      setTimeout(() => setMediaCacheCleared(false), 3000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsClearingMedia(false);
+    }
+  };
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -614,6 +730,83 @@ export const SettingsPage: React.FC = () => {
               </div>
             </form>
 
+            {/* Two-Factor Authentication Setup Card */}
+            <div className="aurora-glass rounded-2xl p-5 sm:p-6 space-y-4">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-brand-400" /> Two-Factor Authentication (2FA)
+              </h2>
+              <p className="text-xs text-slate-400">
+                Enhance your account security by requiring a 6-digit TOTP verification code from an authenticator app (e.g. Google Authenticator) at login.
+              </p>
+
+              {mfaSuccessMsg && (
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+                  {mfaSuccessMsg}
+                </div>
+              )}
+
+              {mfaErrorMsg && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
+                  {mfaErrorMsg}
+                </div>
+              )}
+
+              {mfaEnabled ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-xs text-emerald-400 font-bold bg-emerald-950/40 p-3 rounded-xl border border-emerald-500/20">
+                    <Check className="w-4 h-4" /> 2FA is currently enabled on your profile.
+                  </div>
+                  <Button variant="danger" size="sm" onClick={handleMfaDisable}>
+                    Disable Two-Factor Authentication
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {!mfaSecret ? (
+                    <Button size="sm" onClick={handleMfaSetupStart} isLoading={isSettingUpMfa}>
+                      Set Up Two-Factor Authentication
+                    </Button>
+                  ) : (
+                    <form onSubmit={handleMfaSetupConfirm} className="space-y-4 p-4 bg-slate-950/60 rounded-xl border border-slate-800 text-xs">
+                      <div className="space-y-2">
+                        <p className="font-bold text-white">1. Configure Authenticator App</p>
+                        <p className="text-slate-400">Enter the following secret key inside Google Authenticator or Authy:</p>
+                        <code className="block p-3 bg-slate-900 border border-slate-800 rounded text-center tracking-widest text-brand-400 font-bold select-all">{mfaSecret}</code>
+                      </div>
+
+                      {mfaRecoveryCodes.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="font-bold text-white text-rose-400">2. Save Your Recovery Codes</p>
+                          <p className="text-slate-400">Keep these codes in a safe place. You can use them to sign in if you lose your phone:</p>
+                          <div className="grid grid-cols-2 gap-2 p-3 bg-slate-900 border border-slate-800 rounded font-mono text-[10px] text-slate-300">
+                            {mfaRecoveryCodes.map((code, idx) => (
+                              <div key={idx} className="select-all">{code}</div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <p className="font-bold text-white">3. Verify Authenticator Token</p>
+                        <Input
+                          label="6-Digit Verification Code"
+                          placeholder="e.g. 123456"
+                          maxLength={6}
+                          value={mfaVerificationCode}
+                          onChange={(e) => setMfaVerificationCode(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <Button type="submit">Verify & Enable 2FA</Button>
+                        <Button type="button" variant="ghost" onClick={() => setMfaSecret(null)}>Cancel</Button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="aurora-glass rounded-2xl p-5 sm:p-6 space-y-3 border-rose-500/20">
               <h2 className="text-base font-bold text-rose-400 flex items-center gap-2">
                 <LogOut className="w-4 h-4" /> Active Sessions & Sign Out
@@ -664,11 +857,27 @@ export const SettingsPage: React.FC = () => {
               <div className="flex items-center justify-between p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
                 <div>
                   <p className="font-semibold text-slate-100 flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-brand-400" /> Private Account (Visibility)
+                  </p>
+                  <p className="text-[11px] text-slate-400">Make your profile discoverable only to followers. Content requires follow approval.</p>
+                </div>
+                <button onClick={togglePrivateMode} className={`w-12 h-6 rounded-full transition-colors p-1 relative ${isPrivate ? 'bg-brand-600' : 'bg-slate-700'}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${isPrivate ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
+                <div>
+                  <p className="font-semibold text-slate-100 flex items-center gap-2">
                     <HeartOff className="w-4 h-4 text-rose-400" /> Hide Like & Reaction Counts
                   </p>
                   <p className="text-[11px] text-slate-400">Hide total like counts on posts and bytes in your feeds</p>
                 </div>
-                <button onClick={() => setHideLikeCounts(!hideLikeCounts)} className={`w-12 h-6 rounded-full transition-colors p-1 relative ${hideLikeCounts ? 'bg-brand-600' : 'bg-slate-700'}`}>
+                <button onClick={() => {
+                  const nextVal = !hideLikeCounts;
+                  setHideLikeCounts(nextVal);
+                  privacyApi.updatePrivacySettings({ hideLikeCounts: nextVal });
+                }} className={`w-12 h-6 rounded-full transition-colors p-1 relative ${hideLikeCounts ? 'bg-brand-600' : 'bg-slate-700'}`}>
                   <div className={`w-4 h-4 bg-white rounded-full transition-transform ${hideLikeCounts ? 'translate-x-6' : 'translate-x-0'}`} />
                 </button>
               </div>
@@ -702,6 +911,24 @@ export const SettingsPage: React.FC = () => {
               <Button size="sm" leftIcon={<Download className="w-4 h-4" />} onClick={handleExportUserData} isLoading={isExportingData}>
                 Download Data Archive (.json)
               </Button>
+            </div>
+
+            {/* Local Media Cache */}
+            <div className="aurora-glass rounded-2xl p-5 sm:p-6 space-y-3">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-amber-500" /> Local Media Cache
+              </h2>
+              <p className="text-xs text-slate-400">
+                Clear cached images, videos, and audio files stored locally on this device.
+              </p>
+              <div className="flex items-center gap-3">
+                <Button size="sm" onClick={handleClearMediaCache} isLoading={isClearingMedia}>
+                  Clear Cached Media
+                </Button>
+                {mediaCacheCleared && (
+                  <span className="text-xs text-emerald-400 font-medium">Cache cleared successfully!</span>
+                )}
+              </div>
             </div>
 
             {/* Account Deactivation */}

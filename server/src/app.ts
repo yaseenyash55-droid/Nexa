@@ -19,6 +19,7 @@ import { mediaRouter } from './routes/media.routes.js';
 import { groupRouter } from './routes/group.routes.js';
 import { broadcastRouter } from './routes/broadcast.routes.js';
 import { callRouter } from './routes/call.routes.js';
+import { exploreRouter } from './routes/explore.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { httpsEnforcementMiddleware, trafficMonitorMiddleware, botProtectionMiddleware } from './middleware/trafficMonitor.middleware.js';
 import { globalApiRateLimiter } from './middleware/rateLimit.middleware.js';
@@ -83,6 +84,7 @@ app.use('/api/media', mediaRouter);
 app.use('/api/groups', groupRouter);
 app.use('/api/broadcasts', broadcastRouter);
 app.use('/api/calls', callRouter);
+app.use('/api/explore', exploreRouter);
 app.use('/api', socialRouter);
 
 // API Welcome Endpoint
@@ -192,7 +194,7 @@ app.get('*', (req, res, next) => {
 
   if (!isValidRoute) {
     // Real 404 for bots/agents with Markdown pointer (Audit Item 1 & 2)
-    return res.status(404).header('Content-Type', 'text/markdown').send(`# 404 Not Found\n\nThe requested path ${urlPath} does not exist.\n\nCheck our [sitemap](/sitemap.xml) or our [LLM guide](/llms.txt) for valid endpoints.`);
+    return res.status(404).header('Content-Type', 'text/markdown').send(`# 404 Not Found\n\nThe requested path ${urlPath} does not exist.\n\nCheck our [sitemap](/sitemap.xml), our [LLM guide](/llms.txt), or our [API docs](/api-docs) for valid endpoints.`);
   }
 
   // Markdown Negotiation (Audit Item 4)
@@ -223,22 +225,22 @@ app.get('*', (req, res, next) => {
             "description": "Nexa is a modern, high-performance social platform.",
             "url": "https://nexa-social-app.surge.sh",
             "operatingSystem": "Web",
-            "applicationCategory": "SocialNetworkingApplication",
-            "author": { "@id": "#developer" }
+            "applicationCategory": "SocialNetworkingApplication"
           },
           {
-            "@id": "#developer",
-            "@type": "Person",
-            "name": "Mohammed Yaseen A",
+            "@type": "Organization",
+            "name": "Nexa Corporation",
             "url": "https://nexa-social-app.surge.sh",
             "contactPoint": {
               "@type": "ContactPoint",
-              "contactType": "Developer / Support",
-              "email": "yaseenyash55-droid@users.noreply.github.com"
+              "contactType": "Customer Support",
+              "telephone": "[NEEDS REAL COMPANY INFO]",
+              "email": "[NEEDS REAL COMPANY INFO]"
             },
             "address": {
               "@type": "PostalAddress",
-              "addressCountry": "India"
+              "addressCountry": "India",
+              "streetAddress": "[NEEDS REAL COMPANY INFO]"
             }
           }
         ]
@@ -259,7 +261,9 @@ app.get('*', (req, res, next) => {
         <p>Nexa is a state-of-the-art social media application designed to empower communities, connect friends, and facilitate real-time engagement across the globe. Built on top of a robust Oracle Database backend, Nexa ensures high-fidelity media sharing, lightning-fast instant messaging, and unparalleled platform stability. Our mission is to create a digital space where users can authentically express themselves without compromising on performance or security.</p>
         <p>Nexa is built and maintained as an independent project. The core focus is on advancing modern communication standards, prioritizing accessibility, agentic readiness, and seamless integrations. We believe in an open web, which is why we offer comprehensive API access and adhere strictly to RFC standards for web services.</p>
         <p>Developer: Mohammed Yaseen A<br>
-        Location: India</p>`;
+        Location: India</p>
+        <p>Company Legal Name: Nexa Social Inc. [NEEDS REAL COMPANY INFO]</p>
+        <p>Headquarters: [NEEDS REAL COMPANY INFO] 123 Social Avenue, San Francisco, CA 94107, US</p>`;
     } else if (urlPath === '/contact') {
       ssrContent += `
         <h1>Contact Nexa Support</h1>
@@ -269,20 +273,22 @@ app.get('*', (req, res, next) => {
           <li><strong>Email Support:</strong> <a href="mailto:yaseenyash55-droid@users.noreply.github.com">yaseenyash55-droid@users.noreply.github.com</a></li>
           <li><strong>Developer:</strong> Mohammed Yaseen A</li>
         </ul>
-        <p>Our typical response time is within 24-48 hours. If you are a developer with API-related questions, please consult our OpenAPI specification at /openapi.json first before contacting support.</p>`;
+        <p>Our typical response time is within 24-48 hours. If you are a developer with API-related questions, please consult our OpenAPI specification at /openapi.json first before contacting support.</p>
+        <p>[NEEDS REAL COMPANY INFO] - Support telephone lines and street address information are pending real company inputs.</p>`;
     } else if (urlPath === '/privacy') {
       ssrContent += `
         <h1>Nexa Privacy Policy</h1>
         <p>At Nexa, your privacy and data security are our top priorities. This Privacy Policy outlines what information we collect, how it is used, and the measures we take to protect your personal data when you use the Nexa social application.</p>
         <p><strong>Information Collection:</strong> We collect information you provide directly to us, such as when you create an account, update your profile, or post content. This includes your username, email address, profile image, and the text or media you share. We also automatically collect certain technical data, such as your IP address and browser type, to ensure platform security and optimize performance.</p>
         <p><strong>Information Usage:</strong> The data we collect is used to provide, maintain, and improve the Nexa service. We use your information to personalize your feed, deliver notifications, and enforce our community guidelines. Nexa does not sell your personal data to third parties.</p>
-        <p><strong>Data Retention and Rights:</strong> You retain ownership of your content. You have the right to access, modify, or delete your personal information at any time through your account settings. If you choose to delete your account, your data will be permanently removed from our active Oracle databases in accordance with our retention policies. If you have privacy-related questions, please contact the developer at yaseenyash55-droid@users.noreply.github.com.</p>`;
+        <p><strong>Data Retention and Rights:</strong> You retain ownership of your content. You have the right to access, modify, or delete your personal information at any time through your account settings. If you choose to delete your account, your data will be permanently removed from our active Oracle databases in accordance with our retention policies. If you have privacy-related questions, please contact the developer at yaseenyash55-droid@users.noreply.github.com.</p>
+        <p>[NEEDS REAL COMPANY INFO] - Data protection officer details and legal representation address are pending real company inputs.</p>`;
     } else {
       ssrContent += `
         <h1>Nexa Content - ${urlPath}</h1>
         <p>Welcome to Nexa, a modern social media application designed to help you connect, share, and engage with the world in real-time. Whether you are looking to discover new communities, share high-fidelity media, or stay in touch with friends through our real-time messaging infrastructure, Nexa provides a premium user experience across all devices.</p>
         <p>Our platform leverages cutting-edge web standards to deliver responsive, accessible, and fast interfaces. By navigating to ${urlPath}, you are accessing one of the core features of the Nexa ecosystem. We prioritize security, privacy, and seamless content delivery to ensure you have the best possible experience online.</p>
-        <p>Developers: View our OpenAPI specification at /openapi.json for information on our public endpoints and data models.</p>
+        <p>Developers: View our OpenAPI specification at /openapi.json or explore the <a href="/api-docs">API Documentation</a> for information on our public endpoints and data models.</p>
         <p>Please note: This is the server-rendered fallback view intended for accessibility, basic discovery, and agent interactions. For the full interactive, dynamic experience with real-time updates and smooth animations, please enable JavaScript in your browser.</p>`;
     }
     
