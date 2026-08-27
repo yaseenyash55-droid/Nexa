@@ -229,16 +229,16 @@ app.get('*', (req, res, next) => {
           {
             "@id": "#developer",
             "@type": "Person",
-            "name": "[NEEDS DEVELOPER INFO]",
+            "name": "Mohammed Yaseen A",
             "url": "https://nexa-social-app.surge.sh",
             "contactPoint": {
               "@type": "ContactPoint",
               "contactType": "Developer / Support",
-              "email": "[NEEDS DEVELOPER INFO]"
+              "email": "yaseenyash55-droid@users.noreply.github.com"
             },
             "address": {
               "@type": "PostalAddress",
-              "addressCountry": "[NEEDS DEVELOPER INFO]"
+              "addressCountry": "India"
             }
           }
         ]
@@ -258,16 +258,16 @@ app.get('*', (req, res, next) => {
         <h1>About Nexa</h1>
         <p>Nexa is a state-of-the-art social media application designed to empower communities, connect friends, and facilitate real-time engagement across the globe. Built on top of a robust Oracle Database backend, Nexa ensures high-fidelity media sharing, lightning-fast instant messaging, and unparalleled platform stability. Our mission is to create a digital space where users can authentically express themselves without compromising on performance or security.</p>
         <p>Nexa is built and maintained as an independent project. The core focus is on advancing modern communication standards, prioritizing accessibility, agentic readiness, and seamless integrations. We believe in an open web, which is why we offer comprehensive API access and adhere strictly to RFC standards for web services.</p>
-        <p>Developer: [NEEDS DEVELOPER INFO]<br>
-        Location: [NEEDS DEVELOPER INFO]</p>`;
+        <p>Developer: Mohammed Yaseen A<br>
+        Location: India</p>`;
     } else if (urlPath === '/contact') {
       ssrContent += `
         <h1>Contact Nexa Support</h1>
         <p>We are here to help you get the most out of Nexa. Whether you are experiencing technical difficulties, have a question about your account, or want to report inappropriate behavior, please reach out. Nexa prioritizes user safety and swift resolution of all inquiries.</p>
         <p>Please include your Nexa username and a detailed description of your issue when reaching out.</p>
         <ul>
-          <li><strong>Email Support:</strong> [NEEDS DEVELOPER INFO]</li>
-          <li><strong>Country:</strong> [NEEDS DEVELOPER INFO]</li>
+          <li><strong>Email Support:</strong> <a href="mailto:yaseenyash55-droid@users.noreply.github.com">yaseenyash55-droid@users.noreply.github.com</a></li>
+          <li><strong>Developer:</strong> Mohammed Yaseen A</li>
         </ul>
         <p>Our typical response time is within 24-48 hours. If you are a developer with API-related questions, please consult our OpenAPI specification at /openapi.json first before contacting support.</p>`;
     } else if (urlPath === '/privacy') {
@@ -276,7 +276,7 @@ app.get('*', (req, res, next) => {
         <p>At Nexa, your privacy and data security are our top priorities. This Privacy Policy outlines what information we collect, how it is used, and the measures we take to protect your personal data when you use the Nexa social application.</p>
         <p><strong>Information Collection:</strong> We collect information you provide directly to us, such as when you create an account, update your profile, or post content. This includes your username, email address, profile image, and the text or media you share. We also automatically collect certain technical data, such as your IP address and browser type, to ensure platform security and optimize performance.</p>
         <p><strong>Information Usage:</strong> The data we collect is used to provide, maintain, and improve the Nexa service. We use your information to personalize your feed, deliver notifications, and enforce our community guidelines. Nexa does not sell your personal data to third parties.</p>
-        <p><strong>Data Retention and Rights:</strong> You retain ownership of your content. You have the right to access, modify, or delete your personal information at any time through your account settings. If you choose to delete your account, your data will be permanently removed from our active Oracle databases in accordance with our retention policies. If you have privacy-related questions, please contact the developer at [NEEDS DEVELOPER INFO].</p>`;
+        <p><strong>Data Retention and Rights:</strong> You retain ownership of your content. You have the right to access, modify, or delete your personal information at any time through your account settings. If you choose to delete your account, your data will be permanently removed from our active Oracle databases in accordance with our retention policies. If you have privacy-related questions, please contact the developer at yaseenyash55-droid@users.noreply.github.com.</p>`;
     } else {
       ssrContent += `
         <h1>Nexa Content - ${urlPath}</h1>
