@@ -19,7 +19,7 @@ export const MobileBottomNavigation: React.FC<MobileBottomNavigationProps> = ({ 
   ];
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background-card/90 backdrop-blur-lg border-t border-slate-800/80 px-2 py-2 pb-safe flex items-center justify-around">
+    <nav aria-label="Mobile Bottom Navigation" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background-card/90 backdrop-blur-lg border-t border-slate-800/80 px-2 py-2 pb-safe flex items-center justify-around">
       {items.slice(0, 2).map(item => (
         <NavLink
           key={item.to}
@@ -67,6 +67,6 @@ export const MobileBottomNavigation: React.FC<MobileBottomNavigationProps> = ({ 
           <span>{item.label}</span>
         </NavLink>
       ))}
-    </div>
+    </nav>
   );
 };

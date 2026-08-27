@@ -248,7 +248,7 @@ app.get('*', (req, res, next) => {
           },
           {
             "@type": "Organization",
-            "name": "Nexa Social [NEEDS REAL COMPANY INFO]",
+            "name": "Nexa Social Inc. [NEEDS REAL COMPANY INFO]",
             "url": "https://nexa-social-app.surge.sh",
             "contactPoint": {
               "@type": "ContactPoint",
@@ -282,7 +282,7 @@ app.get('*', (req, res, next) => {
         <h1>About Nexa</h1>
         <p>Nexa is a state-of-the-art social media application designed to empower communities, connect friends, and facilitate real-time engagement across the globe. Built on top of a robust Oracle Database backend, Nexa ensures high-fidelity media sharing, lightning-fast instant messaging, and unparalleled platform stability. Our mission is to create a digital space where users can authentically express themselves without compromising on performance or security.</p>
         <p>Currently, Nexa is operated by [NEEDS REAL COMPANY INFO] Nexa Social Inc., a technology company dedicated to advancing modern communication standards. Our engineering team prioritizes accessibility, agentic readiness, and seamless integrations. We believe in an open web, which is why we offer comprehensive API access and adhere strictly to RFC standards for web services.</p>
-        <p>Company Legal Name: [NEEDS REAL COMPANY INFO] Nexa Social Inc.<br>
+        <p>Company Legal Name: Nexa Social Inc. [NEEDS REAL COMPANY INFO]<br>
         Headquarters: [NEEDS REAL COMPANY INFO] 123 Social Avenue, San Francisco, CA 94107, US</p>`;
     } else if (urlPath === '/contact') {
       ssrContent += `

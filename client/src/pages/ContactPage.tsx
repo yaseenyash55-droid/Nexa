@@ -13,7 +13,7 @@ export const ContactPage: React.FC = () => {
 
   return (
     <AppShell>
-      <main className="p-6 md:p-8 max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="p-6 md:p-8 max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <header className="space-y-3 pb-6 border-b border-slate-800/80">
           <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">Contact Support</h1>
           <p className="text-lg text-slate-400">We're here to help you get the most out of Nexa.</p>
@@ -84,7 +84,7 @@ export const ContactPage: React.FC = () => {
             )}
           </section>
         </div>
-      </main>
+      </div>
     </AppShell>
   );
 };

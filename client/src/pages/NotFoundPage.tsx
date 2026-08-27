@@ -4,7 +4,7 @@ import { Button } from '../components/ui/Button.js';
 import { Compass } from 'lucide-react';
 
 export const NotFoundPage: React.FC = () => (
-  <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center space-y-4">
+  <main className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center space-y-4">
     <div className="p-4 bg-slate-800/40 rounded-full text-brand-400">
       <Compass className="w-12 h-12" />
     </div>
@@ -16,5 +16,5 @@ export const NotFoundPage: React.FC = () => (
     <Link to="/">
       <Button variant="primary">Return Home</Button>
     </Link>
-  </div>
+  </main>
 );

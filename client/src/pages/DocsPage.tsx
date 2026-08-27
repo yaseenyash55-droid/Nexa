@@ -5,7 +5,7 @@ import { Terminal, Code, Server, ArrowRight } from 'lucide-react';
 export const DocsPage: React.FC = () => {
   return (
     <AppShell>
-      <main className="p-6 md:p-8 max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="p-6 md:p-8 max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <header className="space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 text-brand-400 text-sm font-medium mb-2 border border-brand-500/20">
             <Terminal className="w-4 h-4" />
@@ -87,7 +87,7 @@ export const DocsPage: React.FC = () => {
             </div>
           </div>
         </section>
-      </main>
+      </div>
     </AppShell>
   );
 };

@@ -33,7 +33,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onOpenComp
   ];
 
   return (
-    <aside className="sticky top-0 h-screen w-64 p-4 flex flex-col justify-between border-r border-slate-800/80 bg-background/50">
+    <aside aria-label="Left sidebar" className="sticky top-0 h-screen w-64 p-4 flex flex-col justify-between border-r border-slate-800/80 bg-background/50">
       <div className="space-y-4">
         {/* Branding Logo - Dr. Doom Holding Magical Orb */}
         <div className="flex items-center gap-2 px-3 py-2 cursor-pointer border-b border-slate-800/60 pb-3" onClick={() => navigate('/')}>
@@ -67,7 +67,7 @@ export const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onOpenComp
         </NavLink>
 
         {/* Navigation Items */}
-        <nav className="space-y-0.5">
+        <nav aria-label="Main navigation" className="space-y-0.5">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
