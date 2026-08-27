@@ -52,7 +52,7 @@ describe('Accessibility Checks for Sub-Prompt 4', () => {
       );
       
       const results = await axe(container);
-      expect(results).toHaveNoViolations();
+      (expect(results) as any).toHaveNoViolations();
     });
   }
 });
