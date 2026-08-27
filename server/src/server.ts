@@ -12,7 +12,7 @@ async function startServer() {
     await initializeDatabasePool();
     initializeFirebase();
 
-    const server = app.listen(env.PORT, () => {
+    const server = app.listen(env.PORT, '0.0.0.0', () => {
       logger.info(
         `Nexa Server listening on port ${env.PORT} with ${env.DATABASE_PROVIDER.toUpperCase()} Database`
       );

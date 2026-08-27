@@ -18,7 +18,8 @@
     "test": "npm run test --workspace=server && npm run test --workspace=client",
     "test:unit": "npm run test:unit --workspace=server && npm run test --workspace=client",
     "test:integration": "npm run test:integration --workspace=server",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "deploy:prod": "gcloud run deploy nexa-social-app --source . --region us-central1 --allow-unauthenticated --project yash-os-build-1"
   },
   "devDependencies": {
     "@playwright/test": "^1.45.0",

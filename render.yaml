@@ -1,37 +1,37 @@
 services:
   - type: web
-  name: nexa-backend
-  env: node
-  plan: free
-  region: singapore
-  buildCommand: npm install && npm run build
-  startCommand: npm start
-  autoDeploy: true
-  envVars:
-    - key: NODE_ENV
-      value: production
-    - key: PORT
-      value: 10000
-    - key: CLIENT_ORIGIN
-      value: https://nexa-social-app.surge.sh
-    - key: DATABASE_PROVIDER
-      value: postgres
-    - key: DATABASE_URL
-      sync: false
-    - key: PG_POOL_MIN
-      value: 1
-    - key: PG_POOL_MAX
-      value: 10
-    - key: JWT_SECRET
-      generateValue: true
-    - key: JWT_REFRESH_SECRET
-      generateValue: true
-    - key: COOKIE_SECURE
-      value: true
-    - key: REDIS_URL
-      sync: false
-    - key: BREVO_API_KEY
-      sync: false
-    - key: BREVO_SENDER_EMAIL
-      sync: false
-
+    name: nexa-backend
+    env: node
+    plan: free
+    region: singapore
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: DATABASE_PROVIDER
+        value: oracle
+      - key: ORACLE_USER
+        sync: false
+      - key: ORACLE_PASSWORD
+        sync: false
+      - key: ORACLE_CONNECT_STRING
+        sync: false
+      - key: DB_POOL_MIN
+        value: 1
+      - key: DB_POOL_MAX
+        value: 10
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: true
+      - key: REDIS_URL
+        sync: false
