@@ -15,11 +15,13 @@ export function sendError(
   statusCode = 400, 
   details: unknown[] = []
 ) {
+  // RFC 7807 Problem Details for HTTP APIs (Audit Item 7)
+  res.setHeader('Content-Type', 'application/problem+json');
   return res.status(statusCode).json({
-    error: {
-      code,
-      message,
-      details
-    }
+    type: `https://nexa-social-app.surge.sh/docs/errors/${code.toLowerCase().replace(/_/g, '-')}`,
+    title: code,
+    status: statusCode,
+    detail: message,
+    ...(details.length > 0 ? { extensions: { details } } : {})
   });
 }

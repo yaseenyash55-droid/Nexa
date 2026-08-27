@@ -33,9 +33,17 @@ export const AppShell: React.FC<AppShellProps> = ({ children, showRightPanel = t
         <aside className="hidden lg:block w-80 p-4 space-y-6 sticky top-0 h-screen overflow-y-auto">
           <SearchInput />
           <SuggestedUsers />
-          <footer className="px-4 text-xs text-slate-500 space-y-1">
-            <p>© 2026 Nexa Social Network Inc.</p>
-            <p>Powered by Oracle Database & React</p>
+          <footer className="px-4 text-xs text-slate-500 space-y-3 pt-4 border-t border-slate-800/50">
+            <nav className="flex flex-wrap gap-x-4 gap-y-2">
+              <a href="/about" className="hover:text-slate-300 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 rounded">About</a>
+              <a href="/contact" className="hover:text-slate-300 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 rounded">Contact</a>
+              <a href="/privacy" className="hover:text-slate-300 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 rounded">Privacy</a>
+              <a href="/docs" className="hover:text-slate-300 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 rounded">Developers</a>
+            </nav>
+            <div className="space-y-1">
+              <p>© 2026 Nexa Social Network Inc.</p>
+              <p>Powered by Oracle Database & React</p>
+            </div>
           </footer>
         </aside>
       )}

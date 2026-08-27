@@ -32,14 +32,14 @@ describe('Security and Oracle-only architecture', () => {
     const response = await request.get('/api/auth/me').set('Authorization', 'Bearer invalid.jwt.token.string');
 
     expect(response.status).toBe(401);
-    expect(response.body.error.code).toBe('UNAUTHORIZED');
+    expect(response.body.title).toBe('UNAUTHORIZED');
   });
 
   it('blocks automated scraping user agents', async () => {
     const response = await request.get('/api/health').set('User-Agent', 'Scrapy/2.5.0 (+https://scrapy.org)');
 
     expect(response.status).toBe(403);
-    expect(response.body.error.code).toBe('BOT_ACCESS_DENIED');
+    expect(response.body.title).toBe('BOT_ACCESS_DENIED');
   });
 
   it('rejects spoofed image signatures', async () => {

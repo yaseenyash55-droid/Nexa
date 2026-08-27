@@ -45,8 +45,9 @@ describe('Privacy, Moderation, Blocks, and Reports Suite', () => {
         .set('Authorization', `Bearer ${testUserToken}`)
         .send({ whoCanMessage: 'INVALID_OPTION' });
 
+      console.log('RESPONSE:', response.text);
       expect(response.status).toBe(400);
-      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      expect(response.body.title).toBe('VALIDATION_ERROR');
     });
 
     it('updates privacy settings and returns updated record', async () => {
@@ -93,7 +94,7 @@ describe('Privacy, Moderation, Blocks, and Reports Suite', () => {
         .send({ words: 'not-an-array' });
 
       expect(response.status).toBe(400);
-      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      expect(response.body.title).toBe('VALIDATION_ERROR');
     });
 
     it('persists cleaned words list', async () => {
@@ -116,7 +117,7 @@ describe('Privacy, Moderation, Blocks, and Reports Suite', () => {
         .set('Authorization', `Bearer ${testUserToken}`);
 
       expect(response.status).toBe(400);
-      expect(response.body.error.code).toBe('SELF_BLOCK_FORBIDDEN');
+      expect(response.body.title).toBe('SELF_BLOCK_FORBIDDEN');
     });
 
     it('successfully unblocks user', async () => {
@@ -144,7 +145,7 @@ describe('Privacy, Moderation, Blocks, and Reports Suite', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      expect(response.body.title).toBe('VALIDATION_ERROR');
     });
 
     it('submits valid report and returns 201 with reportId', async () => {

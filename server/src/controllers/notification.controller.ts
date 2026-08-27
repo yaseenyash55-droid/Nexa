@@ -14,7 +14,7 @@ export class NotificationController {
 
   async getNotifications(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
       const limit = Number(req.query.limit) || 20;
       const result = await this.notifRepo.getUserNotifications(req.user.userId, cursor, limit);
@@ -26,7 +26,7 @@ export class NotificationController {
 
   async getUnreadCount(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const unreadCount = await this.notifRepo.getUnreadCount(req.user.userId);
       return sendSuccess(res, { unreadCount });
     } catch (err) {
@@ -36,14 +36,14 @@ export class NotificationController {
 
   async markAsRead(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const notifId = Number(req.params.id);
       if (isNaN(notifId)) {
-        return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid notification ID', details: [] } });
+        return sendError(res, 'VALIDATION_ERROR', 'Invalid notification ID', 400);
       }
       const updated = await this.notifRepo.markAsRead(notifId, req.user.userId);
       if (!updated) {
-        return res.status(404).json({ error: { code: 'NOTIFICATION_NOT_FOUND', message: 'Notification not found', details: [] } });
+        return sendError(res, 'NOTIFICATION_NOT_FOUND', 'Notification not found', 404);
       }
       return sendSuccess(res, null, 'Notification marked as read');
     } catch (err) {
@@ -53,7 +53,7 @@ export class NotificationController {
 
   async markAllAsRead(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       await this.notifRepo.markAllAsRead(req.user.userId);
       return sendSuccess(res, null, 'All notifications marked as read');
     } catch (err) {
@@ -63,7 +63,7 @@ export class NotificationController {
 
   async registerFcmToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const token = req.body?.fcmToken || req.body?.token;
       const platform = req.body?.platform || 'android';
       const deviceId = req.body?.deviceId;
@@ -86,7 +86,7 @@ export class NotificationController {
 
   async revokeFcmToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const token = req.body?.fcmToken || req.body?.token;
 
       if (token && typeof token === 'string' && token.trim()) {

@@ -2,13 +2,14 @@ import { Response, NextFunction } from 'express';
 import { PostService } from '../services/post.service.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { sendSuccess } from '../utils/response.js';
+import { sendError } from '../utils/response.js';
 
 const postService = new PostService();
 
 export class PostController {
   async createPost(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const post = await postService.createPost({
         userId: req.user.userId,
         content: req.body.content,
@@ -33,7 +34,7 @@ export class PostController {
 
   async updatePost(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const postId = Number(req.params.id);
       const { content, tags, collaborator } = req.body;
       const updated = await postService.updatePost(postId, req.user.userId, { content, tags, collaborator });
@@ -45,7 +46,7 @@ export class PostController {
 
   async deletePost(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const postId = Number(req.params.id);
       await postService.deletePost(postId, req.user.userId);
       return sendSuccess(res, null, 'Post deleted successfully');
@@ -64,7 +65,7 @@ export class PostController {
       let result;
       if (scope === 'following') {
         if (!currentUserId) {
-          return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required for following feed', details: [] } });
+          return sendError(res, 'UNAUTHORIZED', 'Auth required for following feed', 401);
         }
         result = await postService.getFollowingFeed(currentUserId, cursor, limit);
       } else {
@@ -79,7 +80,7 @@ export class PostController {
 
   async likePost(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const postId = Number(req.params.id);
       await postService.likePost(req.user.userId, postId);
       return sendSuccess(res, null, 'Liked post');
@@ -90,7 +91,7 @@ export class PostController {
 
   async unlikePost(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const postId = Number(req.params.id);
       await postService.unlikePost(req.user.userId, postId);
       return sendSuccess(res, null, 'Unliked post');
@@ -101,7 +102,7 @@ export class PostController {
 
   async bookmarkPost(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const postId = Number(req.params.id);
       await postService.bookmarkPost(req.user.userId, postId);
       return sendSuccess(res, null, 'Bookmarked post');
@@ -112,7 +113,7 @@ export class PostController {
 
   async unbookmarkPost(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const postId = Number(req.params.id);
       await postService.unbookmarkPost(req.user.userId, postId);
       return sendSuccess(res, null, 'Unbookmarked post');
@@ -123,7 +124,7 @@ export class PostController {
 
   async getUserBookmarks(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const cursor = req.query.cursor ? Number(req.query.cursor) : undefined;
       const limit = Number(req.query.limit) || 10;
       const result = await postService.getUserBookmarks(req.user.userId, cursor, limit);
@@ -135,7 +136,7 @@ export class PostController {
 
   async addComment(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const postId = Number(req.params.id);
       const comment = await postService.addComment({
         postId,
@@ -162,7 +163,7 @@ export class PostController {
 
   async deleteComment(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const postId = Number(req.params.postId);
       const commentId = Number(req.params.commentId);
       await postService.deleteComment(commentId, postId, req.user.userId);

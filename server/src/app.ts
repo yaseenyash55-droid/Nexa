@@ -84,8 +84,8 @@ app.use('/api/broadcasts', broadcastRouter);
 app.use('/api/calls', callRouter);
 app.use('/api', socialRouter);
 
-// Root & API Welcome Endpoints
-app.get(['/', '/api'], (req, res) => {
+// API Welcome Endpoint
+app.get('/api', (req, res) => {
   res.json({
     status: 'online',
     app: 'Nexa Social API',
@@ -109,9 +109,215 @@ app.get(['/', '/api'], (req, res) => {
   });
 });
 
-// 404 Route Handler for undefined endpoints
-app.use((req, res) => {
-  res.status(404).json({ error: { code: 'NOT_FOUND', message: `Route ${req.method} ${req.url} not found` } });
+// Route Manifest for SSR, 404s, and Sitemap
+const validFrontendRoutes = [
+  '/', '/explore', '/search', '/music', '/reels', '/user-manual', '/help', 
+  '/tutorial', '/download', '/apk', '/get-app', '/install', '/login', 
+  '/register', '/reset-password', '/notifications', '/bookmarks', '/settings', 
+  '/protection', '/insights', '/moderation', '/messages', '/about', '/contact', '/privacy', '/docs'
+];
+
+// Generate Sitemap (Audit Item 3 & 4)
+app.get('/sitemap.xml', (req, res) => {
+  res.header('Content-Type', 'application/xml');
+  const urls = validFrontendRoutes.map(route => 
+    `  <url><loc>https://nexa-social-app.surge.sh${route}</loc><changefreq>${route === '/' ? 'daily' : 'monthly'}</changefreq><priority>${route === '/' ? '1.0' : '0.5'}</priority></url>`
+  ).join('\n');
+
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`);
+});
+
+// Serve llms.txt (Audit Item 10)
+app.get('/llms.txt', (req, res) => {
+  res.header('Content-Type', 'text/plain');
+  res.send(`# Nexa Social App LLM Guide
+
+> Nexa is a modern social media application.
+
+## API Documentation
+The API documentation is available at /api-docs and the OpenAPI spec is at /openapi.json.
+
+## When to use this
+- **Get Public Profile**: Use \`GET /api/users/username/{username}\` to resolve a user's handle to their internal ID, follower counts, and public profile data.
+- **Get Global Feed**: Use \`GET /api/posts/feed\` to pull the most recent public posts from the platform.
+- **Get Specific Post**: Use \`GET /api/posts/{id}\` to retrieve details of a specific post by its ID.
+- **Errors**: All API errors follow RFC 7807 problem+json. If you receive an error, parse the \`detail\` field for instructions.
+`);
+});
+
+// Serve OpenAPI Spec (Audit Item 6)
+app.get('/openapi.json', (req, res) => {
+  try {
+    const openapiPath = path.join(process.cwd(), 'src', 'docs', 'openapi.json');
+    const openapiData = fs.readFileSync(openapiPath, 'utf8');
+    res.header('Content-Type', 'application/json');
+    res.send(openapiData);
+  } catch (error) {
+    res.status(500).json({ error: 'OpenAPI spec not found' });
+  }
+});
+
+app.get('/api-docs', (req, res) => {
+  res.header('Content-Type', 'text/html');
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <title>Nexa API Docs</title>
+      <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" >
+    </head>
+    <body>
+      <div id="swagger-ui"></div>
+      <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"> </script>
+      <script>
+        window.onload = function() {
+          window.ui = SwaggerUIBundle({
+            url: "/openapi.json",
+            dom_id: '#swagger-ui',
+          });
+        }
+      </script>
+    </body>
+    </html>
+  `);
+});
+
+// Serve client static assets
+const clientDistPath = path.join(process.cwd(), '../client/dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath, { index: false }));
+}
+
+// SSR and Markdown Negotiation
+app.get('*', (req, res, next) => {
+  const urlPath = req.path;
+  
+  // API Routes 404 (Audit Item 7)
+  if (urlPath.startsWith('/api/')) {
+    res.setHeader('Content-Type', 'application/problem+json');
+    return res.status(404).json({
+      type: "https://nexa-social-app.surge.sh/docs/errors/not-found",
+      title: "NOT_FOUND",
+      status: 404,
+      detail: `Route ${req.method} ${req.url} not found`
+    });
+  }
+
+  // Check if valid route (including dynamic like /profile/:username)
+  const isValidRoute = validFrontendRoutes.includes(urlPath) || 
+                       urlPath.startsWith('/profile/') ||
+                       urlPath.startsWith('/settings/');
+
+  res.header('Vary', 'Accept');
+
+  if (!isValidRoute) {
+    // Real 404 for bots/agents with Markdown pointer (Audit Item 1 & 2)
+    return res.status(404).header('Content-Type', 'text/markdown').send(`# 404 Not Found\n\nThe requested path ${urlPath} does not exist.\n\nCheck our [sitemap](/sitemap.xml), our [LLM guide](/llms.txt), or the [API Docs](/api-docs) for valid endpoints.`);
+  }
+
+  // Markdown Negotiation (Audit Item 4)
+  if (req.headers.accept?.includes('text/markdown')) {
+    return res.header('Content-Type', 'text/markdown').send(`# Nexa Page: ${urlPath}\n\nThis is the markdown representation of ${urlPath}. Nexa is a robust social application designed for premium user experiences. It supports dynamic content fetching, real-time messaging, and high-fidelity media sharing. The platform is built on modern web standards and offers seamless integrations for social connectivity, content discovery, and personalized user profiles.`);
+  }
+
+  // SSR / Agent-readable HTML (Audit Item 1 & 2)
+  if (fs.existsSync(path.join(clientDistPath, 'index.html'))) {
+    let html = fs.readFileSync(path.join(clientDistPath, 'index.html'), 'utf-8');
+    
+    // Inject metadata (Audit Item 5 & 12)
+    const metadata = `
+      <title>Nexa - ${urlPath === '/' ? 'Home' : urlPath.substring(1)}</title>
+      <meta name="description" content="Nexa Social App - Connect and share." />
+      <meta property="og:title" content="Nexa" />
+      <meta property="og:description" content="Nexa Social App" />
+      <meta property="og:type" content="website" />
+      <meta property="og:image" content="https://nexa-social-app.surge.sh/assets/og-image.png" />
+      <link rel="canonical" href="https://nexa-social-app.surge.sh${urlPath}" />
+      <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "SoftwareApplication",
+            "name": "Nexa",
+            "description": "Nexa is a modern, high-performance social platform.",
+            "url": "https://nexa-social-app.surge.sh",
+            "operatingSystem": "Web",
+            "applicationCategory": "SocialNetworkingApplication"
+          },
+          {
+            "@type": "Organization",
+            "name": "Nexa Social [NEEDS REAL COMPANY INFO]",
+            "url": "https://nexa-social-app.surge.sh",
+            "contactPoint": {
+              "@type": "ContactPoint",
+              "telephone": "[NEEDS REAL COMPANY INFO] +1-800-555-0199",
+              "contactType": "Customer Support",
+              "email": "[NEEDS REAL COMPANY INFO] support@nexa.example.com"
+            },
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "[NEEDS REAL COMPANY INFO] 123 Social Avenue",
+              "addressLocality": "San Francisco",
+              "addressRegion": "CA",
+              "postalCode": "94107",
+              "addressCountry": "US"
+            }
+          }
+        ]
+      }
+      </script>
+    `;
+    html = html.replace('</head>', `${metadata}</head>`);
+    if (!html.includes('lang=')) {
+      html = html.replace('<html', '<html lang="en"');
+    }
+    
+    // Basic SSR content fallback for no-JS environments (>500 chars required)
+    let ssrContent = `<div id="root">`;
+    
+    if (urlPath === '/about') {
+      ssrContent += `
+        <h1>About Nexa</h1>
+        <p>Nexa is a state-of-the-art social media application designed to empower communities, connect friends, and facilitate real-time engagement across the globe. Built on top of a robust Oracle Database backend, Nexa ensures high-fidelity media sharing, lightning-fast instant messaging, and unparalleled platform stability. Our mission is to create a digital space where users can authentically express themselves without compromising on performance or security.</p>
+        <p>Currently, Nexa is operated by [NEEDS REAL COMPANY INFO] Nexa Social Inc., a technology company dedicated to advancing modern communication standards. Our engineering team prioritizes accessibility, agentic readiness, and seamless integrations. We believe in an open web, which is why we offer comprehensive API access and adhere strictly to RFC standards for web services.</p>
+        <p>Company Legal Name: [NEEDS REAL COMPANY INFO] Nexa Social Inc.<br>
+        Headquarters: [NEEDS REAL COMPANY INFO] 123 Social Avenue, San Francisco, CA 94107, US</p>`;
+    } else if (urlPath === '/contact') {
+      ssrContent += `
+        <h1>Contact Nexa Support</h1>
+        <p>We are here to help you get the most out of Nexa. Whether you are experiencing technical difficulties, have a question about your account, or want to report inappropriate behavior, our dedicated support team is available to assist you. Nexa prioritizes user safety and swift resolution of all inquiries.</p>
+        <p>You can reach a human representative through our official customer support channels below. Please include your Nexa username and a detailed description of your issue when reaching out. Note that these contact details are currently marked for review and require official company data.</p>
+        <ul>
+          <li><strong>Email Support:</strong> [NEEDS REAL COMPANY INFO] support@nexa.example.com</li>
+          <li><strong>Phone Support:</strong> [NEEDS REAL COMPANY INFO] +1-800-555-0199</li>
+          <li><strong>Mailing Address:</strong> [NEEDS REAL COMPANY INFO] 123 Social Avenue, San Francisco, CA 94107, US</li>
+        </ul>
+        <p>Our typical response time is within 24 hours during standard business days. If you are a developer with API-related questions, please consult our <a href="/api-docs">API Documentation</a> first before contacting support.</p>`;
+    } else if (urlPath === '/privacy') {
+      ssrContent += `
+        <h1>Nexa Privacy Policy</h1>
+        <p>At Nexa, your privacy and data security are our top priorities. This Privacy Policy outlines what information we collect, how it is used, and the measures we take to protect your personal data when you use the Nexa social application.</p>
+        <p><strong>Information Collection:</strong> We collect information you provide directly to us, such as when you create an account, update your profile, or post content. This includes your username, email address, profile image, and the text or media you share. We also automatically collect certain technical data, such as your IP address and browser type, to ensure platform security and optimize performance.</p>
+        <p><strong>Information Usage:</strong> The data we collect is used to provide, maintain, and improve the Nexa service. We use your information to personalize your feed, deliver notifications, and enforce our community guidelines. Nexa does not sell your personal data to third parties. [NEEDS REAL COMPANY INFO] (Actual data sharing practices and third-party vendor integrations must be legally reviewed and inserted here).</p>
+        <p><strong>Data Retention and Rights:</strong> You retain ownership of your content. You have the right to access, modify, or delete your personal information at any time through your account settings. If you choose to delete your account, your data will be permanently removed from our active Oracle databases in accordance with our retention policies. If you have privacy-related questions, please contact us at [NEEDS REAL COMPANY INFO] privacy@nexa.example.com.</p>`;
+    } else {
+      ssrContent += `
+        <h1>Nexa Content - ${urlPath}</h1>
+        <p>Welcome to Nexa, a modern social media application designed to help you connect, share, and engage with the world in real-time. Whether you are looking to discover new communities, share high-fidelity media, or stay in touch with friends through our real-time messaging infrastructure, Nexa provides a premium user experience across all devices.</p>
+        <p>Our platform leverages cutting-edge web standards to deliver responsive, accessible, and fast interfaces. By navigating to ${urlPath}, you are accessing one of the core features of the Nexa ecosystem. We prioritize security, privacy, and seamless content delivery to ensure you have the best possible experience online.</p>
+        <p>Developers: View our <a href="/api-docs">API Documentation</a> for information on our public endpoints and data models.</p>
+        <p>Please note: This is the server-rendered fallback view intended for accessibility, basic discovery, and agent interactions. For the full interactive, dynamic experience with real-time updates and smooth animations, please enable JavaScript in your browser.</p>`;
+    }
+    
+    ssrContent += `</div>`;
+    html = html.replace('<div id="root"></div>', ssrContent);
+    
+    return res.status(200).send(html);
+  }
+
+  res.status(200).send(`<html><body><h1>Nexa</h1><p>Running ${urlPath}</p></body></html>`);
 });
 
 app.use(errorHandler);

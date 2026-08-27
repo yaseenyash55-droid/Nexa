@@ -180,6 +180,7 @@ describe('Group Chat Flow & Multi-Member Creation Suite', () => {
     let responseData: any = null;
 
     const res: any = {
+      setHeader() { return this; },
       status: (code: number) => {
         responseStatus = code;
         return res;
@@ -230,6 +231,7 @@ describe('Group Chat Flow & Multi-Member Creation Suite', () => {
     let responseStatus: number = 200;
     let responseData: any = null;
     const res: any = {
+      setHeader() { return this; },
       status: (code: number) => {
         responseStatus = code;
         return res;
@@ -262,6 +264,7 @@ describe('Group Chat Flow & Multi-Member Creation Suite', () => {
     let responseStatus: number = 200;
     let responseData: any = null;
     const res: any = {
+      setHeader() { return this; },
       status: (code: number) => {
         responseStatus = code;
         return res;
@@ -274,7 +277,7 @@ describe('Group Chat Flow & Multi-Member Creation Suite', () => {
 
     await createGroup(req, res);
     expect(responseStatus).toBe(400);
-    expect(responseData.error.code).toBe('VALIDATION_ERROR');
+    expect(responseData.title).toBe('VALIDATION_ERROR');
   });
 
   it('fetches group details and member list via getGroupById and getGroupMembers', async () => {
@@ -365,6 +368,7 @@ describe('Group Chat Flow & Multi-Member Creation Suite', () => {
     };
     let nonAdminStatus = 200;
     const nonAdminRemoveRes: any = {
+      setHeader() { return this; },
       status: (code: number) => { nonAdminStatus = code; return nonAdminRemoveRes; },
       json: () => nonAdminRemoveRes
     };
@@ -379,6 +383,7 @@ describe('Group Chat Flow & Multi-Member Creation Suite', () => {
     let adminRemoveStatus = 200;
     let adminRemoveResult: any = null;
     const adminRemoveRes: any = {
+      setHeader() { return this; },
       status: (code: number) => { adminRemoveStatus = code; return adminRemoveRes; },
       json: (d: any) => { adminRemoveResult = d; return adminRemoveRes; }
     };
@@ -421,12 +426,13 @@ describe('Group Chat Flow & Multi-Member Creation Suite', () => {
     let memberMsgStatus = 200;
     let memberMsgResult: any = null;
     const memberMsgRes: any = {
+      setHeader() { return this; },
       status: (code: number) => { memberMsgStatus = code; return memberMsgRes; },
       json: (d: any) => { memberMsgResult = d; return memberMsgRes; }
     };
     await sendGroupMessage(memberMsgReq, memberMsgRes);
     expect(memberMsgStatus).toBe(403);
-    expect(memberMsgResult.error.message).toMatch(/Only admins can post in this group/);
+    expect(memberMsgResult.detail).toMatch(/Only admins can post in this group/);
 
     // 4. Admin (100) sends a message -> successful
     const adminMsgReq: any = {
@@ -437,6 +443,7 @@ describe('Group Chat Flow & Multi-Member Creation Suite', () => {
     let adminMsgStatus = 200;
     let adminMsgResult: any = null;
     const adminMsgRes: any = {
+      setHeader() { return this; },
       status: (code: number) => { adminMsgStatus = code; return adminMsgRes; },
       json: (d: any) => { adminMsgResult = d; return adminMsgRes; }
     };

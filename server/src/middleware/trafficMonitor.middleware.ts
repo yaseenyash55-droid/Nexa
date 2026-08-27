@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { sendError } from '../utils/response.js';
 import { auditLogSecurityEvent, hashIp } from '../utils/securityAuditLogger.js';
 
 interface RequestTrack {
@@ -100,13 +101,7 @@ export function botProtectionMiddleware(req: Request, res: Response, next: NextF
       }
     });
 
-    return res.status(403).json({
-      error: {
-        code: 'BOT_ACCESS_DENIED',
-        message: 'Access denied: automated scraping tool detected',
-        details: []
-      }
-    });
+    return sendError(res, 'BOT_ACCESS_DENIED', 'Access denied: automated scraping tool detected', 403);
   }
 
   next();

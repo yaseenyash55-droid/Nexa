@@ -3,6 +3,7 @@ import { AuthService } from '../services/auth.service.js';
 import { sendSuccess } from '../utils/response.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { env } from '../config/env.js';
+import { sendError } from '../utils/response.js';
 
 const authService = new AuthService();
 
@@ -119,15 +120,11 @@ export class AuthController {
   async me(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       if (!req.user?.userId) {
-        return res.status(401).json({
-          error: { code: 'UNAUTHORIZED', message: 'Not authenticated', details: [] }
-        });
+        return sendError(res, 'UNAUTHORIZED', 'Not authenticated', 401);
       }
       const user = await authService.getCurrentUser(req.user.userId);
       if (!user) {
-        return res.status(404).json({
-          error: { code: 'USER_NOT_FOUND', message: 'User not found', details: [] }
-        });
+        return sendError(res, 'USER_NOT_FOUND', 'User not found', 404);
       }
       return sendSuccess(res, user);
     } catch (err) {
@@ -173,9 +170,7 @@ export class AuthController {
       const userId = req.user?.userId;
       const email = req.body.email || req.user?.email;
       if (!userId && !email) {
-        return res.status(400).json({
-          error: { code: 'VALIDATION_ERROR', message: 'Email address or authenticated session is required', details: [] }
-        });
+        return sendError(res, 'VALIDATION_ERROR', 'Email address or authenticated session is required', 400);
       }
       const result = await authService.sendEmailVerification(userId || 0, email);
       return sendSuccess(res, result);

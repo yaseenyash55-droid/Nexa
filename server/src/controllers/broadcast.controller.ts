@@ -2,23 +2,24 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../types/index.js';
 import { getBroadcastRepository, getMessageRepository } from '../repositories/factory.js';
 import { realtimeServer } from '../socket.js';
+import { sendError } from '../utils/response.js';
 
 export async function createBroadcast(req: AuthenticatedRequest, res: Response) {
   try {
     const currentUserId = req.user?.userId;
     if (!currentUserId) {
-      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return sendError(res, 'UNAUTHORIZED', 'Authentication required', 401);
     }
 
     const { title, recipientIds, message, content } = req.body;
     const bodyContent = (content || message || '').trim();
 
     if (!Array.isArray(recipientIds) || recipientIds.length === 0) {
-      return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'At least one recipient is required for broadcast' } });
+      return sendError(res, 'VALIDATION_ERROR', 'At least one recipient is required for broadcast', 400);
     }
 
     if (!bodyContent) {
-      return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Broadcast message content cannot be empty' } });
+      return sendError(res, 'VALIDATION_ERROR', 'Broadcast message content cannot be empty', 400);
     }
 
     const messageRepo = getMessageRepository();
@@ -53,7 +54,7 @@ export async function createBroadcast(req: AuthenticatedRequest, res: Response) 
       }
     });
   } catch (error: any) {
-    return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message || 'Failed to send broadcast' } });
+    return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to send broadcast', 500);
   }
 }
 
@@ -61,13 +62,13 @@ export async function getUserBroadcasts(req: AuthenticatedRequest, res: Response
   try {
     const currentUserId = req.user?.userId;
     if (!currentUserId) {
-      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return sendError(res, 'UNAUTHORIZED', 'Authentication required', 401);
     }
 
     const broadcastRepo = getBroadcastRepository();
     const broadcasts = await broadcastRepo.getUserBroadcasts(currentUserId);
     return res.json({ data: broadcasts });
   } catch (error: any) {
-    return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message || 'Failed to fetch broadcasts' } });
+    return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to fetch broadcasts', 500);
   }
 }

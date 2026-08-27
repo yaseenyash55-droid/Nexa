@@ -23,6 +23,7 @@ export const HomePage: React.FC = () => {
     isFetchingNextPage,
     isLoading,
     isError,
+    error,
     refetch
   } = useInfiniteQuery({
     queryKey: ['feed', scope],
@@ -53,7 +54,10 @@ export const HomePage: React.FC = () => {
           </div>
         ) : isError ? (
           <div className="text-center p-8 bg-rose-500/10 border border-rose-500/30 rounded-2xl space-y-3">
-            <p className="text-sm text-rose-300 font-semibold">Failed to load feed</p>
+            <p className="text-sm text-rose-300 font-semibold">
+              {/* @ts-ignore */}
+              {error?.response?.data?.detail || error?.message || 'Failed to load feed'}
+            </p>
             <Button size="sm" variant="outline" onClick={() => refetch()}>
               Retry
             </Button>

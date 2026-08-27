@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { UserService } from '../services/user.service.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { sendSuccess } from '../utils/response.js';
+import { sendError } from '../utils/response.js';
 
 const userService = new UserService();
 
@@ -32,9 +33,7 @@ export class UserController {
     try {
       const targetUserId = Number(req.params.id);
       if (req.user?.userId !== targetUserId) {
-        return res.status(403).json({
-          error: { code: 'FORBIDDEN', message: 'You can only edit your own profile', details: [] }
-        });
+        return sendError(res, 'FORBIDDEN', 'You can only edit your own profile', 403);
       }
       const updated = await userService.updateProfile(targetUserId, req.body);
       return sendSuccess(res, updated, 'Profile updated successfully');
@@ -57,7 +56,7 @@ export class UserController {
 
   async getSuggestions(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const limit = Number(req.query.limit) || 5;
       const suggestions = await userService.getSuggestions(req.user.userId, limit);
       return sendSuccess(res, suggestions);
@@ -68,7 +67,7 @@ export class UserController {
 
   async followUser(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const targetUserId = Number(req.params.id);
       await userService.followUser(req.user.userId, targetUserId);
       return sendSuccess(res, null, 'Followed user successfully');
@@ -79,7 +78,7 @@ export class UserController {
 
   async unfollowUser(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const targetUserId = Number(req.params.id);
       await userService.unfollowUser(req.user.userId, targetUserId);
       return sendSuccess(res, null, 'Unfollowed user successfully');
@@ -101,11 +100,11 @@ export class UserController {
 
   async removeFollower(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const targetUserId = Number(req.params.id);
       const followerId = Number(req.params.followerId);
       if (req.user.userId !== targetUserId) {
-        return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You can only remove followers from your own profile', details: [] } });
+        return sendError(res, 'FORBIDDEN', 'You can only remove followers from your own profile', 403);
       }
       await userService.unfollowUser(followerId, targetUserId);
       return sendSuccess(res, null, 'Follower removed successfully');
@@ -127,7 +126,7 @@ export class UserController {
 
   async updateFcmToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Auth required', details: [] } });
+      if (!req.user) return sendError(res, 'UNAUTHORIZED', 'Auth required', 401);
       const { token } = req.body;
       if (!token) {
         return res.status(400).json({ error: 'FCM token is required' });

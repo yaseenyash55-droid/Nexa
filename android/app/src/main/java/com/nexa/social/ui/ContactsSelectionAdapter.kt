@@ -43,16 +43,19 @@ class ContactsSelectionAdapter : RecyclerView.Adapter<ContactsSelectionAdapter.V
         fun bind(user: User) {
             tvName.text = user.displayName
             tvUsername.text = "@${user.username}"
+            cbSelect.setOnCheckedChangeListener(null)
             cbSelect.isChecked = selectedUserIds.contains(user.userId)
 
-            itemView.setOnClickListener {
-                if (selectedUserIds.contains(user.userId)) {
-                    selectedUserIds.remove(user.userId)
-                    cbSelect.isChecked = false
-                } else {
+            cbSelect.setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked) {
                     selectedUserIds.add(user.userId)
-                    cbSelect.isChecked = true
+                } else {
+                    selectedUserIds.remove(user.userId)
                 }
+            }
+
+            itemView.setOnClickListener {
+                cbSelect.isChecked = !cbSelect.isChecked
             }
         }
     }

@@ -2,17 +2,18 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../types/index.js';
 import { getGroupRepository } from '../repositories/factory.js';
 import { realtimeServer } from '../socket.js';
+import { sendError } from '../utils/response.js';
 
 export async function createGroup(req: AuthenticatedRequest, res: Response) {
   try {
     const currentUserId = req.user?.userId;
     if (!currentUserId) {
-      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return sendError(res, 'UNAUTHORIZED', 'Authentication required', 401);
     }
 
     const { name, description, avatarUrl, memberIds } = req.body;
     if (!name || !name.trim()) {
-      return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Group name is required' } });
+      return sendError(res, 'VALIDATION_ERROR', 'Group name is required', 400);
     }
 
     const parsedMemberIds: number[] = Array.isArray(memberIds)
@@ -36,7 +37,7 @@ export async function createGroup(req: AuthenticatedRequest, res: Response) {
 
     return res.status(201).json({ data: group });
   } catch (error: any) {
-    return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message || 'Failed to create group' } });
+    return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to create group', 500);
   }
 }
 
@@ -44,14 +45,14 @@ export async function getUserGroups(req: AuthenticatedRequest, res: Response) {
   try {
     const currentUserId = req.user?.userId;
     if (!currentUserId) {
-      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return sendError(res, 'UNAUTHORIZED', 'Authentication required', 401);
     }
 
     const repo = getGroupRepository();
     const groups = await repo.getUserGroups(currentUserId);
     return res.json({ data: groups });
   } catch (error: any) {
-    return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message || 'Failed to fetch groups' } });
+    return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to fetch groups', 500);
   }
 }
 
@@ -59,25 +60,25 @@ export async function getGroupMessages(req: AuthenticatedRequest, res: Response)
   try {
     const currentUserId = req.user?.userId;
     if (!currentUserId) {
-      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return sendError(res, 'UNAUTHORIZED', 'Authentication required', 401);
     }
 
     const groupId = parseInt(req.params.id, 10);
     if (isNaN(groupId)) {
-      return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid group ID' } });
+      return sendError(res, 'VALIDATION_ERROR', 'Invalid group ID', 400);
     }
 
     const repo = getGroupRepository();
     const members = await repo.getGroupMembers(groupId);
     const isMember = members.some((m) => m.userId === currentUserId);
     if (!isMember) {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You are not a member of this group' } });
+      return sendError(res, 'FORBIDDEN', 'You are not a member of this group', 403);
     }
 
     const messages = await repo.getGroupMessages(groupId);
     return res.json({ data: messages });
   } catch (error: any) {
-    return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message || 'Failed to fetch group messages' } });
+    return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to fetch group messages', 500);
   }
 }
 
@@ -85,31 +86,31 @@ export async function sendGroupMessage(req: AuthenticatedRequest, res: Response)
   try {
     const currentUserId = req.user?.userId;
     if (!currentUserId) {
-      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return sendError(res, 'UNAUTHORIZED', 'Authentication required', 401);
     }
 
     const groupId = parseInt(req.params.id, 10);
     const { content } = req.body;
 
     if (isNaN(groupId) || !content || !content.trim()) {
-      return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Group ID and message content are required' } });
+      return sendError(res, 'VALIDATION_ERROR', 'Group ID and message content are required', 400);
     }
 
     const repo = getGroupRepository();
     const group = await repo.getGroupById(groupId);
     if (!group) {
-      return res.status(404).json({ error: { code: 'GROUP_NOT_FOUND', message: 'Group not found' } });
+      return sendError(res, 'GROUP_NOT_FOUND', 'Group not found', 404);
     }
 
     const members = await repo.getGroupMembers(groupId);
     const currentMember = members.find((m) => m.userId === currentUserId);
     if (!currentMember) {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You are not a member of this group' } });
+      return sendError(res, 'FORBIDDEN', 'You are not a member of this group', 403);
     }
 
     // Check announcement mode / admin-only posting
     if (group.onlyAdminsCanPost && currentMember.role !== 'ADMIN') {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only admins can post in this group' } });
+      return sendError(res, 'FORBIDDEN', 'Only admins can post in this group', 403);
     }
 
     const msg = await repo.sendGroupMessage(groupId, currentUserId, content);
@@ -123,7 +124,7 @@ export async function sendGroupMessage(req: AuthenticatedRequest, res: Response)
 
     return res.status(201).json({ data: msg });
   } catch (error: any) {
-    return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message || 'Failed to send group message' } });
+    return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to send group message', 500);
   }
 }
 
@@ -131,21 +132,21 @@ export async function addGroupMembers(req: AuthenticatedRequest, res: Response) 
   try {
     const currentUserId = req.user?.userId;
     if (!currentUserId) {
-      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return sendError(res, 'UNAUTHORIZED', 'Authentication required', 401);
     }
 
     const groupId = parseInt(req.params.id, 10);
     const memberIds = req.body.memberIds || req.body.members;
 
     if (isNaN(groupId) || !Array.isArray(memberIds)) {
-      return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid group ID or member list' } });
+      return sendError(res, 'VALIDATION_ERROR', 'Invalid group ID or member list', 400);
     }
 
     const repo = getGroupRepository();
     const members = await repo.getGroupMembers(groupId);
     const isMember = members.some((m) => m.userId === currentUserId);
     if (!isMember) {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You are not a member of this group' } });
+      return sendError(res, 'FORBIDDEN', 'You are not a member of this group', 403);
     }
 
     const existingUserIds = new Set(members.map((m) => m.userId));
@@ -163,7 +164,7 @@ export async function addGroupMembers(req: AuthenticatedRequest, res: Response) 
 
     return res.json({ data: updatedMembers });
   } catch (error: any) {
-    return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message || 'Failed to add group members' } });
+    return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to add group members', 500);
   }
 }
 
@@ -171,26 +172,26 @@ export async function removeGroupMember(req: AuthenticatedRequest, res: Response
   try {
     const currentUserId = req.user?.userId;
     if (!currentUserId) {
-      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return sendError(res, 'UNAUTHORIZED', 'Authentication required', 401);
     }
 
     const groupId = parseInt(req.params.id, 10);
     const targetUserId = parseInt(req.params.userId, 10);
 
     if (isNaN(groupId) || isNaN(targetUserId)) {
-      return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid group or user ID' } });
+      return sendError(res, 'VALIDATION_ERROR', 'Invalid group or user ID', 400);
     }
 
     const repo = getGroupRepository();
     const members = await repo.getGroupMembers(groupId);
     const currentMember = members.find((m) => m.userId === currentUserId);
     if (!currentMember) {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You are not a member of this group' } });
+      return sendError(res, 'FORBIDDEN', 'You are not a member of this group', 403);
     }
 
     const isSelf = targetUserId === currentUserId;
     if (!isSelf && currentMember.role !== 'ADMIN') {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only admins can remove other members' } });
+      return sendError(res, 'FORBIDDEN', 'Only admins can remove other members', 403);
     }
 
     await repo.removeGroupMember(groupId, targetUserId);
@@ -211,7 +212,7 @@ export async function removeGroupMember(req: AuthenticatedRequest, res: Response
 
     return res.json({ data: { success: true, isSelf, removedUserId: targetUserId } });
   } catch (error: any) {
-    return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message || 'Failed to remove group member' } });
+    return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to remove group member', 500);
   }
 }
 
@@ -224,21 +225,21 @@ export async function updateGroupSettings(req: AuthenticatedRequest, res: Respon
   try {
     const currentUserId = req.user?.userId;
     if (!currentUserId) {
-      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return sendError(res, 'UNAUTHORIZED', 'Authentication required', 401);
     }
 
     const groupId = parseInt(req.params.id, 10);
     const { onlyAdminsCanPost, name, description } = req.body;
 
     if (isNaN(groupId)) {
-      return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid group ID' } });
+      return sendError(res, 'VALIDATION_ERROR', 'Invalid group ID', 400);
     }
 
     const repo = getGroupRepository();
     const members = await repo.getGroupMembers(groupId);
     const currentMember = members.find((m) => m.userId === currentUserId);
     if (!currentMember || currentMember.role !== 'ADMIN') {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only group admins can update settings' } });
+      return sendError(res, 'FORBIDDEN', 'Only group admins can update settings', 403);
     }
 
     await repo.updateGroupSettings(groupId, { onlyAdminsCanPost, name, description });
@@ -250,7 +251,7 @@ export async function updateGroupSettings(req: AuthenticatedRequest, res: Respon
 
     return res.json({ data: updatedGroup });
   } catch (error: any) {
-    return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message || 'Failed to update group settings' } });
+    return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to update group settings', 500);
   }
 }
 
@@ -258,18 +259,18 @@ export async function deleteGroup(req: AuthenticatedRequest, res: Response) {
   try {
     const currentUserId = req.user?.userId;
     if (!currentUserId) {
-      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return sendError(res, 'UNAUTHORIZED', 'Authentication required', 401);
     }
 
     const groupId = parseInt(req.params.id, 10);
     if (isNaN(groupId)) {
-      return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid group ID' } });
+      return sendError(res, 'VALIDATION_ERROR', 'Invalid group ID', 400);
     }
 
     const repo = getGroupRepository();
     const group = await repo.getGroupById(groupId);
     if (!group) {
-      return res.status(404).json({ error: { code: 'GROUP_NOT_FOUND', message: 'Group not found' } });
+      return sendError(res, 'GROUP_NOT_FOUND', 'Group not found', 404);
     }
 
     const members = await repo.getGroupMembers(groupId);
@@ -278,7 +279,7 @@ export async function deleteGroup(req: AuthenticatedRequest, res: Response) {
     const isAdmin = currentMember?.role === 'ADMIN';
 
     if (!isCreator && !isAdmin) {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Only the group creator or admins can delete this group' } });
+      return sendError(res, 'FORBIDDEN', 'Only the group creator or admins can delete this group', 403);
     }
 
     await repo.deleteGroup(groupId);
@@ -289,7 +290,7 @@ export async function deleteGroup(req: AuthenticatedRequest, res: Response) {
 
     return res.json({ data: { success: true, deletedGroupId: groupId } });
   } catch (error: any) {
-    return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message || 'Failed to delete group' } });
+    return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to delete group', 500);
   }
 }
 
@@ -297,29 +298,29 @@ export async function getGroupById(req: AuthenticatedRequest, res: Response) {
   try {
     const currentUserId = req.user?.userId;
     if (!currentUserId) {
-      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return sendError(res, 'UNAUTHORIZED', 'Authentication required', 401);
     }
 
     const groupId = parseInt(req.params.id, 10);
     if (isNaN(groupId)) {
-      return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid group ID' } });
+      return sendError(res, 'VALIDATION_ERROR', 'Invalid group ID', 400);
     }
 
     const repo = getGroupRepository();
     const group = await repo.getGroupById(groupId);
     if (!group) {
-      return res.status(404).json({ error: { code: 'GROUP_NOT_FOUND', message: 'Group not found' } });
+      return sendError(res, 'GROUP_NOT_FOUND', 'Group not found', 404);
     }
 
     const members = await repo.getGroupMembers(groupId);
     const isMember = members.some((m) => m.userId === currentUserId);
     if (!isMember) {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You are not a member of this group' } });
+      return sendError(res, 'FORBIDDEN', 'You are not a member of this group', 403);
     }
 
     return res.json({ data: group });
   } catch (error: any) {
-    return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message || 'Failed to fetch group' } });
+    return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to fetch group', 500);
   }
 }
 
@@ -327,23 +328,23 @@ export async function getGroupMembers(req: AuthenticatedRequest, res: Response) 
   try {
     const currentUserId = req.user?.userId;
     if (!currentUserId) {
-      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+      return sendError(res, 'UNAUTHORIZED', 'Authentication required', 401);
     }
 
     const groupId = parseInt(req.params.id, 10);
     if (isNaN(groupId)) {
-      return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid group ID' } });
+      return sendError(res, 'VALIDATION_ERROR', 'Invalid group ID', 400);
     }
 
     const repo = getGroupRepository();
     const members = await repo.getGroupMembers(groupId);
     const isMember = members.some((m) => m.userId === currentUserId);
     if (!isMember) {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You are not a member of this group' } });
+      return sendError(res, 'FORBIDDEN', 'You are not a member of this group', 403);
     }
 
     return res.json({ data: members });
   } catch (error: any) {
-    return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message || 'Failed to fetch group members' } });
+    return sendError(res, 'INTERNAL_ERROR', error.message || 'Failed to fetch group members', 500);
   }
 }

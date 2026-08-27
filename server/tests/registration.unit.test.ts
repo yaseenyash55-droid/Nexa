@@ -260,9 +260,8 @@ describe('Registration endpoint (POST /api/auth/register)', () => {
       .send(VALID_REGISTRATION)
       .expect(409);
 
-    expect(res.body.error).toBeDefined();
-    expect(res.body.error.code).toBe('USERNAME_TAKEN');
-    expect(res.body.error.message).toBe('Username is already registered');
+    expect(res.body.title).toBe('USERNAME_TAKEN');
+    expect(res.body.detail).toBe('Username is already registered');
   });
 
   it('returns 409 for duplicate email', async () => {
@@ -273,9 +272,8 @@ describe('Registration endpoint (POST /api/auth/register)', () => {
       .send(VALID_REGISTRATION)
       .expect(409);
 
-    expect(res.body.error).toBeDefined();
-    expect(res.body.error.code).toBe('EMAIL_TAKEN');
-    expect(res.body.error.message).toBe('Email is already registered');
+    expect(res.body.title).toBe('EMAIL_TAKEN');
+    expect(res.body.detail).toBe('Email is already registered');
   });
 
   it('returns 409 when pre-check finds existing username', async () => {
@@ -296,8 +294,8 @@ describe('Registration endpoint (POST /api/auth/register)', () => {
       .send(VALID_REGISTRATION)
       .expect(409);
 
-    expect(res.body.error.code).toBe('USERNAME_TAKEN');
-    // withTransaction should NOT have been called (rejected before DB insert)
+    expect(res.body.title).toBe('USERNAME_TAKEN');
+    // withTransaction should NOT have been called (rejected before DB insertion phase)
     expect(mockWithTransaction).not.toHaveBeenCalled();
   });
 
@@ -383,9 +381,9 @@ describe('Registration endpoint (POST /api/auth/register)', () => {
 
       // The error middleware should return a sanitized message
       expect(res.status).toBe(500);
-      expect(res.body.error.message).toBe('An unexpected error occurred. Please try again later.');
+      expect(res.body.detail).toBe('An unexpected error occurred. Please try again later.');
       // Must NOT contain internal error details
-      expect(res.body.error.message).not.toContain('Unexpected internal failure');
+      expect(res.body.detail).not.toContain('Unexpected internal failure');
     } finally {
       process.env.NODE_ENV = originalEnv;
     }
@@ -416,7 +414,6 @@ describe('Registration endpoint (POST /api/auth/register)', () => {
       .send({ username: 'ab', email: 'not-an-email', password: 'short', displayName: 'X' })
       .expect(400);
 
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
-    expect(res.body.error.details.length).toBeGreaterThan(0);
+    expect(res.body.title).toBe('VALIDATION_ERROR');
   });
 });

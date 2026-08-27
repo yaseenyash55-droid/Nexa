@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt.js';
 import { AuthenticatedRequest } from '../types/index.js';
+import { sendError } from '../utils/response.js';
 
 export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   try {
@@ -18,25 +19,13 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
     }
 
     if (!token) {
-      return res.status(401).json({
-        error: {
-          code: 'UNAUTHORIZED',
-          message: 'Authentication token required',
-          details: []
-        }
-      });
+      return sendError(res, 'UNAUTHORIZED', 'Authentication token required', 401);
     }
 
     // 3. Verify JWT Access Token
     const decoded = verifyAccessToken(token);
     if (!decoded) {
-      return res.status(401).json({
-        error: {
-          code: 'UNAUTHORIZED',
-          message: 'Invalid or expired access token',
-          details: []
-        }
-      });
+      return sendError(res, 'UNAUTHORIZED', 'Invalid or expired access token', 401);
     }
 
     req.user = {
@@ -47,13 +36,7 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
 
     return next();
   } catch (err: any) {
-    return res.status(401).json({
-      error: {
-        code: 'INVALID_TOKEN',
-        message: 'Invalid or expired access token',
-        details: []
-      }
-    });
+    return sendError(res, 'INVALID_TOKEN', 'Invalid or expired access token', 401);
   }
 }
 
