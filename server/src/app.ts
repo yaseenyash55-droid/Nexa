@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { env } from './config/env.js';
 import authRouter from './routes/auth.routes.js';
 import userRouter from './routes/user.routes.js';
@@ -184,7 +185,9 @@ app.get('/api-docs', (req, res) => {
 });
 
 // Serve client static assets
-const clientDistPath = path.join(process.cwd(), '../client/dist');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const clientDistPath = path.join(__dirname, '../../client/dist');
 if (fs.existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath, { index: false }));
 }
