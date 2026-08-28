@@ -50,13 +50,13 @@ export const LoginPage: React.FC = () => {
       setErrorMsg(null);
       await login(values);
       navigate(from, { replace: true });
-    } catch (err: any) {
-      const msg =
-        err.response?.data?.error?.message ||
-        err.response?.data?.message ||
-        err.message ||
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error?.message ||
         'Invalid username/email or password';
-      setErrorMsg(msg);
+
+      setErrorMsg(message);
     }
   };
 
