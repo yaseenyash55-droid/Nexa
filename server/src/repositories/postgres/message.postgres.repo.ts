@@ -115,9 +115,9 @@ export class PostgresMessageRepository implements IMessageRepository {
     };
   }
 
-  async sendMessage(msg: { senderId: number; receiverId: number; content: string }): Promise<Message> {
-    if (!msg.content || !msg.content.trim()) {
-      throw new Error('Message content cannot be empty');
+  async sendMessage(msg: { senderId: number; receiverId: number; content: string; attachments?: any[] }): Promise<Message> {
+    if ((!msg.content || !msg.content.trim()) && (!msg.attachments || msg.attachments.length === 0)) {
+      throw new Error('Message content or attachments are required');
     }
 
     const sql = `
@@ -129,9 +129,50 @@ export class PostgresMessageRepository implements IMessageRepository {
     const res = await executePostgresSql<{
       message_id: number | string;
       created_at: Date | string;
-    }>(sql, [msg.senderId, msg.receiverId, msg.content.trim()]);
+    }>(sql, [msg.senderId, msg.receiverId, msg.content?.trim() || '']);
 
     const createdRow = res.rows[0];
+    const messageId = Number(createdRow.message_id);
+
+    const savedAttachments = [];
+    if (msg.attachments && msg.attachments.length > 0) {
+      for (const att of msg.attachments) {
+        const attSql = `
+          INSERT INTO message_attachments (
+            message_id, attachment_type, media_id,
+            music_provider, music_track_id, music_title,
+            music_artist, music_artwork_url, music_audio_url, music_duration
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING *
+        `;
+        const attRes = await executePostgresSql<any>(attSql, [
+          messageId,
+          att.type,
+          att.mediaId || null,
+          att.music?.provider || null,
+          att.music?.id || null,
+          att.music?.title || null,
+          att.music?.artist || null,
+          att.music?.artworkUrl || null,
+          att.music?.audioUrl || null,
+          att.music?.duration || null
+        ]);
+        const dbAtt = attRes.rows[0];
+        savedAttachments.push({
+          type: dbAtt.attachment_type,
+          mediaId: dbAtt.media_id,
+          music: dbAtt.music_track_id ? {
+            provider: dbAtt.music_provider,
+            id: dbAtt.music_track_id,
+            title: dbAtt.music_title,
+            artist: dbAtt.music_artist,
+            artworkUrl: dbAtt.music_artwork_url,
+            audioUrl: dbAtt.music_audio_url,
+            duration: dbAtt.music_duration
+          } : undefined
+        });
+      }
+    }
 
     const senderRes = await executePostgresSql<{
       username: string;
@@ -149,7 +190,7 @@ export class PostgresMessageRepository implements IMessageRepository {
     };
 
     return {
-      messageId: Number(createdRow.message_id),
+      messageId: messageId,
       senderId: msg.senderId,
       receiverId: msg.receiverId,
       sender: {
@@ -158,7 +199,8 @@ export class PostgresMessageRepository implements IMessageRepository {
         displayName: sender.display_name,
         profileImageUrl: sender.profile_image_url ?? undefined
       },
-      content: msg.content.trim(),
+      content: msg.content?.trim() || '',
+      attachments: savedAttachments.length > 0 ? savedAttachments : undefined,
       isRead: false,
       createdAt: new Date(createdRow.created_at).toISOString()
     };
@@ -177,7 +219,48 @@ export class PostgresMessageRepository implements IMessageRepository {
       ORDER BY m.created_at ASC
     `;
     const res = await executePostgresSql<RawMessageRow>(sql, [userA, userB]);
-    return (res.rows || []).map((row) => this.mapRowToMessage(row));
+    const messages = (res.rows || []).map((row) => this.mapRowToMessage(row));
+
+    if (messages.length > 0) {
+      const messageIds = messages.map(m => m.messageId);
+      const attSql = `
+        SELECT message_id, attachment_type, media_id,
+               music_provider, music_track_id, music_title,
+               music_artist, music_artwork_url, music_audio_url, music_duration
+        FROM message_attachments
+        WHERE message_id = ANY($1::bigint[])
+      `;
+      const attRes = await executePostgresSql<any>(attSql, [messageIds]);
+      const attachmentsByMsgId: Record<number, any[]> = {};
+
+      for (const row of (attRes.rows || [])) {
+        const msgId = Number(row.message_id);
+        if (!attachmentsByMsgId[msgId]) {
+          attachmentsByMsgId[msgId] = [];
+        }
+        attachmentsByMsgId[msgId].push({
+          type: row.attachment_type,
+          mediaId: row.media_id,
+          music: row.music_track_id ? {
+            provider: row.music_provider,
+            id: row.music_track_id,
+            title: row.music_title,
+            artist: row.music_artist,
+            artworkUrl: row.music_artwork_url,
+            audioUrl: row.music_audio_url,
+            duration: row.music_duration
+          } : undefined
+        });
+      }
+
+      for (const msg of messages) {
+        if (attachmentsByMsgId[msg.messageId]) {
+          msg.attachments = attachmentsByMsgId[msg.messageId];
+        }
+      }
+    }
+
+    return messages;
   }
 
   async markMessageAsRead(messageId: number, receiverUserId: number): Promise<{

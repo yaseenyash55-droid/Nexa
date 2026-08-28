@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="end"
+    android:orientation="vertical"
+    android:paddingHorizontal="8dp"
+    android:paddingVertical="4dp">
+
+    <LinearLayout
+        android:id="@+id/bubbleLayout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="48dp"
+        android:background="#4F46E5"
+        android:orientation="vertical"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="8dp">
+
+        <!-- Music Track Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardMusicTrack"
+            android:layout_width="260dp"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            app:cardBackgroundColor="#1E1B4B"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:strokeColor="#6366F1"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <!-- Album Cover -->
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/ivMusicCover"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="#312E81"
+                        android:scaleType="centerCrop"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.CornerSize12dp"
+                        tools:src="@drawable/ic_gallery" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvMusicTitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="#FFFFFF"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            tools:text="Midnight City (Remix)" />
+
+                        <TextView
+                            android:id="@+id/tvMusicArtist"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="1dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="#C7D2FE"
+                            android:textSize="11sp"
+                            tools:text="Artist Name • Jamendo" />
+                    </LinearLayout>
+
+                    <!-- Play / Pause Button -->
+                    <ImageButton
+                        android:id="@+id/btnMusicPlayPause"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="@drawable/bg_unread_badge"
+                        android:backgroundTint="#6366F1"
+                        android:contentDescription="Play or Pause Track"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_call_audio"
+                        app:tint="#FFFFFF" />
+                </LinearLayout>
+
+                <!-- Audio Playback Progress Bar -->
+                <SeekBar
+                    android:id="@+id/seekMusicProgress"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:max="100"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:progressBackgroundTint="#4338CA"
+                    android:progressTint="#818CF8"
+                    android:thumbTint="#A5B4FC" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvMusicCurrentTime"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0:00"
+                        android:textColor="#A5B4FC"
+                        android:textSize="10sp" />
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/tvMusicDuration"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="#A5B4FC"
+                        android:textSize="10sp"
+                        tools:text="3:45" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Optional Text Caption -->
+        <TextView
+            android:id="@+id/tvContent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            tools:text="Listen to this track!" />
+
+        <!-- Timestamp & Read Receipt -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvReadStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="✓✓ Read"
+                android:textColor="#6EE7B7"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#C7D2FE"
+                android:textSize="10sp"
+                tools:text="12:45" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

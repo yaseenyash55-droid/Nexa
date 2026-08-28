@@ -208,10 +208,10 @@ socialRouter.get('/messages/:otherUserId', requireAuth, async (req: any, res, ne
 
 socialRouter.post('/messages', requireAuth, async (req: any, res, next) => {
   try {
-    const { receiverId, content } = req.body;
+    const { receiverId, content, attachments } = req.body;
     const parsedReceiverId = parseInt(String(receiverId), 10);
-    if (!parsedReceiverId || !content || !String(content).trim()) {
-      return sendError(res, 'INVALID_INPUT', 'Receiver ID and content are required', 400);
+    if (!parsedReceiverId || (!content?.trim() && (!attachments || attachments.length === 0))) {
+      return sendError(res, 'INVALID_INPUT', 'Receiver ID and content/attachments are required', 400);
     }
 
     const privacySettings = await getPrivacyRepository().getPrivacySettings(parsedReceiverId);
@@ -222,10 +222,22 @@ socialRouter.post('/messages', requireAuth, async (req: any, res, next) => {
       }
     }
 
+    if (attachments && Array.isArray(attachments)) {
+      const mediaIds = attachments.map(a => a.mediaId).filter(Boolean);
+      if (mediaIds.length > 0) {
+        const { verifyMediaOwnership } = await import('../services/media.service.js');
+        const isOwner = await verifyMediaOwnership(req.user.userId, mediaIds);
+        if (!isOwner) {
+          return sendError(res, 'FORBIDDEN', 'You do not have permission to attach this media', 403);
+        }
+      }
+    }
+
     const msg = await getMessageRepository().sendMessage({
       senderId: req.user.userId,
       receiverId: parsedReceiverId,
-      content: String(content).trim()
+      content: content ? String(content).trim() : '',
+      attachments: Array.isArray(attachments) ? attachments : undefined
     });
     realtimeServer.emitToUser(parsedReceiverId, 'message:created', msg);
     return sendSuccess(res, msg, 'Message sent', undefined, 201);

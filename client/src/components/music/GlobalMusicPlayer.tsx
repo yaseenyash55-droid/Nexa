@@ -28,7 +28,7 @@ export const GlobalMusicPlayer: React.FC = () => {
   };
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
-  const coverImage = currentTrack.image || currentTrack.album_image || '';
+  const coverImage = currentTrack.artworkUrl || '';
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-xl px-4 py-2.5 shadow-2xl transition-all animate-slideUp">
@@ -37,7 +37,7 @@ export const GlobalMusicPlayer: React.FC = () => {
         <div className="flex items-center gap-3 w-full md:w-1/4 min-w-0">
           <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shrink-0">
             {coverImage ? (
-              <img src={coverImage} alt={currentTrack.name} className="w-full h-full object-cover" />
+              <img src={currentTrack.artworkUrl} alt={currentTrack.title} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-brand-400 bg-brand-500/10">
                 <Music className="w-6 h-6" />
@@ -52,11 +52,9 @@ export const GlobalMusicPlayer: React.FC = () => {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold text-white truncate hover:underline">
-              {currentTrack.name}
-            </p>
+            <h4 className="text-white text-sm font-bold truncate" title={currentTrack.title}>{currentTrack.title}</h4>
             <p className="text-[11px] text-slate-400 truncate">
-              {currentTrack.artist_name}
+              {currentTrack.artist}
             </p>
           </div>
         </div>
@@ -129,7 +127,7 @@ export const GlobalMusicPlayer: React.FC = () => {
           </div>
 
           <a
-            href={currentTrack.shareurl || 'https://www.jamendo.com'}
+            href={currentTrack.shareUrl || 'https://www.jamendo.com'}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-brand-300 bg-slate-900 border border-slate-800 hover:border-brand-500/40 rounded-lg px-2.5 py-1 transition-all"

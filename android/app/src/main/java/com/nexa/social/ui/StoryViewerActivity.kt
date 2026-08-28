@@ -12,6 +12,7 @@ import com.nexa.social.R
 import com.nexa.social.data.models.Story
 import com.nexa.social.databinding.ActivityStoryViewerBinding
 import com.nexa.social.utils.MediaUrlResolver
+import kotlinx.coroutines.launch
 
 class StoryViewerActivity : AppCompatActivity() {
     private lateinit var binding: ActivityStoryViewerBinding
@@ -72,7 +73,7 @@ class StoryViewerActivity : AppCompatActivity() {
     }
 
     private fun loadAndPlayMusic(trackId: String) {
-        androidx.lifecycle.lifecycleScope.launchWhenStarted {
+        lifecycleScope.launch {
             try {
                 val response = com.nexa.social.NexaApiClient.spotifyApi.getTrackDetails(trackId)
                 val body = response.body()
@@ -83,12 +84,7 @@ class StoryViewerActivity : AppCompatActivity() {
                     binding.tvStickerArtist.text = track.getArtistNames()
                     val thumb = track.getThumbnailUrl()
                     if (!thumb.isNullOrEmpty()) {
-                        coil.imageLoader(this@StoryViewerActivity).enqueue(
-                            coil.request.ImageRequest.Builder(this@StoryViewerActivity)
-                                .data(thumb)
-                                .target(binding.ivStickerArt)
-                                .build()
-                        )
+                        binding.ivStickerArt.load(thumb)
                     }
 
                     val previewUrl = track.previewUrl

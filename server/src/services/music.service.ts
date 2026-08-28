@@ -95,7 +95,7 @@ export class MusicLicensingService {
   }
 
   // --- Real Jamendo Integration ---
-  
+
   private transformJamendoTrack(track: any): NexaMusicTrack {
     return {
       id: track.id,
@@ -112,20 +112,10 @@ export class MusicLicensingService {
 
   public async getTracks(params: { search?: string; tags?: string; id?: string; limit?: number }): Promise<NexaMusicTrack[]> {
     if (!env.JAMENDO_CLIENT_ID) {
-      // Fallback to mock catalog for unified UI
-      const mock = this.searchLicensedCatalog(params.search).map(t => ({
-        id: t.trackId,
-        title: t.title,
-        artist: t.artistName,
-        album: t.albumName,
-        artworkUrl: t.coverArtUrl,
-        audioUrl: t.audioUrl,
-        shareUrl: '',
-        duration: t.durationSeconds,
-        provider: 'jamendo'
-      }));
-      if (params.id) return mock.filter(m => m.id === params.id);
-      return mock;
+      const error: any = new Error('Music provider is not configured. (JAMENDO_CLIENT_ID is missing)');
+      error.code = 'MUSIC_PROVIDER_NOT_CONFIGURED';
+      error.status = 503;
+      throw error;
     }
 
     try {
@@ -146,9 +136,20 @@ export class MusicLicensingService {
         return response.data.results.map(this.transformJamendoTrack);
       }
       return [];
-    } catch (error) {
-      console.error('[MusicLicensingService] Jamendo API Error:', error);
-      throw new Error('Failed to fetch from Jamendo catalog');
+    } catch (error: any) {
+      console.error('[MusicLicensingService] Jamendo API Error:', error.message);
+
+      const apiError: any = new Error('Music provider is currently unavailable.');
+      apiError.status = 502; // Bad Gateway
+
+      if (error.code === 'ECONNABORTED') {
+        apiError.code = 'MUSIC_PROVIDER_TIMEOUT';
+        apiError.status = 504; // Gateway Timeout
+      } else {
+        apiError.code = 'MUSIC_PROVIDER_UNAVAILABLE';
+      }
+
+      throw apiError;
     }
   }
 }

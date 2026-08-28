@@ -52,7 +52,7 @@ mediaRouter.post(
   async (req, res, next) => {
     const uploaded = req.file;
     if (!uploaded) {
-      return sendError(res, 'FILE_REQUIRED', 'Choose one supported image or video file', 400);
+      return sendError(res, 'FILE_REQUIRED', 'Choose one supported image, video, or document file', 400);
     }
 
     try {

@@ -18,6 +18,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import coil.load
 import com.nexa.social.NexaApiClient
 import com.nexa.social.R
 import com.nexa.social.data.repository.StoryRepository
@@ -123,12 +124,7 @@ class CreateStoryActivity : AppCompatActivity() {
                                 tvArtist.text = track.getArtistNames()
                                 val thumb = track.getThumbnailUrl()
                                 if (!thumb.isNullOrEmpty()) {
-                                    coil.imageLoader(this@CreateStoryActivity).enqueue(
-                                        coil.request.ImageRequest.Builder(this@CreateStoryActivity)
-                                            .data(thumb)
-                                            .target(ivCover)
-                                            .build()
-                                    )
+                                    ivCover.load(thumb)
                                 }
 
                                 trackView.setOnClickListener {
@@ -137,12 +133,7 @@ class CreateStoryActivity : AppCompatActivity() {
                                     binding.tvStickerTitle.text = track.name
                                     binding.tvStickerArtist.text = track.getArtistNames()
                                     if (!thumb.isNullOrEmpty()) {
-                                        coil.imageLoader(this@CreateStoryActivity).enqueue(
-                                            coil.request.ImageRequest.Builder(this@CreateStoryActivity)
-                                                .data(thumb)
-                                                .target(binding.ivStickerArt)
-                                                .build()
-                                        )
+                                        binding.ivStickerArt.load(thumb)
                                     }
                                     dialog.dismiss()
                                 }

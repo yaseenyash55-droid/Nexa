@@ -129,7 +129,8 @@ object MediaCacheManager {
     /**
      * LRU Eviction: Removes oldest accessed files to keep cache within maximum size limit.
      */
-    private synchronized fun evictOldestFiles(cacheDir: File) {
+    @Synchronized
+    private fun evictOldestFiles(cacheDir: File) {
         try {
             val files = cacheDir.listFiles() ?: return
             var currentSize = files.sumOf { it.length() }

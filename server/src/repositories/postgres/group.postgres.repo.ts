@@ -170,7 +170,7 @@ export class PostgresGroupRepository implements GroupRepository {
       [groupId]
     );
 
-    return (res.rows || []).map((r: any) => {
+    const messages: GroupMessage[] = (res.rows || []).map((r: any) => {
       const isAi = (r.sender_type || '').toLowerCase() === 'ai' || r.sender_id === null;
       return {
         messageId: Number(r.message_id),
@@ -180,6 +180,7 @@ export class PostgresGroupRepository implements GroupRepository {
         aiAgent: isAi ? (r.ai_agent || 'nexa') : undefined,
         triggerMessageId: r.trigger_message_id ? Number(r.trigger_message_id) : null,
         content: r.content,
+        attachments: undefined,
         createdAt: new Date(r.created_at).toISOString(),
         sender: {
           userId: isAi ? 0 : Number(r.sender_id),
@@ -189,6 +190,47 @@ export class PostgresGroupRepository implements GroupRepository {
         }
       };
     });
+
+    if (messages.length > 0) {
+      const msgIds = messages.map((m) => m.messageId);
+      const attSql = `
+        SELECT message_id, attachment_type, media_id,
+               music_provider, music_track_id, music_title,
+               music_artist, music_artwork_url, music_audio_url, music_duration
+        FROM message_attachments
+        WHERE group_message_id = ANY($1::bigint[])
+      `;
+      const attRes = await executePostgresSql<any>(attSql, [msgIds]);
+      const attachmentsByMsgId: Record<number, any[]> = {};
+
+      for (const row of (attRes.rows || [])) {
+        const mId = Number(row.message_id);
+        if (!attachmentsByMsgId[mId]) {
+          attachmentsByMsgId[mId] = [];
+        }
+        attachmentsByMsgId[mId].push({
+          type: row.attachment_type,
+          mediaId: row.media_id,
+          music: row.music_track_id ? {
+            provider: row.music_provider,
+            id: row.music_track_id,
+            title: row.music_title,
+            artist: row.music_artist,
+            artworkUrl: row.music_artwork_url,
+            audioUrl: row.music_audio_url,
+            duration: row.music_duration
+          } : undefined
+        });
+      }
+
+      for (const m of messages) {
+        if (attachmentsByMsgId[m.messageId]) {
+          m.attachments = attachmentsByMsgId[m.messageId];
+        }
+      }
+    }
+
+    return messages;
   }
 
   async findAiGroupResponseByTrigger(groupId: number, triggerMessageId: number, aiAgent = 'nexa'): Promise<GroupMessage | null> {
@@ -266,7 +308,7 @@ export class PostgresGroupRepository implements GroupRepository {
     });
   }
 
-  async sendGroupMessage(groupId: number, senderId: number, content: string): Promise<GroupMessage> {
+  async sendGroupMessage(groupId: number, senderId: number, content: string, attachments?: any[]): Promise<GroupMessage> {
     return withPostgresTransaction(async (conn) => {
       const result = await conn.query(
         `INSERT INTO group_messages (group_id, sender_id, content, created_at)
@@ -277,6 +319,41 @@ export class PostgresGroupRepository implements GroupRepository {
 
       const messageId = Number(result.rows[0].message_id);
       const createdAt = new Date(result.rows[0].created_at).toISOString();
+
+      const savedAttachments = [];
+      if (attachments && attachments.length > 0) {
+        for (const att of attachments) {
+          const attResult = await conn.query(
+            `INSERT INTO message_attachments (
+              group_message_id, attachment_type, media_id,
+              music_provider, music_track_id, music_title,
+              music_artist, music_artwork_url, music_audio_url, music_duration
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING *`,
+            [
+              messageId, att.type, att.mediaId || null,
+              att.music?.provider || null, att.music?.id || null,
+              att.music?.title || null, att.music?.artist || null,
+              att.music?.artworkUrl || null, att.music?.audioUrl || null,
+              att.music?.duration || null
+            ]
+          );
+          const dbAtt = attResult.rows[0];
+          savedAttachments.push({
+            type: dbAtt.attachment_type,
+            mediaId: dbAtt.media_id,
+            music: dbAtt.music_track_id ? {
+              provider: dbAtt.music_provider,
+              id: dbAtt.music_track_id,
+              title: dbAtt.music_title,
+              artist: dbAtt.music_artist,
+              artworkUrl: dbAtt.music_artwork_url,
+              audioUrl: dbAtt.music_audio_url,
+              duration: dbAtt.music_duration
+            } : undefined
+          });
+        }
+      }
 
       const userRows = await conn.query(
         `SELECT username, display_name, profile_image_url FROM users WHERE user_id = $1`,
@@ -289,6 +366,7 @@ export class PostgresGroupRepository implements GroupRepository {
         groupId,
         senderId,
         content: content.trim(),
+        attachments: savedAttachments.length > 0 ? savedAttachments : undefined,
         createdAt,
         sender: {
           userId: senderId,

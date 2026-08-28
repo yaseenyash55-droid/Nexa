@@ -1,5 +1,5 @@
 import { api } from './client.js';
-import { User } from '../types/index.js';
+import { User, ApiResponse } from '../types/index.js';
 
 export interface Group {
   groupId: number;
@@ -51,8 +51,8 @@ export const groupsApi = {
     return res.data.data;
   },
 
-  sendGroupMessage: async (groupId: number, content: string): Promise<GroupMessage> => {
-    const res = await api.post(`/groups/${groupId}/messages`, { content });
+  sendGroupMessage: async (groupId: number, content?: string, attachments?: any[]): Promise<GroupMessage> => {
+    const res = await api.post<ApiResponse<GroupMessage>>(`/groups/${groupId}/messages`, { content, attachments });
     return res.data.data;
   },
 

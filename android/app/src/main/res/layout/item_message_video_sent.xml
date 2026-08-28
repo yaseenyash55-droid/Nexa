@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="end"
+    android:orientation="vertical"
+    android:paddingHorizontal="8dp"
+    android:paddingVertical="4dp">
+
+    <LinearLayout
+        android:id="@+id/bubbleLayout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="48dp"
+        android:background="#4F46E5"
+        android:orientation="vertical"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="8dp">
+
+        <!-- Video Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardVideo"
+            android:layout_width="240dp"
+            android:layout_height="180dp"
+            android:layout_marginBottom="6dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:strokeColor="#33FFFFFF"
+            app:strokeWidth="1dp">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#000000">
+
+                <ImageView
+                    android:id="@+id/imgVideoThumbnail"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    tools:src="@drawable/ic_gallery" />
+
+                <!-- Play Overlay Icon -->
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_unread_badge"
+                    android:backgroundTint="#80000000"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_call_audio"
+                    app:tint="#FFFFFF" />
+
+                <!-- Duration Badge -->
+                <TextView
+                    android:id="@+id/tvVideoDuration"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|end"
+                    android:layout_margin="8dp"
+                    android:background="@drawable/bg_unread_badge"
+                    android:backgroundTint="#B3000000"
+                    android:paddingHorizontal="6dp"
+                    android:paddingVertical="2dp"
+                    android:textColor="#FFFFFF"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    tools:text="0:45" />
+            </FrameLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Optional Text Caption -->
+        <TextView
+            android:id="@+id/tvContent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            tools:text="Check out this video clip" />
+
+        <!-- Timestamp & Read Receipt -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvReadStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="✓✓ Read"
+                android:textColor="#6EE7B7"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#C7D2FE"
+                android:textSize="10sp"
+                tools:text="12:45" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

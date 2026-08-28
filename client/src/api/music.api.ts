@@ -1,36 +1,28 @@
-// client/src/api/music.api.ts
-
-import axios from 'axios';
-
-export interface JamendoTrack {
-  id: string;
-  name: string;
-  artist_name: string;
-  album_image: string;
-  audio: string;
-  duration: number; // seconds
-}
+import { api } from './client.js';
+import { NexaMusicTrack } from '../types/music.types.js';
 
 /**
- * Search tracks on Jamendo.
- * @param query Search keyword
+ * Fetch tracks from backend.
+ * @param query Optional search keyword
  * @param genre Optional genre filter
- * @returns List of tracks
+ * @returns List of NexaMusicTrack
  */
-export async function searchJamendoTracks(query: string, genre?: string): Promise<JamendoTrack[]> {
-  const clientId = import.meta.env.VITE_JAMENDO_CLIENT_ID as string;
-  const params: Record<string, string> = {
-    client_id: clientId,
-    format: 'json',
-    limit: '20',
-    namesearch: query,
-    audioformat: 'mp31', // mp3 format
-  };
-  if (genre) {
-    params['tags'] = genre;
+export async function searchJamendoTracks(query?: string, genre?: string): Promise<NexaMusicTrack[]> {
+  const params: Record<string, string> = {};
+  let endpoint = '/music/tracks';
+
+  if (query) {
+    endpoint = '/music/search';
+    params.q = query;
+  } else if (genre) {
+    endpoint = `/music/genres/${encodeURIComponent(genre)}`;
   }
-  const url = 'https://api.jamendo.com/v3.0/tracks/';
-  const resp = await axios.get(url, { params });
-  const tracks = resp.data.results as JamendoTrack[];
-  return tracks;
+
+  const resp = await api.get(endpoint, { params });
+  return resp.data.data as NexaMusicTrack[];
+}
+
+export async function getTrackById(trackId: string): Promise<NexaMusicTrack> {
+  const resp = await api.get(`/music/tracks/${encodeURIComponent(trackId)}`);
+  return resp.data.data as NexaMusicTrack;
 }

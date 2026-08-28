@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS message_attachments (
   attachment_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   message_id BIGINT REFERENCES messages(message_id) ON DELETE CASCADE,
   group_message_id BIGINT REFERENCES group_messages(message_id) ON DELETE CASCADE,
-  broadcast_message_id BIGINT REFERENCES broadcasts(broadcast_id) ON DELETE CASCADE,
+  broadcast_id BIGINT REFERENCES broadcasts(broadcast_id) ON DELETE CASCADE,
   
   attachment_type VARCHAR(20) NOT NULL CHECK (attachment_type IN ('image', 'video', 'file', 'music', 'gif')),
   
@@ -28,12 +28,12 @@ CREATE TABLE IF NOT EXISTS message_attachments (
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
   
   CONSTRAINT chk_attachment_destination CHECK (
-    (message_id IS NOT NULL AND group_message_id IS NULL AND broadcast_message_id IS NULL) OR
-    (message_id IS NULL AND group_message_id IS NOT NULL AND broadcast_message_id IS NULL) OR
-    (message_id IS NULL AND group_message_id IS NULL AND broadcast_message_id IS NOT NULL)
+    (message_id IS NOT NULL AND group_message_id IS NULL AND broadcast_id IS NULL) OR
+    (message_id IS NULL AND group_message_id IS NOT NULL AND broadcast_id IS NULL) OR
+    (message_id IS NULL AND group_message_id IS NULL AND broadcast_id IS NOT NULL)
   )
 );
 
 CREATE INDEX IF NOT EXISTS idx_msg_attachments_msg_id ON message_attachments (message_id) WHERE message_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_msg_attachments_group_msg_id ON message_attachments (group_message_id) WHERE group_message_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_msg_attachments_broadcast_msg_id ON message_attachments (broadcast_message_id) WHERE broadcast_message_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_msg_attachments_broadcast_id ON message_attachments (broadcast_id) WHERE broadcast_id IS NOT NULL;

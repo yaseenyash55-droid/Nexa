@@ -91,5 +91,6 @@ object NexaApiClient {
     val userApi: UserApi by lazy { retrofit.create(UserApi::class.java) }
     val storyApi: StoryApi by lazy { retrofit.create(StoryApi::class.java) }
     val callApi: CallApi by lazy { retrofit.create(CallApi::class.java) }
+    val musicApi: com.nexa.social.data.api.MusicApi by lazy { retrofit.create(com.nexa.social.data.api.MusicApi::class.java) }
     val spotifyApi: com.nexa.social.data.api.SpotifyApi by lazy { retrofit.create(com.nexa.social.data.api.SpotifyApi::class.java) }
 }

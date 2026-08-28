@@ -123,6 +123,7 @@ export interface Message {
   senderType?: 'user' | 'ai';
   aiAgent?: string;
   triggerMessageId?: number | null;
+  attachments?: any[];
   createdAt: string;
 }
 
@@ -175,6 +176,7 @@ export interface GroupMessage {
   senderType?: 'user' | 'ai';
   aiAgent?: string;
   triggerMessageId?: number | null;
+  attachments?: any[];
   createdAt: string;
 }
 
@@ -194,6 +196,7 @@ export interface Broadcast {
   content: string;
   recipientsCount: number;
   recipientIds: number[];
+  attachments?: any[];
   createdAt: string;
 }
 

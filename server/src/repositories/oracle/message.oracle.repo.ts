@@ -57,7 +57,55 @@ export class OracleMessageRepository implements IMessageRepository {
       ORDER BY m.MESSAGE_ID ASC
     `;
     const res = await executeSql<RawMessageRow>(sql, { userA, userB });
-    return (res.rows || []).map((row: RawMessageRow) => this.mapRowToMessage(row));
+    const messages = (res.rows || []).map((row: RawMessageRow) => this.mapRowToMessage(row));
+
+    if (messages.length > 0) {
+      const messageIds = messages.map(m => m.messageId);
+
+      // Split messageIds into chunks of 1000 to avoid Oracle IN clause limits if needed,
+      // but for simplicity here we assume it's small enough or we use a subquery if too large.
+      // Assuming pagination limits the result set size.
+      const idList = messageIds.join(',');
+      if (idList) {
+        const attSql = `
+          SELECT MESSAGE_ID, ATTACHMENT_TYPE, MEDIA_ID,
+                 MUSIC_PROVIDER, MUSIC_TRACK_ID, MUSIC_TITLE,
+                 MUSIC_ARTIST, MUSIC_ARTWORK_URL, MUSIC_AUDIO_URL, MUSIC_DURATION
+          FROM MESSAGE_ATTACHMENTS
+          WHERE MESSAGE_ID IN (${idList})
+        `;
+        const attRes = await executeSql<any>(attSql);
+        const attachmentsByMsgId: Record<number, any[]> = {};
+
+        for (const row of (attRes.rows || [])) {
+          const msgId = Number(row.MESSAGE_ID);
+          if (!attachmentsByMsgId[msgId]) {
+            attachmentsByMsgId[msgId] = [];
+          }
+          attachmentsByMsgId[msgId].push({
+            type: row.ATTACHMENT_TYPE,
+            mediaId: row.MEDIA_ID,
+            music: row.MUSIC_TRACK_ID ? {
+              provider: row.MUSIC_PROVIDER,
+              id: row.MUSIC_TRACK_ID,
+              title: row.MUSIC_TITLE,
+              artist: row.MUSIC_ARTIST,
+              artworkUrl: row.MUSIC_ARTWORK_URL,
+              audioUrl: row.MUSIC_AUDIO_URL,
+              duration: row.MUSIC_DURATION
+            } : undefined
+          });
+        }
+
+        for (const msg of messages) {
+          if (attachmentsByMsgId[msg.messageId]) {
+            msg.attachments = attachmentsByMsgId[msg.messageId];
+          }
+        }
+      }
+    }
+
+    return messages;
   }
 
   async findAiResponseByTrigger(triggerKey: string, aiAgent = 'nexa'): Promise<Message | null> {
@@ -145,7 +193,7 @@ export class OracleMessageRepository implements IMessageRepository {
     }
   }
 
-  async sendMessage(msg: { senderId: number; receiverId: number; content: string }): Promise<Message> {
+  async sendMessage(msg: { senderId: number; receiverId: number; content: string; attachments?: any[] }): Promise<Message> {
     return withTransaction(async (conn) => {
       const sql = `
         INSERT INTO MESSAGES (SENDER_ID, RECEIVER_ID, CONTENT, CREATED_AT)
@@ -155,7 +203,7 @@ export class OracleMessageRepository implements IMessageRepository {
       const binds = {
         senderId: Number(msg.senderId),
         receiverId: Number(msg.receiverId),
-        content: msg.content.trim(),
+        content: msg.content?.trim() || '',
         messageId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT },
         createdAt: { type: oracledb.DATE, dir: oracledb.BIND_OUT }
       };
@@ -167,6 +215,41 @@ export class OracleMessageRepository implements IMessageRepository {
       const createdAtStr = createdVal instanceof Date
         ? createdVal.toISOString()
         : (typeof createdVal === 'string' ? createdVal : new Date().toISOString());
+
+      const messageId = Number(outBinds?.messageId?.[0]);
+
+      const savedAttachments = [];
+      if (msg.attachments && msg.attachments.length > 0) {
+        for (const att of msg.attachments) {
+          const attSql = `
+            INSERT INTO MESSAGE_ATTACHMENTS (
+              MESSAGE_ID, ATTACHMENT_TYPE, MEDIA_ID,
+              MUSIC_PROVIDER, MUSIC_TRACK_ID, MUSIC_TITLE,
+              MUSIC_ARTIST, MUSIC_ARTWORK_URL, MUSIC_AUDIO_URL, MUSIC_DURATION
+            ) VALUES (
+              :messageId, :attachmentType, :mediaId,
+              :musicProvider, :musicTrackId, :musicTitle,
+              :musicArtist, :musicArtworkUrl, :musicAudioUrl, :musicDuration
+            )
+            RETURNING ATTACHMENT_ID INTO :attachmentId
+          `;
+          const attBinds = {
+            messageId,
+            attachmentType: att.type,
+            mediaId: att.mediaId || null,
+            musicProvider: att.music?.provider || null,
+            musicTrackId: att.music?.id || null,
+            musicTitle: att.music?.title || null,
+            musicArtist: att.music?.artist || null,
+            musicArtworkUrl: att.music?.artworkUrl || null,
+            musicAudioUrl: att.music?.audioUrl || null,
+            musicDuration: att.music?.duration || null,
+            attachmentId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
+          };
+          await conn.execute(attSql, attBinds);
+          savedAttachments.push(att);
+        }
+      }
 
       let senderUsername = 'user';
       let senderDisplayName = 'User';
@@ -186,7 +269,7 @@ export class OracleMessageRepository implements IMessageRepository {
       } catch {}
 
       return {
-        messageId: Number(outBinds?.messageId?.[0]),
+        messageId,
         senderId: Number(msg.senderId),
         receiverId: Number(msg.receiverId),
         sender: {
@@ -195,7 +278,8 @@ export class OracleMessageRepository implements IMessageRepository {
           displayName: senderDisplayName,
           profileImageUrl: senderProfileImage
         },
-        content: msg.content.trim(),
+        content: msg.content?.trim() || '',
+        attachments: savedAttachments.length > 0 ? savedAttachments : undefined,
         isRead: false,
         createdAt: createdAtStr
       };

@@ -91,10 +91,10 @@ export async function sendGroupMessage(req: AuthenticatedRequest, res: Response)
     }
 
     const groupId = parseInt(req.params.id, 10);
-    const { content } = req.body;
+    const { content, attachments } = req.body;
 
-    if (isNaN(groupId) || !content || !content.trim()) {
-      return sendError(res, 'VALIDATION_ERROR', 'Group ID and message content are required', 400);
+    if (isNaN(groupId) || (!content?.trim() && (!attachments || attachments.length === 0))) {
+      return sendError(res, 'VALIDATION_ERROR', 'Group ID and message content or attachments are required', 400);
     }
 
     const repo = getGroupRepository();
@@ -114,7 +114,18 @@ export async function sendGroupMessage(req: AuthenticatedRequest, res: Response)
       return sendError(res, 'FORBIDDEN', 'Only admins can post in this group', 403);
     }
 
-    const msg = await repo.sendGroupMessage(groupId, currentUserId, content);
+    if (attachments && Array.isArray(attachments)) {
+      const mediaIds = attachments.map(a => a.mediaId).filter(Boolean);
+      if (mediaIds.length > 0) {
+        const { verifyMediaOwnership } = await import('../services/media.service.js');
+        const isOwner = await verifyMediaOwnership(currentUserId, mediaIds);
+        if (!isOwner) {
+          return sendError(res, 'FORBIDDEN', 'You do not have permission to attach this media', 403);
+        }
+      }
+    }
+
+    const msg = await repo.sendGroupMessage(groupId, currentUserId, content ? content.trim() : '', Array.isArray(attachments) ? attachments : undefined);
     
     // Broadcast via Socket.IO to group members
     for (const member of members) {

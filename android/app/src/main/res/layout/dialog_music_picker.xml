@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#151E2E"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- Header Drag Handle & Title -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_unread_badge"
+        android:backgroundTint="#475569" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Select Music Track 🎵"
+            android:textColor="#F8FAFC"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btnClosePicker"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Close music picker"
+            android:padding="6dp"
+            android:src="@drawable/ic_close"
+            app:tint="#94A3B8" />
+    </LinearLayout>
+
+    <!-- Search Input -->
+    <EditText
+        android:id="@+id/etSearchMusic"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_input_field"
+        android:drawableStart="@drawable/ic_search"
+        android:drawablePadding="10dp"
+        android:drawableTint="#94A3B8"
+        android:hint="Search tracks, artists..."
+        android:inputType="text"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="10dp"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#64748B"
+        android:textSize="14sp" />
+
+    <!-- Genre Chips Horizontal Scroll -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:scrollbars="none">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipGroupGenres"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:singleSelection="true" />
+    </HorizontalScrollView>
+
+    <!-- Track List Area -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="360dp"
+        android:layout_marginTop="10dp">
+
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipeRefreshMusic"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvMusicTracks"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                tools:listitem="@layout/item_music_track" />
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+        <ProgressBar
+            android:id="@+id/progressBarMusic"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:indeterminateTint="#6366F1"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/layoutEmptyMusic"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="No tracks found"
+                android:textColor="#94A3B8"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>

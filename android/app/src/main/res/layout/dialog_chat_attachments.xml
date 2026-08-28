@@ -7,6 +7,15 @@
     android:orientation="vertical"
     android:padding="20dp">
 
+    <!-- Drag Handle -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="14dp"
+        android:background="@drawable/bg_unread_badge"
+        android:backgroundTint="#475569" />
+
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -19,62 +28,30 @@
     <GridLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="16dp"
         android:alignmentMode="alignMargins"
         android:columnCount="3"
-        android:rowCount="2">
+        android:rowCount="3">
 
-        <!-- 1. Local Storage / Files -->
-        <LinearLayout
-            android:id="@+id/btnAttachFile"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_columnWeight="1"
-            android:layout_margin="8dp"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="12dp">
-
-            <com.google.android.material.imageview.ShapeableImageView
-                android:layout_width="54dp"
-                android:layout_height="54dp"
-                android:background="#1E293B"
-                android:padding="14dp"
-                android:src="@drawable/ic_folder"
-                app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.CornerSize50Percent"
-                app:tint="#38BDF8" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Files / Storage"
-                android:textColor="#F8FAFC"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <!-- 2. Photos / Gallery -->
+        <!-- 1. Photos / Images -->
         <LinearLayout
             android:id="@+id/btnAttachGallery"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_columnWeight="1"
-            android:layout_margin="8dp"
+            android:layout_margin="6dp"
             android:background="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:padding="10dp">
 
             <com.google.android.material.imageview.ShapeableImageView
-                android:layout_width="54dp"
-                android:layout_height="54dp"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
                 android:background="#1E293B"
-                android:padding="14dp"
+                android:padding="13dp"
                 android:src="@drawable/ic_gallery"
                 app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.CornerSize50Percent"
                 app:tint="#A855F7" />
@@ -82,95 +59,159 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Gallery"
+                android:layout_marginTop="6dp"
+                android:text="Photo"
                 android:textColor="#F8FAFC"
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- 3. Camera -->
+        <!-- 2. Videos -->
         <LinearLayout
-            android:id="@+id/btnAttachCamera"
+            android:id="@+id/btnAttachVideo"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_columnWeight="1"
-            android:layout_margin="8dp"
+            android:layout_margin="6dp"
             android:background="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:padding="10dp">
 
             <com.google.android.material.imageview.ShapeableImageView
-                android:layout_width="54dp"
-                android:layout_height="54dp"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
                 android:background="#1E293B"
-                android:padding="14dp"
-                android:src="@drawable/ic_camera"
+                android:padding="13dp"
+                android:src="@drawable/ic_video"
                 app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.CornerSize50Percent"
                 app:tint="#EC4899" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="6dp"
+                android:text="Video"
+                android:textColor="#F8FAFC"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- 3. Documents / Files -->
+        <LinearLayout
+            android:id="@+id/btnAttachFile"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:layout_margin="6dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="10dp">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="#1E293B"
+                android:padding="13dp"
+                android:src="@drawable/ic_folder"
+                app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.CornerSize50Percent"
+                app:tint="#38BDF8" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Document"
+                android:textColor="#F8FAFC"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- 4. Music / Audio -->
+        <LinearLayout
+            android:id="@+id/btnAttachMusic"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:layout_margin="6dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="10dp">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="#1E293B"
+                android:padding="13dp"
+                android:src="@drawable/ic_call_audio"
+                app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.CornerSize50Percent"
+                app:tint="#6366F1" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Music"
+                android:textColor="#F8FAFC"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- 5. Camera -->
+        <LinearLayout
+            android:id="@+id/btnAttachCamera"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:layout_margin="6dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="10dp">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="#1E293B"
+                android:padding="13dp"
+                android:src="@drawable/ic_camera"
+                app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.CornerSize50Percent"
+                app:tint="#F97316" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
                 android:text="Camera"
                 android:textColor="#F8FAFC"
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- 4. Stickers -->
-        <LinearLayout
-            android:id="@+id/btnAttachStickers"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_columnWeight="1"
-            android:layout_margin="8dp"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="12dp">
-
-            <com.google.android.material.imageview.ShapeableImageView
-                android:layout_width="54dp"
-                android:layout_height="54dp"
-                android:background="#1E293B"
-                android:padding="14dp"
-                android:src="@drawable/ic_sticker"
-                app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.CornerSize50Percent"
-                app:tint="#F59E0B" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Stickers"
-                android:textColor="#F8FAFC"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <!-- 5. GIFs -->
+        <!-- 6. GIFs -->
         <LinearLayout
             android:id="@+id/btnAttachGif"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_columnWeight="1"
-            android:layout_margin="8dp"
+            android:layout_margin="6dp"
             android:background="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:padding="10dp">
 
             <com.google.android.material.imageview.ShapeableImageView
-                android:layout_width="54dp"
-                android:layout_height="54dp"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
                 android:background="#1E293B"
-                android:padding="14dp"
+                android:padding="13dp"
                 android:src="@drawable/ic_gif"
                 app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.CornerSize50Percent"
                 app:tint="#10B981" />
@@ -178,8 +219,40 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="GIFs"
+                android:layout_marginTop="6dp"
+                android:text="GIF"
+                android:textColor="#F8FAFC"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- 7. Stickers -->
+        <LinearLayout
+            android:id="@+id/btnAttachStickers"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:layout_margin="6dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="10dp">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="#1E293B"
+                android:padding="13dp"
+                android:src="@drawable/ic_sticker"
+                app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.CornerSize50Percent"
+                app:tint="#F59E0B" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Stickers"
                 android:textColor="#F8FAFC"
                 android:textSize="12sp" />
         </LinearLayout>

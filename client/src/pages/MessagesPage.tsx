@@ -22,111 +22,15 @@ import { decryptMessage, DecryptedMessageResult } from '../utils/e2ee.js';
 import { webFcmService } from '../services/fcm.service.js';
 import { EmojiPickerPopover } from '../components/ui/EmojiPickerPopover.js';
 import { GifPickerModal } from '../components/ui/GifPickerModal.js';
+import { ChatComposer, ChatTarget, ComposerAttachment } from '../components/chat/ChatComposer.js';
+import { MusicMessageCard } from '../components/chat/MusicMessageCard.js';
 
 import { mediaCache } from '../utils/mediaCache.js';
 
-const CachedMedia: React.FC<{
-  url: string;
-  type: 'image' | 'video' | 'gif';
-  className?: string;
-  onClick?: () => void;
-  controls?: boolean;
-}> = ({ url, type, className, onClick, controls }) => {
-  const [src, setSrc] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+import { CachedMedia } from '../components/chat/CachedMedia.js';
+import { ImageMessageCard, VideoMessageCard, FileMessageCard } from '../components/chat/MediaMessageCards.js';
 
-  useEffect(() => {
-    let active = true;
-    let localUrl: string | null = null;
-
-    async function load() {
-      try {
-        setLoading(true);
-        const cached = await mediaCache.getMedia(url);
-        if (cached && active) {
-          setSrc(cached.objectUrl);
-          localUrl = cached.objectUrl;
-          setLoading(false);
-          return;
-        }
-
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Fetch failed');
-        const blob = await res.blob();
-        if (active) {
-          const objUrl = URL.createObjectURL(blob);
-          setSrc(objUrl);
-          localUrl = objUrl;
-          setLoading(false);
-        }
-        await mediaCache.saveMedia(url, blob, res.headers.get('content-type') || '');
-      } catch (err) {
-        console.error('Failed to load cached media:', err);
-        if (active) {
-          setError(true);
-          setLoading(false);
-        }
-      }
-    }
-
-    load();
-
-    return () => {
-      active = false;
-      if (localUrl) {
-        URL.revokeObjectURL(localUrl);
-      }
-    };
-  }, [url]);
-
-  if (loading) {
-    return (
-      <div className={`${className} flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl min-h-[160px] animate-pulse`}>
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-[10px] text-slate-500 font-semibold">Loading media...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !src) {
-    return (
-      <div className={`${className} flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl min-h-[160px]`}>
-        <span className="text-xs text-rose-400">Failed to load media</span>
-      </div>
-    );
-  }
-
-  if (type === 'image' || type === 'gif') {
-    return (
-      <img
-        src={src}
-        alt="Media"
-        className={className}
-        onClick={onClick}
-        loading="lazy"
-      />
-    );
-  }
-
-  if (type === 'video') {
-    return (
-      <video
-        src={src}
-        controls={controls}
-        playsInline
-        className={className}
-        preload="metadata"
-      />
-    );
-  }
-
-  return null;
-};
-
-const MessageContent: React.FC<{ content: string; isSelf?: boolean }> = ({ content }) => {
+const MessageContent: React.FC<{ content: string; isSelf?: boolean, message?: any }> = ({ content, message }) => {
   // 1. Check if content has photo URL (e.g. 📷 [Photo] https://... or direct image URL)
   const photoMatch = content.match(/(?:📷\s*\[Photo\]\s*|(?:^|\s))(https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?|https?:\/\/\S*supabase\.co\S*|https?:\/\/\S*\/uploads\/\S+)/i);
   // 2. Check if content has video URL (e.g. 🎥 [Video] https://... or direct video URL)
@@ -140,6 +44,41 @@ const MessageContent: React.FC<{ content: string; isSelf?: boolean }> = ({ conte
     : !gifMatch && /(?:https?:\/\/\S+\.gif(?:\?\S*)?|https?:\/\/media\.giphy\.com\S*|https?:\/\/media\.tenor\.com\S*)/i.test(content)
     ? content.match(/(https?:\/\/\S+(?:\.gif(?:\?\S*)?|giphy\.com\S*|tenor\.com\S*))/i)?.[1]
     : null;
+
+  // Render structured attachments first
+  const { attachments } = message || { attachments: [] };
+  const structuredAttachments = attachments?.map((att: any, i: number) => {
+    if (att.attachmentType === 'music' || att.type === 'music') {
+      const track = {
+        id: att.musicTrackId || att.track?.id,
+        title: att.musicTitle || att.track?.title,
+        artist: att.musicArtist || att.track?.artist,
+        artworkUrl: att.musicArtworkUrl || att.track?.artworkUrl,
+        audioUrl: att.musicAudioUrl || att.track?.audioUrl,
+        duration: att.musicDuration || att.track?.duration,
+      } as any;
+      return <MusicMessageCard key={i} track={track} />;
+    }
+    if (att.attachmentType === 'image' || att.type === 'image') {
+      return <ImageMessageCard key={i} url={att.mediaUrl || att.url} />;
+    }
+    if (att.attachmentType === 'video' || att.type === 'video') {
+      return <VideoMessageCard key={i} url={att.mediaUrl || att.url} />;
+    }
+    if (att.attachmentType === 'file' || att.type === 'file') {
+      return <FileMessageCard key={i} url={att.mediaUrl || att.url} fileName={att.fileName || att.file?.name} />;
+    }
+    return null;
+  });
+
+  if (structuredAttachments && structuredAttachments.length > 0) {
+    return (
+      <div className="space-y-1.5">
+        {structuredAttachments}
+        {content && <p className="leading-relaxed whitespace-pre-line text-xs">{content}</p>}
+      </div>
+    );
+  }
 
   if (gifUrl) {
     return (
@@ -386,13 +325,16 @@ export const MessagesPage: React.FC = () => {
   const isPostingDisabled = Boolean(selectedGroup?.onlyAdminsCanPost && !isCurrentGroupAdmin);
 
   // Send Direct Message (TLS-Protected)
-  const sendDirectMessageMutation = useMutation<Message, Error, string | void>({
-    mutationFn: async (overrideContent) => {
-      const textToSend = (typeof overrideContent === 'string' ? overrideContent : messageInput).trim();
-      if (!currentUser || !selectedUser || !textToSend) {
+  const sendDirectMessageMutation = useMutation<Message, Error, { text?: string; attachments?: any[] } | string>({
+    mutationFn: async (payload) => {
+      const isString = typeof payload === 'string';
+      const textToSend = isString ? payload : payload.text;
+      const attachments = isString ? undefined : payload.attachments;
+
+      if (!currentUser || !selectedUser || (!textToSend && (!attachments || attachments.length === 0))) {
         throw new Error('Invalid send message state');
       }
-      return socialApi.sendMessage(selectedUser.userId, textToSend);
+      return socialApi.sendMessage(selectedUser.userId, textToSend, attachments);
     },
     onSuccess: (message) => {
       setMessageInput('');
@@ -409,13 +351,16 @@ export const MessagesPage: React.FC = () => {
   });
 
   // Send Group Message
-  const sendGroupMessageMutation = useMutation<GroupMessage, Error, string | void>({
-    mutationFn: async (overrideContent) => {
-      const textToSend = (typeof overrideContent === 'string' ? overrideContent : messageInput).trim();
-      if (!selectedGroup || !textToSend) {
+  const sendGroupMessageMutation = useMutation<GroupMessage, Error, { text?: string; attachments?: any[] } | string>({
+    mutationFn: async (payload) => {
+      const isString = typeof payload === 'string';
+      const textToSend = isString ? payload : payload.text;
+      const attachments = isString ? undefined : payload.attachments;
+
+      if (!selectedGroup || (!textToSend && (!attachments || attachments.length === 0))) {
         throw new Error('Invalid group message state');
       }
-      return groupsApi.sendGroupMessage(selectedGroup.groupId, textToSend);
+      return groupsApi.sendGroupMessage(selectedGroup.groupId, textToSend, attachments);
     },
     onSuccess: (msg) => {
       setMessageInput('');
@@ -698,23 +643,6 @@ export const MessagesPage: React.FC = () => {
     }
   };
 
-  const handleSendMessageSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!messageInput.trim()) return;
-
-    if (chatType === 'direct' && selectedUser) {
-      if (typingTimerRef.current) {
-        clearTimeout(typingTimerRef.current);
-      }
-      if (socketRef.current && isEmittingTypingRef.current) {
-        socketRef.current.emit('typing:stop', { receiverId: selectedUser.userId });
-        isEmittingTypingRef.current = false;
-      }
-      sendDirectMessageMutation.mutate();
-    } else if (chatType === 'groups' && selectedGroup) {
-      sendGroupMessageMutation.mutate();
-    }
-  };
 
   const displayDirectItems = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -1147,7 +1075,7 @@ export const MessagesPage: React.FC = () => {
                               : `${currentChatTheme.receiverBubble} rounded-bl-none`
                           }`}
                         >
-                          <MessageContent content={decryptedInfo.text} isSelf={isSelf} />
+                          <MessageContent content={decryptedInfo.text} isSelf={isSelf} message={m} />
                           <div className={`flex items-center justify-end gap-1.5 text-[9px] ${isSelf ? 'text-brand-200' : 'text-slate-400'}`}>
                             <span>{formatDistanceToNow(new Date(m.createdAt), { addSuffix: true })}</span>
                             {isSelf && (
@@ -1183,55 +1111,18 @@ export const MessagesPage: React.FC = () => {
               </div>
 
               {/* Chat Input Form */}
-              <form
-                onSubmit={handleSendMessageSubmit}
-                className="p-3 border-t border-slate-800/80 bg-background-card/60 flex items-center gap-2 relative"
-              >
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-                    className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 rounded-xl transition"
-                    title="Add Emoji"
-                  >
-                    <Smile className="w-5 h-5" />
-                  </button>
-
-                  <EmojiPickerPopover
-                    isOpen={isEmojiPickerOpen}
-                    onClose={() => setIsEmojiPickerOpen(false)}
-                    onSelectEmoji={(emoji) => {
-                      setMessageInput((prev) => prev + emoji);
-                    }}
-                    position="top"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsGifModalOpen(true)}
-                  className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60 rounded-xl transition"
-                  title="Search & Send GIF"
-                >
-                  <ImageIcon className="w-5 h-5" />
-                </button>
-
-                <input
-                  type="text"
-                  value={messageInput}
-                  onChange={handleInputChange}
-                  placeholder={`Message @${selectedUser.username}...`}
-                  className="flex-1 bg-slate-900 border border-slate-800 focus:border-brand-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={!messageInput.trim() || sendDirectMessageMutation.isPending}
-                  className="p-2.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white rounded-xl shadow-glow-brand transition-all flex items-center justify-center"
-                  title="Send Message"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
+              <ChatComposer
+                target={{ type: 'direct', userId: selectedUser.userId }}
+                disabled={sendDirectMessageMutation.isPending}
+                onSend={async (payload) => {
+                  if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+                  if (socketRef.current && isEmittingTypingRef.current) {
+                    socketRef.current.emit('typing:stop', { receiverId: selectedUser.userId });
+                    isEmittingTypingRef.current = false;
+                  }
+                  await sendDirectMessageMutation.mutateAsync(payload);
+                }}
+              />
             </>
           ) : chatType === 'groups' && selectedGroup ? (
             <>
@@ -1310,7 +1201,7 @@ export const MessagesPage: React.FC = () => {
                               {m.sender.displayName || m.sender.username}
                             </p>
                           )}
-                          <MessageContent content={m.content} isSelf={isSelf} />
+                          <MessageContent content={m.content} isSelf={isSelf} message={m} />
                           <div className={`flex items-center justify-end text-[9px] ${isSelf ? 'text-brand-200' : 'text-slate-400'}`}>
                             <span>{formatDistanceToNow(new Date(m.createdAt), { addSuffix: true })}</span>
                           </div>
@@ -1328,55 +1219,13 @@ export const MessagesPage: React.FC = () => {
                   🔒 Only group admins can send messages in this group.
                 </div>
               ) : (
-                <form
-                  onSubmit={handleSendMessageSubmit}
-                  className="p-3 border-t border-slate-800/80 bg-background-card/60 flex items-center gap-2 relative"
-                >
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-                      className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 rounded-xl transition"
-                      title="Add Emoji"
-                    >
-                      <Smile className="w-5 h-5" />
-                    </button>
-
-                    <EmojiPickerPopover
-                      isOpen={isEmojiPickerOpen}
-                      onClose={() => setIsEmojiPickerOpen(false)}
-                      onSelectEmoji={(emoji) => {
-                        setMessageInput((prev) => prev + emoji);
-                      }}
-                      position="top"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsGifModalOpen(true)}
-                    className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60 rounded-xl transition"
-                    title="Search & Send GIF"
-                  >
-                    <ImageIcon className="w-5 h-5" />
-                  </button>
-
-                  <input
-                    type="text"
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                    placeholder={`Message #${selectedGroup.name}...`}
-                    className="flex-1 bg-slate-900 border border-slate-800 focus:border-brand-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!messageInput.trim() || sendGroupMessageMutation.isPending}
-                    className="p-2.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white rounded-xl shadow-glow-brand transition-all flex items-center justify-center"
-                    title="Send Group Message"
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                </form>
+                <ChatComposer
+                  target={{ type: 'group', groupId: selectedGroup.groupId }}
+                  disabled={sendGroupMessageMutation.isPending}
+                  onSend={async (payload) => {
+                    await sendGroupMessageMutation.mutateAsync(payload);
+                  }}
+                />
               )}
             </>
           ) : chatType === 'broadcasts' && selectedBroadcast ? (

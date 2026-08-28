@@ -71,8 +71,8 @@ export const socialApi = {
     return res.data.data;
   },
 
-  sendMessage: async (receiverId: number, content: string): Promise<Message> => {
-    const res = await api.post<ApiResponse<Message>>('/messages', { receiverId, content });
+  sendMessage: async (receiverId: number, content?: string, attachments?: any[]): Promise<Message> => {
+    const res = await api.post<ApiResponse<Message>>('/messages', { receiverId, content, attachments });
     return res.data.data;
   },
 

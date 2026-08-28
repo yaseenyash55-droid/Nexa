@@ -1,15 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { JamendoTrack } from '../types/music.types.js';
+import { NexaMusicTrack } from '../types/music.types.js';
 
 interface MusicContextType {
-  currentTrack: JamendoTrack | null;
+  currentTrack: NexaMusicTrack | null;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
   volume: number;
   isMuted: boolean;
-  queue: JamendoTrack[];
-  playTrack: (track: JamendoTrack, trackList?: JamendoTrack[]) => void;
+  queue: NexaMusicTrack[];
+  playTrack: (track: NexaMusicTrack, trackList?: NexaMusicTrack[]) => void;
   pauseTrack: () => void;
   resumeTrack: () => void;
   togglePlay: () => void;
@@ -23,13 +23,13 @@ interface MusicContextType {
 const MusicContext = createContext<MusicContextType | undefined>(undefined);
 
 export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentTrack, setCurrentTrack] = useState<JamendoTrack | null>(null);
+  const [currentTrack, setCurrentTrack] = useState<NexaMusicTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
-  const [queue, setQueue] = useState<JamendoTrack[]>([]);
+  const [queue, setQueue] = useState<NexaMusicTrack[]>([]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -69,7 +69,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
-  const playTrack = useCallback((track: JamendoTrack, trackList?: JamendoTrack[]) => {
+  const playTrack = useCallback((track: NexaMusicTrack, trackList?: NexaMusicTrack[]) => {
     if (!audioRef.current) return;
 
     if (trackList && trackList.length > 0) {
@@ -80,7 +80,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setDuration(track.duration || 0);
     setCurrentTime(0);
 
-    audioRef.current.src = track.audio;
+    audioRef.current.src = track.audioUrl || '';
     audioRef.current.load();
     audioRef.current.play().then(() => {
       setIsPlaying(true);

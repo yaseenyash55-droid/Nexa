@@ -67,6 +67,6 @@ interface GroupApi {
     @POST("groups/{id}/messages")
     suspend fun sendGroupMessage(
         @Path("id") groupId: Int,
-        @Body body: Map<String, String>
+        @Body request: com.nexa.social.data.models.SendGroupMessageRequest
     ): Response<ApiResponse<GroupMessage>>
 }

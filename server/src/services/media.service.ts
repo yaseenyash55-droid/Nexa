@@ -10,7 +10,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '../config/env.js';
 
-export type UploadKind = 'avatar' | 'photo' | 'story' | 'reel' | 'video' | 'chat';
+export type UploadKind = 'avatar' | 'photo' | 'story' | 'reel' | 'video' | 'chat' | 'document';
 
 export const MiB = 1024 * 1024;
 
@@ -20,7 +20,8 @@ export const MAX_BYTES: Record<UploadKind, number> = {
   story: 100 * MiB,
   reel: 500 * MiB,
   video: 500 * MiB,
-  chat: 50 * MiB
+  chat: 50 * MiB,
+  document: 20 * MiB
 };
 
 export const MIME_EXTENSIONS: Record<string, string> = {
@@ -31,7 +32,11 @@ export const MIME_EXTENSIONS: Record<string, string> = {
   'video/mp4': '.mp4',
   'video/webm': '.webm',
   'video/quicktime': '.mov',
-  'video/x-matroska': '.mkv'
+  'video/x-matroska': '.mkv',
+  'application/pdf': '.pdf',
+  'text/plain': '.txt',
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx'
 };
 
 export interface MediaAssetMetadata {
@@ -41,7 +46,7 @@ export interface MediaAssetMetadata {
   storageKey: string;
   mimeType: string;
   sizeBytes: number;
-  mediaType: 'image' | 'video';
+  mediaType: 'image' | 'video' | 'file';
   publicUrl: string;
   createdAt: string;
 }
@@ -95,7 +100,7 @@ export class LocalDiskMediaStorageProvider implements IMediaStorageProvider {
     await fs.promises.rename(tempFilePath, destinationPath);
 
     const stats = await fs.promises.stat(destinationPath);
-    const mediaType = mimeType.startsWith('video/') ? 'video' : 'image';
+    const mediaType = mimeType.startsWith('video/') ? 'video' : (mimeType.startsWith('image/') ? 'image' : 'file');
 
     return {
       assetId,
@@ -244,7 +249,7 @@ export class S3CompatibleMediaStorageProvider implements IMediaStorageProvider {
       publicUrl = `${this.endpoint.replace(/\/$/, '')}/${this.bucket}/${storageKey}`;
     }
 
-    const mediaType = mimeType.startsWith('video/') ? 'video' : 'image';
+    const mediaType = mimeType.startsWith('video/') ? 'video' : (mimeType.startsWith('image/') ? 'image' : 'file');
 
     return {
       assetId,
@@ -309,6 +314,40 @@ export class S3CompatibleMediaStorageProvider implements IMediaStorageProvider {
   }
 }
 
+export async function verifyMediaOwnership(userId: number, mediaIds: string[]): Promise<boolean> {
+  if (!mediaIds || mediaIds.length === 0) return true;
+
+  // Dedup media ids and filter empty
+  const uniqueIds = Array.from(new Set(mediaIds.filter(Boolean)));
+  if (uniqueIds.length === 0) return true;
+
+  try {
+    if (env.DATABASE_PROVIDER === 'postgres') {
+      const { executePostgresSql } = await import('../db/postgres.pool.js');
+      const res = await executePostgresSql(
+        `SELECT COUNT(*) as count FROM media_assets WHERE user_id = $1 AND asset_id = ANY($2::varchar[])`,
+        [userId, uniqueIds]
+      );
+      return Number(res.rows[0].count) === uniqueIds.length;
+    } else {
+      const { executeSql } = await import('../db/pool.js');
+      const inClause = uniqueIds.map((_, i) => `:id${i}`).join(',');
+      const params: Record<string, any> = { userId };
+      uniqueIds.forEach((id, i) => {
+        params[`id${i}`] = id;
+      });
+      const res = await executeSql(
+        `SELECT COUNT(*) as count FROM MEDIA_ASSETS WHERE USER_ID = :userId AND ASSET_ID IN (${inClause})`,
+        params
+      );
+      return Number(res.rows?.[0]?.COUNT || res.rows?.[0]?.[0] || 0) === uniqueIds.length;
+    }
+  } catch (err) {
+    console.error('[verifyMediaOwnership] Error:', err);
+    return false;
+  }
+}
+
 let activeStorageProvider: IMediaStorageProvider | null = null;
 
 export function getMediaStorageProvider(): IMediaStorageProvider {
@@ -368,6 +407,28 @@ export function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
   // WebM / MKV: EBML header 1A 45 DF A3
   if (mimeType === 'video/webm' || mimeType === 'video/x-matroska') {
     return hex === '1A45DFA3';
+  }
+  // PDF: %PDF- (25 50 44 46 2D)
+  if (mimeType === 'application/pdf') {
+    return buffer.toString('utf8', 0, 5) === '%PDF-';
+  }
+  // DOCX / ZIP: PK.. (50 4B 03 04)
+  if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    return hex === '504B0304';
+  }
+  // DOC (Old MS Word OLE): D0 CF 11 E0
+  if (mimeType === 'application/msword') {
+    return hex === 'D0CF11E0';
+  }
+  // TXT (Plain text has no magic bytes, allow text files)
+  if (mimeType === 'text/plain') {
+    // Only allow if the initial characters are valid ASCII/UTF-8 and not binary
+    // Simple heuristic: check if first few bytes are valid text characters or whitespace
+    for (let i = 0; i < Math.min(buffer.length, 10); i++) {
+      const byte = buffer[i];
+      if (byte < 9 || (byte > 13 && byte < 32)) return false; // Contains control characters (excluding tab/newline)
+    }
+    return true;
   }
 
   return false;

@@ -33,7 +33,7 @@ interface MessageApi {
 
     @POST("broadcasts")
     suspend fun createBroadcast(
-        @Body body: Map<String, @JvmSuppressWildcards Any>
+        @Body request: com.nexa.social.data.models.CreateBroadcastRequest
     ): Response<ApiResponse<Map<String, Any>>>
 
     @GET("broadcasts")

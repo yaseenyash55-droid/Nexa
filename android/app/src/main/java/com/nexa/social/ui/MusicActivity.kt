@@ -23,6 +23,7 @@ import coil.load
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
+import com.nexa.social.NexaApiClient
 import com.nexa.social.R
 import com.nexa.social.data.models.MusicTrack
 import com.nexa.social.ui.adapters.MusicTrackAdapter
@@ -32,10 +33,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
-import java.net.URLEncoder
 
 class MusicActivity : AppCompatActivity(), MusicPlayerManager.PlayerListener {
 
@@ -60,9 +57,7 @@ class MusicActivity : AppCompatActivity(), MusicPlayerManager.PlayerListener {
     private lateinit var tvMiniDuration: TextView
 
     private lateinit var adapter: MusicTrackAdapter
-    private val httpClient = OkHttpClient()
 
-    private val jamendoClientId = "c031c261"
     private val genres = listOf("All", "Pop", "Electronic", "Rock", "Hip-Hop", "Chillout", "Acoustic", "Jazz", "Cinematic")
     private var currentGenre = "All"
     private var currentSearchQuery = ""
@@ -209,78 +204,31 @@ class MusicActivity : AppCompatActivity(), MusicPlayerManager.PlayerListener {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                var url = "https://api.jamendo.com/v3.0/tracks/?client_id=$jamendoClientId&format=jsonpretty&limit=25&include=musicinfo&audioformat=mp32"
-                if (currentSearchQuery.isNotEmpty()) {
-                    val encoded = URLEncoder.encode(currentSearchQuery, "UTF-8")
-                    url += "&search=$encoded"
+                val res = if (currentSearchQuery.isNotEmpty()) {
+                    NexaApiClient.musicApi.searchTracks(currentSearchQuery)
                 } else if (currentGenre != "All") {
-                    val encoded = URLEncoder.encode(currentGenre.lowercase(), "UTF-8")
-                    url += "&tags=$encoded&boost=popularity_month"
+                    NexaApiClient.musicApi.getTracksByGenre(currentGenre.lowercase())
                 } else {
-                    url += "&boost=popularity_month"
+                    NexaApiClient.musicApi.getTracks()
                 }
 
-                val request = Request.Builder().url(url).build()
-                val response = httpClient.newCall(request).execute()
-                val body = response.body?.string()
+                val tracks = res.body()?.data ?: emptyList()
 
-                if (response.isSuccessful && body != null) {
-                    val json = JSONObject(body)
-                    val results = json.optJSONArray("results")
-                    val parsedTracks = mutableListOf<MusicTrack>()
-
-                    if (results != null) {
-                        for (i in 0 until results.length()) {
-                            val item = results.getJSONObject(i)
-                            val id = item.optString("id")
-                            val name = item.optString("name", "Unknown Track")
-                            val duration = item.optInt("duration", 0)
-                            val artistId = item.optString("artist_id")
-                            val artistName = item.optString("artist_name", "Unknown Artist")
-                            val albumName = item.optString("album_name")
-                            val albumImage = item.optString("album_image")
-                            val image = item.optString("image")
-                            val audio = item.optString("audio")
-                            val audioDownload = item.optString("audiodownload")
-                            val shareUrl = item.optString("shareurl")
-
-                            if (audio.isNotBlank()) {
-                                parsedTracks.add(
-                                    MusicTrack(
-                                        id = id,
-                                        name = name,
-                                        duration = duration,
-                                        artistId = artistId,
-                                        artistName = artistName,
-                                        albumName = albumName,
-                                        albumImage = albumImage,
-                                        image = image,
-                                        audioUrl = audio,
-                                        audioDownloadUrl = audioDownload,
-                                        shareUrl = shareUrl
-                                    )
-                                )
-                            }
-                        }
-                    }
-
-                    withContext(Dispatchers.Main) {
-                        progressBar.visibility = View.GONE
-                        swipeRefresh.isRefreshing = false
-                        adapter.submitList(parsedTracks)
-                        layoutEmpty.visibility = if (parsedTracks.isEmpty()) View.VISIBLE else View.GONE
-                    }
-                    return@launch
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+                    swipeRefresh.isRefreshing = false
+                    adapter.submitList(tracks)
+                    layoutEmpty.visibility = if (tracks.isEmpty()) View.VISIBLE else View.GONE
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
-            }
-
-            withContext(Dispatchers.Main) {
-                progressBar.visibility = View.GONE
-                swipeRefresh.isRefreshing = false
-                layoutEmpty.visibility = View.VISIBLE
-                Toast.makeText(this@MusicActivity, "Could not fetch Jamendo music", Toast.LENGTH_SHORT).show()
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+                    swipeRefresh.isRefreshing = false
+                    if (adapter.itemCount == 0) {
+                        layoutEmpty.visibility = View.VISIBLE
+                        Toast.makeText(this@MusicActivity, "Could not fetch music from NEXA backend", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         }
     }

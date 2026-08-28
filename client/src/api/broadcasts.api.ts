@@ -11,7 +11,7 @@ export interface Broadcast {
 }
 
 export const broadcastsApi = {
-  createBroadcast: async (data: { title?: string; recipientIds: number[]; message: string }): Promise<{ broadcast: Broadcast; messagesCount: number }> => {
+  createBroadcast: async (data: { title?: string; recipientIds: number[]; message?: string; attachments?: any[] }): Promise<{ broadcast: Broadcast; messagesCount: number }> => {
     const res = await api.post('/broadcasts', data);
     return res.data.data;
   },

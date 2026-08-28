@@ -129,18 +129,65 @@ data class CreateStoryRequest(
     @SerializedName("musicTrackId") val musicTrackId: String? = null
 )
 
+data class MusicMetadata(
+    @SerializedName("provider") val provider: String? = "jamendo",
+    @SerializedName("id") val id: String,
+    @SerializedName("title") val title: String,
+    @SerializedName("artist") val artist: String,
+    @SerializedName("artworkUrl") val artworkUrl: String? = null,
+    @SerializedName("audioUrl") val audioUrl: String,
+    @SerializedName("duration") val duration: Int? = null
+)
+
+data class MessageAttachment(
+    @SerializedName("attachmentId") val attachmentId: Long? = null,
+    @SerializedName("type") val type: String, // 'image', 'video', 'file', 'music', 'gif'
+    @SerializedName("mediaId") val mediaId: String? = null,
+    @SerializedName("url") val url: String? = null,
+    @SerializedName("filename") val filename: String? = null,
+    @SerializedName("mimeType") val mimeType: String? = null,
+    @SerializedName("size") val size: Long? = null,
+    @SerializedName("music") val music: MusicMetadata? = null,
+    // Denormalized fields for database/backend parity
+    @SerializedName("musicProvider") val musicProvider: String? = null,
+    @SerializedName("musicTrackId") val musicTrackId: String? = null,
+    @SerializedName("musicTitle") val musicTitle: String? = null,
+    @SerializedName("musicArtist") val musicArtist: String? = null,
+    @SerializedName("musicArtworkUrl") val musicArtworkUrl: String? = null,
+    @SerializedName("musicAudioUrl") val musicAudioUrl: String? = null,
+    @SerializedName("musicDuration") val musicDuration: Int? = null
+) {
+    fun resolvedMusic(): MusicMetadata? {
+        if (music != null) return music
+        val audioUrl = musicAudioUrl ?: return null
+        return MusicMetadata(
+            provider = musicProvider ?: "jamendo",
+            id = musicTrackId ?: "",
+            title = musicTitle ?: "Unknown Track",
+            artist = musicArtist ?: "Unknown Artist",
+            artworkUrl = musicArtworkUrl,
+            audioUrl = audioUrl,
+            duration = musicDuration
+        )
+    }
+
+    fun resolvedUrl(): String? = url ?: resolvedMusic()?.audioUrl
+}
+
 data class Message(
     @SerializedName("messageId") val messageId: Int,
     @SerializedName("senderId") val senderId: Int,
     @SerializedName("receiverId") val receiverId: Int,
-    @SerializedName("content") val content: String,
+    @SerializedName("content") val content: String = "",
+    @SerializedName("attachments") val attachments: List<MessageAttachment> = emptyList(),
     @SerializedName("isRead") val isRead: Boolean = false,
-    @SerializedName("createdAt") val createdAt: String?
+    @SerializedName("createdAt") val createdAt: String? = null
 )
 
 data class SendDirectMessageRequest(
     @SerializedName("receiverId") val receiverId: Int,
-    @SerializedName("content") val content: String
+    @SerializedName("content") val content: String = "",
+    @SerializedName("attachments") val attachments: List<MessageAttachment>? = null
 )
 
 data class MarkReadResponse(
@@ -231,17 +278,32 @@ data class GroupMessage(
     @SerializedName("groupId") val groupId: Int,
     @SerializedName("senderId") val senderId: Int,
     @SerializedName("sender") val sender: GroupSender,
-    @SerializedName("content") val content: String,
-    @SerializedName("createdAt") val createdAt: String?
+    @SerializedName("content") val content: String = "",
+    @SerializedName("attachments") val attachments: List<MessageAttachment> = emptyList(),
+    @SerializedName("createdAt") val createdAt: String? = null
+)
+
+data class SendGroupMessageRequest(
+    @SerializedName("content") val content: String = "",
+    @SerializedName("attachments") val attachments: List<MessageAttachment>? = null
+)
+
+data class CreateBroadcastRequest(
+    @SerializedName("recipientIds") val recipientIds: List<Int>,
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("content") val content: String = "",
+    @SerializedName("message") val message: String = "",
+    @SerializedName("attachments") val attachments: List<MessageAttachment>? = null
 )
 
 data class Broadcast(
     @SerializedName("broadcastId") val broadcastId: Int,
     @SerializedName("senderId") val senderId: Int,
     @SerializedName("title") val title: String?,
-    @SerializedName("content") val content: String,
-    @SerializedName("recipientsCount") val recipientsCount: Int,
-    @SerializedName("createdAt") val createdAt: String?
+    @SerializedName("content") val content: String = "",
+    @SerializedName("attachments") val attachments: List<MessageAttachment> = emptyList(),
+    @SerializedName("recipientsCount") val recipientsCount: Int = 0,
+    @SerializedName("createdAt") val createdAt: String? = null
 )
 
 data class MediaUploadResponse(
@@ -280,7 +342,8 @@ data class DisplayMessage(
     val content: String,
     val isSelf: Boolean,
     val timestamp: String?,
-    val isRead: Boolean = false
+    val isRead: Boolean = false,
+    val attachments: List<MessageAttachment> = emptyList()
 )
 
 data class Comment(

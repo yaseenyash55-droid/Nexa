@@ -73,15 +73,14 @@ class CreateBroadcastActivity : AppCompatActivity() {
             binding.btnSendBroadcast.isEnabled = false
             lifecycleScope.launch(Dispatchers.IO) {
                 try {
-                    val body = mutableMapOf<String, Any>(
-                        "recipientIds" to selectedIds,
-                        "message" to message
+                    val req = com.nexa.social.data.models.CreateBroadcastRequest(
+                        recipientIds = selectedIds,
+                        title = if (title.isNotEmpty()) title else null,
+                        content = message,
+                        message = message
                     )
-                    if (title.isNotEmpty()) {
-                        body["title"] = title
-                    }
 
-                    val res = NexaApiClient.messageApi.createBroadcast(body)
+                    val res = NexaApiClient.messageApi.createBroadcast(req)
                     if (res.isSuccessful && res.body()?.data != null) {
                         withContext(Dispatchers.Main) {
                             Toast.makeText(this@CreateBroadcastActivity, "Broadcast dispatched successfully!", Toast.LENGTH_SHORT).show()

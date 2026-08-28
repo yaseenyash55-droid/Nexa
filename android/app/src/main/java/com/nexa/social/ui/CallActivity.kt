@@ -241,11 +241,7 @@ class CallActivity : AppCompatActivity(), CallSignalListener, WebRtcCallManager.
                 addAction(ACTION_PIP_CAMERA)
                 addAction(ACTION_PIP_END)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(pipActionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                registerReceiver(pipActionReceiver, filter)
-            }
+            ContextCompat.registerReceiver(this, pipActionReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
             isReceiverRegistered = true
         }
     }

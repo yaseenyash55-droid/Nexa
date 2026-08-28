@@ -62,19 +62,19 @@ callRouter.get('/ice-config', requireAuth, (req, res) => {
 callRouter.post('/token', requireAuth, async (req, res) => {
   const { roomName } = req.body;
   if (!roomName) {
-    return sendError(res, 400, 'Room name is required');
+    return sendError(res, 'VALIDATION_ERROR', 'Room name is required', 400);
   }
 
   const user = (req as AuthenticatedRequest).user!;
   
   if (!env.LIVEKIT_API_KEY || !env.LIVEKIT_API_SECRET) {
-    return sendError(res, 500, 'LiveKit credentials not configured');
+    return sendError(res, 'INTERNAL_ERROR', 'LiveKit credentials not configured', 500);
   }
 
   try {
     const at = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
       identity: user.userId.toString(),
-      name: user.displayName,
+      name: user.username,
     });
 
     at.addGrant({ roomJoin: true, room: roomName, canPublish: true, canSubscribe: true });
@@ -86,6 +86,6 @@ callRouter.post('/token', requireAuth, async (req, res) => {
       url: env.LIVEKIT_URL
     });
   } catch (error: any) {
-    return sendError(res, 500, 'Failed to generate token: ' + error.message);
+    return sendError(res, 'INTERNAL_ERROR', 'Failed to generate token: ' + error.message, 500);
   }
 });

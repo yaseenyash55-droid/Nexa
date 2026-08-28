@@ -10,7 +10,7 @@ export interface GroupRepository {
   addGroupMember(groupId: number, userId: number, role?: 'ADMIN' | 'MEMBER'): Promise<void>;
   removeGroupMember(groupId: number, userId: number): Promise<boolean>;
   getGroupMessages(groupId: number): Promise<GroupMessage[]>;
-  sendGroupMessage(groupId: number, senderId: number, content: string): Promise<GroupMessage>;
+  sendGroupMessage(groupId: number, senderId: number, content: string, attachments?: any[]): Promise<GroupMessage>;
   sendAiGroupMessage(groupId: number, content: string, aiAgent?: string, triggerMessageId?: number | null): Promise<GroupMessage>;
   findAiGroupResponseByTrigger?(groupId: number, triggerMessageId: number, aiAgent?: string): Promise<GroupMessage | null>;
   updateGroupSettings(groupId: number, settings: { onlyAdminsCanPost?: boolean; name?: string; description?: string }): Promise<void>;
@@ -209,7 +209,7 @@ export class OracleGroupRepository implements GroupRepository {
     );
 
     const rows = res.rows || [];
-    return rows.map((r: any) => {
+    const messages: GroupMessage[] = rows.map((r: any) => {
       const isAi = (r.SENDER_TYPE || '').toLowerCase() === 'ai' || r.SENDER_ID === null;
       return {
         messageId: r.MESSAGE_ID,
@@ -219,6 +219,7 @@ export class OracleGroupRepository implements GroupRepository {
         aiAgent: isAi ? (r.AI_AGENT || 'nexa') : undefined,
         triggerMessageId: r.TRIGGER_MESSAGE_ID ?? null,
         content: r.CONTENT,
+        attachments: undefined,
         createdAt: new Date(r.CREATED_AT).toISOString(),
         sender: {
           userId: isAi ? 0 : Number(r.SENDER_ID),
@@ -228,6 +229,47 @@ export class OracleGroupRepository implements GroupRepository {
         }
       };
     });
+
+    if (messages.length > 0) {
+      const msgIds = messages.map((m) => m.messageId);
+      const msgIdsList = msgIds.join(',');
+      if (msgIdsList) {
+        const attRes = await executeSql(
+          `SELECT MESSAGE_ID, ATTACHMENT_TYPE, MEDIA_ID,
+                  MUSIC_PROVIDER, MUSIC_TRACK_ID, MUSIC_TITLE,
+                  MUSIC_ARTIST, MUSIC_ARTWORK_URL, MUSIC_AUDIO_URL, MUSIC_DURATION
+           FROM MESSAGE_ATTACHMENTS
+           WHERE GROUP_MESSAGE_ID IN (${msgIdsList})`
+        );
+        const attachmentsByMsgId: Record<number, any[]> = {};
+        for (const row of (attRes.rows || [])) {
+          const mId = Number(row.MESSAGE_ID);
+          if (!attachmentsByMsgId[mId]) {
+            attachmentsByMsgId[mId] = [];
+          }
+          attachmentsByMsgId[mId].push({
+            type: row.ATTACHMENT_TYPE,
+            mediaId: row.MEDIA_ID,
+            music: row.MUSIC_TRACK_ID ? {
+              provider: row.MUSIC_PROVIDER,
+              id: row.MUSIC_TRACK_ID,
+              title: row.MUSIC_TITLE,
+              artist: row.MUSIC_ARTIST,
+              artworkUrl: row.MUSIC_ARTWORK_URL,
+              audioUrl: row.MUSIC_AUDIO_URL,
+              duration: row.MUSIC_DURATION
+            } : undefined
+          });
+        }
+        for (const m of messages) {
+          if (attachmentsByMsgId[m.messageId]) {
+            m.attachments = attachmentsByMsgId[m.messageId];
+          }
+        }
+      }
+    }
+
+    return messages;
   }
 
   async findAiGroupResponseByTrigger(groupId: number, triggerMessageId: number, aiAgent = 'nexa'): Promise<GroupMessage | null> {
@@ -324,7 +366,7 @@ export class OracleGroupRepository implements GroupRepository {
     }
   }
 
-  async sendGroupMessage(groupId: number, senderId: number, content: string): Promise<GroupMessage> {
+  async sendGroupMessage(groupId: number, senderId: number, content: string, attachments?: any[]): Promise<GroupMessage> {
     return withTransaction(async (conn: any) => {
       const result = await conn.execute(
         `INSERT INTO GROUP_MESSAGES (GROUP_ID, SENDER_ID, CONTENT, CREATED_AT)
@@ -342,6 +384,39 @@ export class OracleGroupRepository implements GroupRepository {
       const messageId = (result.outBinds as any)?.[0]?.[0];
       const createdAt = (result.outBinds as any)?.[1]?.[0]?.toISOString() || new Date().toISOString();
 
+      const savedAttachments = [];
+      if (attachments && attachments.length > 0) {
+        for (const att of attachments) {
+          const attSql = `
+            INSERT INTO MESSAGE_ATTACHMENTS (
+              GROUP_MESSAGE_ID, ATTACHMENT_TYPE, MEDIA_ID,
+              MUSIC_PROVIDER, MUSIC_TRACK_ID, MUSIC_TITLE,
+              MUSIC_ARTIST, MUSIC_ARTWORK_URL, MUSIC_AUDIO_URL, MUSIC_DURATION
+            ) VALUES (
+              :messageId, :attachmentType, :mediaId,
+              :musicProvider, :musicTrackId, :musicTitle,
+              :musicArtist, :musicArtworkUrl, :musicAudioUrl, :musicDuration
+            )
+            RETURNING ATTACHMENT_ID INTO :attachmentId
+          `;
+          const attBinds = {
+            messageId,
+            attachmentType: att.type,
+            mediaId: att.mediaId || null,
+            musicProvider: att.music?.provider || null,
+            musicTrackId: att.music?.id || null,
+            musicTitle: att.music?.title || null,
+            musicArtist: att.music?.artist || null,
+            musicArtworkUrl: att.music?.artworkUrl || null,
+            musicAudioUrl: att.music?.audioUrl || null,
+            musicDuration: att.music?.duration || null,
+            attachmentId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
+          };
+          await conn.execute(attSql, attBinds);
+          savedAttachments.push(att);
+        }
+      }
+
       const userRows = await conn.execute(`SELECT USERNAME, DISPLAY_NAME, PROFILE_IMAGE_URL FROM USERS WHERE USER_ID = :1`, [senderId]);
 
       const userRow = (userRows.rows as any)?.[0] || {};
@@ -351,6 +426,7 @@ export class OracleGroupRepository implements GroupRepository {
         groupId,
         senderId,
         content: content.trim(),
+        attachments: savedAttachments.length > 0 ? savedAttachments : undefined,
         createdAt,
         sender: {
           userId: senderId,

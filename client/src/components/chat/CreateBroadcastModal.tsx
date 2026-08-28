@@ -4,6 +4,7 @@ import { Avatar } from '../ui/Avatar.js';
 import { X, Radio, Search, Check, Send, Loader2 } from 'lucide-react';
 import { broadcastsApi, Broadcast } from '../../api/broadcasts.api.js';
 import { usersApi } from '../../api/users.api.js';
+import { ChatComposer } from './ChatComposer.js';
 
 interface CreateBroadcastModalProps {
   isOpen: boolean;
@@ -19,7 +20,6 @@ export const CreateBroadcastModal: React.FC<CreateBroadcastModalProps> = ({
   onBroadcastSent
 }) => {
   const [title, setTitle] = useState('');
-  const [message, setMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<Map<number, User>>(new Map());
   const [searchResults, setSearchResults] = useState<User[]>([]);
@@ -31,7 +31,6 @@ export const CreateBroadcastModal: React.FC<CreateBroadcastModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setTitle('');
-      setMessage('');
       setSearchQuery('');
       setSelectedUsers(new Map());
       setSearchResults([]);
@@ -126,13 +125,12 @@ export const CreateBroadcastModal: React.FC<CreateBroadcastModalProps> = ({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleBroadcastSend = async (payload: { text?: string; attachments?: any[] }) => {
     if (selectedUsers.size === 0) {
       setError('Please select at least one recipient');
       return;
     }
-    if (!message.trim()) {
+    if (!payload.text?.trim() && (!payload.attachments || payload.attachments.length === 0)) {
       setError('Broadcast message cannot be empty');
       return;
     }
@@ -143,7 +141,8 @@ export const CreateBroadcastModal: React.FC<CreateBroadcastModalProps> = ({
       const result = await broadcastsApi.createBroadcast({
         title: title.trim() || undefined,
         recipientIds: Array.from(selectedUsers.keys()),
-        message: message.trim()
+        message: payload.text?.trim(),
+        attachments: payload.attachments
       });
 
       onBroadcastSent(result);
@@ -175,7 +174,7 @@ export const CreateBroadcastModal: React.FC<CreateBroadcastModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-4 space-y-4 flex-1 overflow-y-auto">
+        <div className="p-4 space-y-4 flex-1 overflow-y-auto">
           {error && (
             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400">
               {error}
@@ -294,35 +293,23 @@ export const CreateBroadcastModal: React.FC<CreateBroadcastModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Message Content *</label>
-            <textarea
-              rows={3}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type your message... (Recipients will receive this as an individual 1-on-1 direct message)"
-              className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none resize-none"
-              required
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-slate-300">Message Content *</label>
+              {selectedUsers.size > 0 && (
+                <span className="text-[10px] text-cyan-400 font-bold">
+                  Will be dispatched to {selectedUsers.size} users
+                </span>
+              )}
+            </div>
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden">
+              <ChatComposer
+                target={{ type: 'broadcast', broadcastId: -1 }}
+                disabled={isSubmitting || selectedUsers.size === 0}
+                onSend={handleBroadcastSend}
+              />
+            </div>
           </div>
-
-          <div className="pt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || selectedUsers.size === 0 || !message.trim()}
-              className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-glow-cyan transition-colors flex items-center gap-1.5"
-            >
-              <Send className="w-3.5 h-3.5" />
-              {isSubmitting ? 'Dispatching...' : `Send to ${selectedUsers.size} users`}
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );

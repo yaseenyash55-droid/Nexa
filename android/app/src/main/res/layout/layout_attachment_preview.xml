@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/cardAttachmentPreview"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="8dp"
+    android:layout_marginBottom="6dp"
+    android:visibility="gone"
+    app:cardBackgroundColor="#1E293B"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp"
+    app:strokeColor="#334155"
+    app:strokeWidth="1dp"
+    tools:visibility="visible">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- Thumbnail Container -->
+            <FrameLayout
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_input_field">
+
+                <ImageView
+                    android:id="@+id/ivAttachmentThumb"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone"
+                    tools:src="@drawable/ic_gallery"
+                    tools:visibility="visible" />
+
+                <ImageView
+                    android:id="@+id/ivAttachmentIcon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_folder"
+                    app:tint="#818CF8" />
+            </FrameLayout>
+
+            <!-- Metadata Info -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvAttachmentTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    tools:text="Document_Name.pdf" />
+
+                <TextView
+                    android:id="@+id/tvAttachmentSubtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="#94A3B8"
+                    android:textSize="11sp"
+                    tools:text="1.2 MB • Ready to send" />
+            </LinearLayout>
+
+            <!-- Retry button -->
+            <ImageButton
+                android:id="@+id/btnRetryUpload"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Retry upload"
+                android:padding="6dp"
+                android:src="@drawable/ic_call_audio"
+                android:visibility="gone"
+                app:tint="#EF4444" />
+
+            <!-- Remove button -->
+            <ImageButton
+                android:id="@+id/btnRemoveAttachment"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Remove attachment"
+                android:padding="6dp"
+                android:src="@drawable/ic_close"
+                app:tint="#94A3B8" />
+        </LinearLayout>
+
+        <!-- Upload Progress Indicator -->
+        <ProgressBar
+            android:id="@+id/progressAttachmentUpload"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:layout_marginTop="6dp"
+            android:indeterminate="true"
+            android:progressTint="#6366F1"
+            android:visibility="gone"
+            tools:visibility="visible" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

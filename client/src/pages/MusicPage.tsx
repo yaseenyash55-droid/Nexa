@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { AppShell } from '../components/layout/AppShell.js';
 import { useMusic } from '../contexts/MusicContext.js';
-import { JamendoTrack, JamendoApiResponse } from '../types/music.types.js';
+import { NexaMusicTrack, JamendoApiResponse } from '../types/music.types.js';
+import { searchJamendoTracks } from '../api/music.api.js';
 import { Search, Play, Pause, Music, Sparkles, ExternalLink, Disc, Loader2, Volume2, AlertCircle } from 'lucide-react';
 
 const GENRES = ['All', 'Pop', 'Electronic', 'Rock', 'Hip-Hop', 'Chillout', 'Acoustic', 'Jazz', 'Cinematic', 'Ambient'];
-const DEFAULT_JAMENDO_CLIENT_ID = 'c031c261';
 
 export const MusicPage: React.FC = () => {
   const { currentTrack, isPlaying, playTrack, togglePlay } = useMusic();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState('All');
-  const [tracks, setTracks] = useState<JamendoTrack[]>([]);
+  const [tracks, setTracks] = useState<NexaMusicTrack[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,35 +23,14 @@ export const MusicPage: React.FC = () => {
       setError(null);
 
       try {
-        const clientId = (import.meta as any).env?.VITE_JAMENDO_CLIENT_ID || DEFAULT_JAMENDO_CLIENT_ID;
-        let url = `https://api.jamendo.com/v3.0/tracks/?client_id=${clientId}&format=jsonpretty&limit=25&include=musicinfo&audioformat=mp32`;
-
-        if (searchQuery.trim()) {
-          url += `&search=${encodeURIComponent(searchQuery.trim())}`;
-        } else if (selectedGenre !== 'All') {
-          url += `&tags=${encodeURIComponent(selectedGenre.toLowerCase())}&boost=popularity_month`;
-        } else {
-          url += `&boost=popularity_month`;
-        }
-
-        const res = await fetch(url);
-        if (!res.ok) {
-          throw new Error(`Jamendo API returned status ${res.status}`);
-        }
-
-        const data: JamendoApiResponse = await res.json();
-
+        const result = await searchJamendoTracks(searchQuery.trim(), selectedGenre === 'All' ? undefined : selectedGenre.toLowerCase());
         if (!isCancelled) {
-          if (data.results && data.results.length > 0) {
-            setTracks(data.results);
-          } else {
-            setTracks([]);
-          }
+          setTracks(result as any);
         }
       } catch (err: any) {
         if (!isCancelled) {
-          console.warn('Jamendo tracks fetch error:', err);
-          setError('Could not connect to Jamendo catalog. Check your internet connection or API client ID.');
+          console.warn('Backend music fetch error:', err);
+          setError('Could not connect to the music service. Please try again later.');
         }
       } finally {
         if (!isCancelled) {
@@ -165,17 +144,19 @@ export const MusicPage: React.FC = () => {
             </div>
           ) : (
             <div className="bg-slate-900/40 border border-slate-800/70 rounded-3xl overflow-hidden divide-y divide-slate-800/40 shadow-xl">
-              {tracks.map((track, idx) => {
+              {tracks.map((track: any, idx) => {
                 const isThisPlaying = currentTrack?.id === track.id && isPlaying;
                 const isThisCurrent = currentTrack?.id === track.id;
-                const cover = track.image || track.album_image || '';
+                const cover = track.artworkUrl || track.image || track.album_image || '';
+                const artist = track.artist || track.artist_name || '';
+                const title = track.title || track.name || '';
 
                 return (
                   <div
                     key={track.id}
                     onClick={() => {
                       if (isThisCurrent) togglePlay();
-                      else playTrack(track, tracks);
+                      else playTrack(track as unknown as NexaMusicTrack, tracks as unknown as NexaMusicTrack[]);
                     }}
                     className={`flex items-center justify-between p-3.5 hover:bg-slate-800/50 transition-all cursor-pointer group ${
                       isThisCurrent ? 'bg-brand-600/10 border-l-4 border-brand-500' : ''
@@ -208,7 +189,7 @@ export const MusicPage: React.FC = () => {
                       {/* Cover Art */}
                       <div className="w-11 h-11 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shrink-0">
                         {cover ? (
-                          <img src={cover} alt={track.name} className="w-full h-full object-cover" />
+                          <img src={cover} alt={title} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-brand-400 bg-brand-500/10">
                             <Music className="w-5 h-5" />
@@ -219,10 +200,10 @@ export const MusicPage: React.FC = () => {
                       {/* Track Details */}
                       <div className="min-w-0 flex-1">
                         <p className={`text-xs font-bold truncate ${isThisCurrent ? 'text-brand-300' : 'text-white'}`}>
-                          {track.name}
+                          {title}
                         </p>
                         <p className="text-[11px] text-slate-400 truncate">
-                          {track.artist_name} {track.album_name ? `• ${track.album_name}` : ''}
+                          {artist} {track.album ? `• ${track.album}` : ''}
                         </p>
                       </div>
                     </div>
@@ -233,9 +214,9 @@ export const MusicPage: React.FC = () => {
                         {formatDuration(track.duration)}
                       </span>
 
-                      {track.shareurl && (
+                      {track.shareUrl && (
                         <a
-                          href={track.shareurl}
+                          href={track.shareUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
