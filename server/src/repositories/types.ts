@@ -104,7 +104,7 @@ export interface IReelRepository {
 export interface IMessageRepository {
   sendMessage(msg: { senderId: number; receiverId: number; content: string }): Promise<Message>;
   sendAiMessage(msg: { receiverId: number; content: string; aiAgent?: string; triggerMessageId?: number | null }): Promise<Message>;
-  findAiResponseByTrigger?(triggerKey: string, aiAgent?: string): Promise<Message | null>;
+  findAiResponseByTrigger?(triggerKey: string | number, aiAgent?: string): Promise<Message | null>;
   getMessagesBetweenUsers(userA: number, userB: number): Promise<Message[]>;
   markMessageAsRead(messageId: number, receiverUserId: number): Promise<{ rowsAffected: number; readAt: Date | null; senderId: number | null }>;
   getConversations(userId: number): Promise<ConversationSummary[]>;

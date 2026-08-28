@@ -3,6 +3,7 @@ import { AuthenticatedRequest } from '../types/index.js';
 import { aiService } from '../ai/ai.service.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { logger } from '../utils/logger.js';
+import { AIProviderError, AIErrorCode } from '../ai/providers/errors.js';
 
 export async function getAiStatus(req: AuthenticatedRequest, res: Response) {
   try {
@@ -23,6 +24,22 @@ export async function handleAiChat(req: AuthenticatedRequest, res: Response) {
 
     return sendSuccess(res, result, 'AI response generated successfully');
   } catch (err: any) {
+    if (err instanceof AIProviderError) {
+      switch (err.code) {
+        case AIErrorCode.AI_AUTH_ERROR:
+          return sendError(res, 'AI_AUTH_ERROR', err.message, 502);
+        case AIErrorCode.AI_RATE_LIMITED:
+          return sendError(res, 'TOO_MANY_REQUESTS', err.message, 429);
+        case AIErrorCode.AI_TIMEOUT:
+          return sendError(res, 'GATEWAY_TIMEOUT', err.message, 504);
+        case AIErrorCode.AI_PROVIDER_UNAVAILABLE:
+          return sendError(res, 'SERVICE_UNAVAILABLE', err.message, 503);
+        case AIErrorCode.AI_UNSUPPORTED_CAPABILITY:
+          return sendError(res, 'BAD_REQUEST', err.message, 400);
+        case AIErrorCode.AI_INVALID_RESPONSE:
+          return sendError(res, 'BAD_GATEWAY', err.message, 502);
+      }
+    }
     if (err.message === 'CONVERSATION_FORBIDDEN_OR_NOT_FOUND') {
       return sendError(res, 'FORBIDDEN', 'Conversation not found or you do not have permission to access it', 403);
     }
@@ -68,7 +85,7 @@ export async function handleAiStreamChat(req: AuthenticatedRequest, res: Respons
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
 
-    req.on('close', () => {
+    res.on('close', () => {
       isClosed = true;
       if (timeoutTimer) clearTimeout(timeoutTimer);
     });
@@ -80,6 +97,7 @@ export async function handleAiStreamChat(req: AuthenticatedRequest, res: Respons
         res.end();
       }
     }, 45000);
+    if (typeof timeoutTimer.unref === 'function') timeoutTimer.unref();
 
     const conv = await aiService.getOrCreateConversation(userId, conversationId, message);
     const activeConvId = conv.conversationId;

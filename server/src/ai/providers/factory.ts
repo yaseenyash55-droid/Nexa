@@ -187,8 +187,11 @@ export async function streamWithFallback(
   }
 }
 
-export function resetAIProviderForTesting(provider: AIProvider | null = null): void {
+export function resetAIProviderForTesting(
+  provider: AIProvider | null = null,
+  fallback: AIProvider | null = null
+): void {
   primaryProvider = provider;
-  fallbackProvider = null;
+  fallbackProvider = fallback;
   embeddingProvider = null;
 }

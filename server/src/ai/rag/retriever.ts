@@ -21,7 +21,13 @@ export class RAGRetriever {
 
     let queryEmbedding: number[] = [];
     try {
-      queryEmbedding = await aiEmbeddingService.getEmbedding(cleanQuery);
+      const embedPromise = aiEmbeddingService.getEmbedding(cleanQuery);
+      const timeoutMs = process.env.NODE_ENV === 'test' ? 100 : 2000;
+      const timeoutPromise = new Promise<number[]>((_, reject) => {
+        const timer = setTimeout(() => reject(new Error('EMBEDDING_TIMEOUT')), timeoutMs);
+        if (typeof timer.unref === 'function') timer.unref();
+      });
+      queryEmbedding = await Promise.race([embedPromise, timeoutPromise]);
     } catch (err: any) {
       logger.warn({ err: err?.message || err }, 'Failed to compute query embedding for RAG retrieval; falling back to lexical search');
     }
@@ -29,7 +35,13 @@ export class RAGRetriever {
     let allChunks: any[] = [];
     try {
       const ragRepo = getRagDocumentRepository();
-      allChunks = await ragRepo.getAllChunksWithEmbeddings();
+      const chunksPromise = ragRepo.getAllChunksWithEmbeddings();
+      const timeoutMs = process.env.NODE_ENV === 'test' ? 100 : 2000;
+      const timeoutPromise = new Promise<any[]>((_, reject) => {
+        const timer = setTimeout(() => reject(new Error('RAG_DB_TIMEOUT')), timeoutMs);
+        if (typeof timer.unref === 'function') timer.unref();
+      });
+      allChunks = await Promise.race([chunksPromise, timeoutPromise]);
     } catch (err: any) {
       logger.warn({ err: err?.message || err }, 'Failed to load RAG knowledge chunks from repository');
       return [];

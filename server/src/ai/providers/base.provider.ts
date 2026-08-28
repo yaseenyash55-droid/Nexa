@@ -11,7 +11,14 @@ import {
 
 export abstract class BaseAIProvider implements AIProvider {
   abstract readonly name: string;
-  abstract readonly capabilities: ProviderCapabilities;
+  public readonly capabilities: ProviderCapabilities = {
+    text: true,
+    streaming: true,
+    vision: true,
+    tools: true,
+    structuredOutput: true,
+    embeddings: true
+  };
 
   abstract isAvailable(): boolean;
 

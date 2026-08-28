@@ -1,4 +1,4 @@
-import { getAIProvider } from '../providers/factory.js';
+import { getEmbeddingProvider } from '../providers/factory.js';
 import { EmbedResult } from '../../types/ai.types.js';
 import { logger } from '../../utils/logger.js';
 
@@ -7,7 +7,7 @@ export class AIEmbeddingService {
    * Generates a vector embedding for the supplied text using the configured provider.
    */
   public async getEmbedding(text: string): Promise<number[]> {
-    const provider = getAIProvider();
+    const provider = getEmbeddingProvider();
     if (!provider.isAvailable()) {
       throw new Error('AI_PROVIDER_UNAVAILABLE');
     }

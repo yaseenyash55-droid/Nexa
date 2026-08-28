@@ -174,7 +174,7 @@ export class AIService {
       logger.warn({ err: err?.message || err, userId }, 'Failed to load user AI memories/preferences; continuing without personalization');
     }
 
-    const tools = provider.capabilities.tools ? toolRegistry.getOpenAiToolDefinitions() : [];
+    const tools = (provider.capabilities?.tools ?? true) ? toolRegistry.getOpenAiToolDefinitions() : [];
 
     const providerModel = provider.name === 'groq' ? env.GROQ_MODEL : (env.OPENAI_MODEL || env.AI_MODEL);
 
@@ -351,7 +351,6 @@ export class AIService {
       }
     ];
 
-    const provider = getAIProvider();
     const providerModel = provider.name === 'groq' ? env.GROQ_MODEL : (env.OPENAI_MODEL || env.AI_MODEL);
 
     const generateOptions: GenerateOptions = {
@@ -361,7 +360,7 @@ export class AIService {
       temperature: 0.7
     };
 
-    const response = await provider.generate(messages, generateOptions);
+    const response = await generateWithFallback(messages, generateOptions);
 
     // Clean any accidental markdown codeblock quotes around simple generated text
     let cleanedResult = response.text.trim();

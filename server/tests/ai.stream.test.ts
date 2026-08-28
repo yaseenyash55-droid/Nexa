@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { generateAccessToken } from '../src/utils/jwt.js';
@@ -7,6 +7,16 @@ import { resetAIProviderForTesting } from '../src/ai/providers/factory.js';
 import { ChatMessage, GenerateOptions, GenerateResult, StreamCallbacks, EmbedOptions, EmbedResult } from '../src/types/ai.types.js';
 import { oracleRepositoryManager } from '../src/repositories/oracle/oracle.repo.js';
 import { postgresRepositoryManager } from '../src/repositories/postgres/postgres.repo.js';
+
+vi.mock('../src/db/pool.js', () => ({
+  isOraclePoolInitialized: () => false,
+  executeSql: vi.fn().mockResolvedValue({ rows: [], rowsAffected: 0 })
+}));
+
+vi.mock('../src/db/postgres.pool.js', () => ({
+  isPostgresPoolInitialized: () => false,
+  executePostgresSql: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 })
+}));
 
 class MockStreamAIProvider extends BaseAIProvider {
   public readonly name = 'openai';
@@ -80,8 +90,11 @@ describe('POST /api/ai/chat/stream SSE Suite', () => {
     mockProvider = new MockStreamAIProvider();
     resetAIProviderForTesting(mockProvider);
     const mockRepo = new MockAiRepo() as any;
+    const mockRagRepo = { getAllChunksWithEmbeddings: async () => [] } as any;
     oracleRepositoryManager.aiRepo = mockRepo;
     postgresRepositoryManager.aiRepo = mockRepo;
+    oracleRepositoryManager.ragRepo = mockRagRepo;
+    postgresRepositoryManager.ragRepo = mockRagRepo;
     validToken = generateAccessToken({
       userId: 701,
       username: 'streamtester',
@@ -90,7 +103,7 @@ describe('POST /api/ai/chat/stream SSE Suite', () => {
   });
 
   afterEach(() => {
-    resetAIProviderForTesting();
+    resetAIProviderForTesting(mockProvider);
   });
 
   it('rejects unauthenticated stream request with 401', async () => {
@@ -124,10 +137,20 @@ describe('POST /api/ai/chat/stream SSE Suite', () => {
     expect(res.body.title).toBe('SERVICE_UNAVAILABLE');
   });
 
+const parseSse = (res: any, callback: any) => {
+  let data = '';
+  res.on('data', (chunk: any) => { data += chunk.toString(); });
+  res.on('end', () => {
+    res.text = data;
+    callback(null, data);
+  });
+};
+
   it('streams chunks and complete events with text/event-stream headers', async () => {
     const res = await request(app)
       .post('/api/ai/chat/stream')
       .set('Authorization', `Bearer ${validToken}`)
+      .parse(parseSse)
       .send({ message: 'Can you stream this?' });
 
     expect(res.status).toBe(200);
@@ -145,6 +168,7 @@ describe('POST /api/ai/chat/stream SSE Suite', () => {
     const res = await request(app)
       .post('/api/ai/chat/stream')
       .set('Authorization', `Bearer ${validToken}`)
+      .parse(parseSse)
       .send({ message: 'Trigger error' });
 
     expect(res.status).toBe(200);
