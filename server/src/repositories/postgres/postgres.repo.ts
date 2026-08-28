@@ -10,6 +10,9 @@ import { PostgresAuthRepository } from './auth.postgres.repo.js';
 import { PostgresSecurityRepository } from './security.postgres.repo.js';
 import { PostgresFcmTokenRepository } from './fcm.postgres.repo.js';
 import { postgresPrivacyRepo } from './privacy.postgres.repo.js';
+import { OracleAiRepository } from '../oracle/ai.oracle.repo.js';
+import { OracleRagDocumentRepository } from '../oracle/rag.oracle.repo.js';
+import { OracleAiMemoryRepository } from '../oracle/memory.oracle.repo.js';
 
 export const postgresRepositoryManager: IRepositoryManager = {
   userRepo: new PostgresUserRepository(),
@@ -23,6 +26,9 @@ export const postgresRepositoryManager: IRepositoryManager = {
   securityRepo: new PostgresSecurityRepository(),
   fcmTokenRepo: new PostgresFcmTokenRepository(),
   privacyRepo: postgresPrivacyRepo,
+  aiRepo: new OracleAiRepository(),
+  ragRepo: new OracleRagDocumentRepository(),
+  memoryRepo: new OracleAiMemoryRepository(),
   get users() { return this.userRepo; },
   get posts() { return this.postRepo; },
   get comments() { return this.commentRepo; },
@@ -33,5 +39,8 @@ export const postgresRepositoryManager: IRepositoryManager = {
   get auth() { return this.authRepo; },
   get security() { return this.securityRepo; },
   get fcmTokens() { return this.fcmTokenRepo; },
-  get privacy() { return this.privacyRepo; }
+  get privacy() { return this.privacyRepo; },
+  get ai() { return this.aiRepo; },
+  get rag() { return this.ragRepo; },
+  get memories() { return this.memoryRepo; }
 };

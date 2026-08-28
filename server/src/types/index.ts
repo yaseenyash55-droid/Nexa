@@ -109,7 +109,7 @@ export interface Reel {
 
 export interface Message {
   messageId: number;
-  senderId: number;
+  senderId?: number | null;
   receiverId: number;
   sender: {
     userId: number;
@@ -120,6 +120,9 @@ export interface Message {
   content: string;
   isRead: boolean;
   isUnsent?: boolean;
+  senderType?: 'user' | 'ai';
+  aiAgent?: string;
+  triggerMessageId?: number | null;
   createdAt: string;
 }
 
@@ -161,7 +164,7 @@ export interface GroupMember {
 export interface GroupMessage {
   messageId: number;
   groupId: number;
-  senderId: number;
+  senderId?: number | null;
   sender: {
     userId: number;
     username: string;
@@ -169,6 +172,9 @@ export interface GroupMessage {
     profileImageUrl?: string | null;
   };
   content: string;
+  senderType?: 'user' | 'ai';
+  aiAgent?: string;
+  triggerMessageId?: number | null;
   createdAt: string;
 }
 

@@ -5,29 +5,38 @@ import { ConversationSummary, Message } from '../../types/index.js';
 
 interface RawMessageRow {
   MESSAGE_ID: number;
-  SENDER_ID: number;
+  SENDER_ID: number | null;
   RECEIVER_ID: number;
-  USERNAME: string;
-  DISPLAY_NAME: string;
+  USERNAME?: string | null;
+  DISPLAY_NAME?: string | null;
   PROFILE_IMAGE_URL?: string | null;
   CONTENT: string;
   READ_AT?: Date | null;
   IS_UNSENT: number;
   CREATED_AT: Date;
+  SENDER_TYPE?: string | null;
+  AI_AGENT?: string | null;
+  TRIGGER_MESSAGE_ID?: number | null;
+  TRIGGER_KEY?: string | null;
 }
 
 export class OracleMessageRepository implements IMessageRepository {
   private mapRowToMessage(row: RawMessageRow): Message {
     const isUnsent = row.IS_UNSENT === 1;
+    const isAi = (row.SENDER_TYPE || '').toLowerCase() === 'ai' || row.SENDER_ID === null;
+
     return {
       messageId: row.MESSAGE_ID,
-      senderId: row.SENDER_ID,
+      senderId: isAi ? null : row.SENDER_ID,
       receiverId: row.RECEIVER_ID,
+      senderType: isAi ? 'ai' : 'user',
+      aiAgent: isAi ? (row.AI_AGENT || 'nexa') : undefined,
+      triggerMessageId: row.TRIGGER_MESSAGE_ID ?? null,
       sender: {
-        userId: row.SENDER_ID,
-        username: row.USERNAME || 'user',
-        displayName: row.DISPLAY_NAME || 'User',
-        profileImageUrl: row.PROFILE_IMAGE_URL
+        userId: isAi ? 0 : Number(row.SENDER_ID),
+        username: isAi ? 'nexa' : (row.USERNAME || 'user'),
+        displayName: isAi ? 'NEXA AI' : (row.DISPLAY_NAME || 'User'),
+        profileImageUrl: isAi ? '/nexa-ai-avatar.png' : (row.PROFILE_IMAGE_URL || undefined)
       },
       content: isUnsent ? 'Message unsent' : row.CONTENT,
       isRead: Boolean(row.READ_AT),
@@ -39,15 +48,101 @@ export class OracleMessageRepository implements IMessageRepository {
   async getMessagesBetweenUsers(userA: number, userB: number): Promise<Message[]> {
     const sql = `
       SELECT m.MESSAGE_ID, m.SENDER_ID, m.RECEIVER_ID, u.USERNAME, u.DISPLAY_NAME, u.PROFILE_IMAGE_URL,
-             m.CONTENT, m.READ_AT, m.IS_UNSENT, m.CREATED_AT
+             m.CONTENT, m.READ_AT, m.IS_UNSENT, m.CREATED_AT, m.SENDER_TYPE, m.AI_AGENT, m.TRIGGER_MESSAGE_ID, m.TRIGGER_KEY
       FROM MESSAGES m
-      JOIN USERS u ON m.SENDER_ID = u.USER_ID
+      LEFT JOIN USERS u ON m.SENDER_ID = u.USER_ID
       WHERE (m.SENDER_ID = :userA AND m.RECEIVER_ID = :userB)
          OR (m.SENDER_ID = :userB AND m.RECEIVER_ID = :userA)
+         OR (m.SENDER_ID IS NULL AND (m.RECEIVER_ID = :userA OR m.RECEIVER_ID = :userB))
       ORDER BY m.MESSAGE_ID ASC
     `;
     const res = await executeSql<RawMessageRow>(sql, { userA, userB });
     return (res.rows || []).map((row: RawMessageRow) => this.mapRowToMessage(row));
+  }
+
+  async findAiResponseByTrigger(triggerKey: string, aiAgent = 'nexa'): Promise<Message | null> {
+    const sql = `
+      SELECT m.MESSAGE_ID, m.SENDER_ID, m.RECEIVER_ID, u.USERNAME, u.DISPLAY_NAME, u.PROFILE_IMAGE_URL,
+             m.CONTENT, m.READ_AT, m.IS_UNSENT, m.CREATED_AT, m.SENDER_TYPE, m.AI_AGENT, m.TRIGGER_MESSAGE_ID, m.TRIGGER_KEY
+      FROM MESSAGES m
+      LEFT JOIN USERS u ON m.SENDER_ID = u.USER_ID
+      WHERE m.TRIGGER_KEY = :triggerKey
+        AND m.SENDER_TYPE = 'ai'
+        AND m.AI_AGENT = :aiAgent
+      FETCH FIRST 1 ROWS ONLY
+    `;
+    const res = await executeSql<RawMessageRow>(sql, { triggerKey, aiAgent });
+    const row = res.rows?.[0];
+    return row ? this.mapRowToMessage(row) : null;
+  }
+
+  async sendAiMessage(msg: { receiverId: number; content: string; aiAgent?: string; triggerMessageId?: number | null }): Promise<Message> {
+    const agentName = msg.aiAgent || 'nexa';
+    const triggerKey = msg.triggerMessageId ? `dm:${agentName}:${msg.triggerMessageId}` : null;
+
+    // 1. Durable idempotency pre-check
+    if (triggerKey) {
+      const existing = await this.findAiResponseByTrigger(triggerKey, agentName);
+      if (existing) {
+        return existing;
+      }
+    }
+
+    try {
+      return await withTransaction(async (conn) => {
+        const sql = `
+          INSERT INTO MESSAGES (SENDER_ID, RECEIVER_ID, CONTENT, SENDER_TYPE, AI_AGENT, TRIGGER_MESSAGE_ID, TRIGGER_KEY, CREATED_AT)
+          VALUES (NULL, :receiverId, :content, 'ai', :aiAgent, :triggerMessageId, :triggerKey, SYSTIMESTAMP)
+          RETURNING MESSAGE_ID, CREATED_AT INTO :messageId, :createdAt
+        `;
+        const binds = {
+          receiverId: Number(msg.receiverId),
+          content: msg.content.trim(),
+          aiAgent: agentName,
+          triggerMessageId: msg.triggerMessageId ?? null,
+          triggerKey,
+          messageId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT },
+          createdAt: { type: oracledb.DATE, dir: oracledb.BIND_OUT }
+        };
+
+        const res = await conn.execute(sql, binds);
+        const outBinds = res.outBinds as any;
+
+        const createdVal = outBinds?.createdAt?.[0];
+        const createdAtStr = createdVal instanceof Date
+          ? createdVal.toISOString()
+          : (typeof createdVal === 'string' ? createdVal : new Date().toISOString());
+
+        const messageId = outBinds?.messageId?.[0];
+
+        return {
+          messageId,
+          senderId: null,
+          receiverId: Number(msg.receiverId),
+          senderType: 'ai',
+          aiAgent: agentName,
+          triggerMessageId: msg.triggerMessageId ?? null,
+          sender: {
+            userId: 0,
+            username: 'nexa',
+            displayName: 'NEXA AI',
+            profileImageUrl: '/nexa-ai-avatar.png'
+          },
+          content: msg.content.trim(),
+          isRead: false,
+          createdAt: createdAtStr
+        };
+      });
+    } catch (err: any) {
+      // ORA-00001: unique constraint violated
+      if (err?.errorNum === 1 || err?.message?.includes('ORA-00001') || err?.code === 'ORA-00001') {
+        if (triggerKey) {
+          const existing = await this.findAiResponseByTrigger(triggerKey, agentName);
+          if (existing) return existing;
+        }
+      }
+      throw err;
+    }
   }
 
   async sendMessage(msg: { senderId: number; receiverId: number; content: string }): Promise<Message> {

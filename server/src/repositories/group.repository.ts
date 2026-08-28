@@ -11,6 +11,8 @@ export interface GroupRepository {
   removeGroupMember(groupId: number, userId: number): Promise<boolean>;
   getGroupMessages(groupId: number): Promise<GroupMessage[]>;
   sendGroupMessage(groupId: number, senderId: number, content: string): Promise<GroupMessage>;
+  sendAiGroupMessage(groupId: number, content: string, aiAgent?: string, triggerMessageId?: number | null): Promise<GroupMessage>;
+  findAiGroupResponseByTrigger?(groupId: number, triggerMessageId: number, aiAgent?: string): Promise<GroupMessage | null>;
   updateGroupSettings(groupId: number, settings: { onlyAdminsCanPost?: boolean; name?: string; description?: string }): Promise<void>;
   deleteGroup(groupId: number): Promise<boolean>;
 }
@@ -197,29 +199,129 @@ export class OracleGroupRepository implements GroupRepository {
 
   async getGroupMessages(groupId: number): Promise<GroupMessage[]> {
     const res = await executeSql(
-      `SELECT gm.MESSAGE_ID, gm.GROUP_ID, gm.SENDER_ID, gm.CONTENT, gm.CREATED_AT,
+      `SELECT gm.MESSAGE_ID, gm.GROUP_ID, gm.SENDER_ID, gm.CONTENT, gm.CREATED_AT, gm.SENDER_TYPE, gm.AI_AGENT, gm.TRIGGER_MESSAGE_ID,
               u.USERNAME, u.DISPLAY_NAME, u.PROFILE_IMAGE_URL
        FROM GROUP_MESSAGES gm
-       INNER JOIN USERS u ON gm.SENDER_ID = u.USER_ID
+       LEFT JOIN USERS u ON gm.SENDER_ID = u.USER_ID
        WHERE gm.GROUP_ID = :1
        ORDER BY gm.CREATED_AT ASC`,
       [groupId]
     );
 
     const rows = res.rows || [];
-    return rows.map((r: any) => ({
-      messageId: r.MESSAGE_ID,
-      groupId: r.GROUP_ID,
-      senderId: r.SENDER_ID,
-      content: r.CONTENT,
-      createdAt: new Date(r.CREATED_AT).toISOString(),
+    return rows.map((r: any) => {
+      const isAi = (r.SENDER_TYPE || '').toLowerCase() === 'ai' || r.SENDER_ID === null;
+      return {
+        messageId: r.MESSAGE_ID,
+        groupId: r.GROUP_ID,
+        senderId: isAi ? null : r.SENDER_ID,
+        senderType: isAi ? 'ai' : 'user',
+        aiAgent: isAi ? (r.AI_AGENT || 'nexa') : undefined,
+        triggerMessageId: r.TRIGGER_MESSAGE_ID ?? null,
+        content: r.CONTENT,
+        createdAt: new Date(r.CREATED_AT).toISOString(),
+        sender: {
+          userId: isAi ? 0 : Number(r.SENDER_ID),
+          username: isAi ? 'nexa' : (r.USERNAME || 'user'),
+          displayName: isAi ? 'NEXA AI' : (r.DISPLAY_NAME || 'User'),
+          profileImageUrl: isAi ? '/nexa-ai-avatar.png' : (r.PROFILE_IMAGE_URL || null)
+        }
+      };
+    });
+  }
+
+  async findAiGroupResponseByTrigger(groupId: number, triggerMessageId: number, aiAgent = 'nexa'): Promise<GroupMessage | null> {
+    const res = await executeSql(
+      `SELECT gm.MESSAGE_ID, gm.GROUP_ID, gm.SENDER_ID, gm.CONTENT, gm.CREATED_AT, gm.SENDER_TYPE, gm.AI_AGENT, gm.TRIGGER_MESSAGE_ID,
+              u.USERNAME, u.DISPLAY_NAME, u.PROFILE_IMAGE_URL
+       FROM GROUP_MESSAGES gm
+       LEFT JOIN USERS u ON gm.SENDER_ID = u.USER_ID
+       WHERE gm.GROUP_ID = :1
+         AND gm.TRIGGER_MESSAGE_ID = :2
+         AND gm.SENDER_TYPE = 'ai'
+         AND gm.AI_AGENT = :3
+       FETCH FIRST 1 ROWS ONLY`,
+      [groupId, triggerMessageId, aiAgent]
+    );
+
+    const row = (res.rows || [])[0] as any;
+    if (!row) return null;
+
+    return {
+      messageId: row.MESSAGE_ID,
+      groupId: row.GROUP_ID,
+      senderId: null,
+      senderType: 'ai',
+      aiAgent,
+      triggerMessageId: row.TRIGGER_MESSAGE_ID ?? null,
+      content: row.CONTENT,
+      createdAt: new Date(row.CREATED_AT).toISOString(),
       sender: {
-        userId: r.SENDER_ID,
-        username: r.USERNAME,
-        displayName: r.DISPLAY_NAME,
-        profileImageUrl: r.PROFILE_IMAGE_URL
+        userId: 0,
+        username: 'nexa',
+        displayName: 'NEXA AI',
+        profileImageUrl: '/nexa-ai-avatar.png'
       }
-    }));
+    };
+  }
+
+  async sendAiGroupMessage(groupId: number, content: string, aiAgent = 'nexa', triggerMessageId?: number | null): Promise<GroupMessage> {
+    const agentName = aiAgent || 'nexa';
+
+    // 1. Durable idempotency pre-check
+    if (triggerMessageId) {
+      const existing = await this.findAiGroupResponseByTrigger(groupId, triggerMessageId, agentName);
+      if (existing) {
+        return existing;
+      }
+    }
+
+    try {
+      return await withTransaction(async (conn: any) => {
+        const result = await conn.execute(
+          `INSERT INTO GROUP_MESSAGES (GROUP_ID, SENDER_ID, CONTENT, SENDER_TYPE, AI_AGENT, TRIGGER_MESSAGE_ID, CREATED_AT)
+           VALUES (:1, NULL, :2, 'ai', :3, :4, SYSTIMESTAMP)
+           RETURNING MESSAGE_ID, CREATED_AT INTO :5, :6`,
+          [
+            groupId,
+            content.trim(),
+            agentName,
+            triggerMessageId ?? null,
+            { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
+            { dir: oracledb.BIND_OUT, type: oracledb.DATE }
+          ]
+        );
+
+        const messageId = (result.outBinds as any)?.[0]?.[0];
+        const createdAt = (result.outBinds as any)?.[1]?.[0]?.toISOString() || new Date().toISOString();
+
+        return {
+          messageId,
+          groupId,
+          senderId: null,
+          senderType: 'ai',
+          aiAgent: agentName,
+          triggerMessageId: triggerMessageId ?? null,
+          content: content.trim(),
+          createdAt,
+          sender: {
+            userId: 0,
+            username: 'nexa',
+            displayName: 'NEXA AI',
+            profileImageUrl: '/nexa-ai-avatar.png'
+          }
+        };
+      });
+    } catch (err: any) {
+      // ORA-00001: unique constraint violated
+      if (err?.errorNum === 1 || err?.message?.includes('ORA-00001') || err?.code === 'ORA-00001') {
+        if (triggerMessageId) {
+          const existing = await this.findAiGroupResponseByTrigger(groupId, triggerMessageId, agentName);
+          if (existing) return existing;
+        }
+      }
+      throw err;
+    }
   }
 
   async sendGroupMessage(groupId: number, senderId: number, content: string): Promise<GroupMessage> {

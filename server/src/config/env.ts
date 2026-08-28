@@ -310,6 +310,32 @@ export const env = {
 
   REDIS_URL: process.env.REDIS_URL || '',
 
+  AI_ENABLED: getBoolean('AI_ENABLED', true),
+  AI_PROVIDER: (process.env.AI_PROVIDER || 'openai').toLowerCase().trim(),
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+  OPENAI_MODEL: process.env.OPENAI_MODEL || process.env.AI_MODEL || 'gpt-4o-mini',
+  AI_MODEL: process.env.AI_MODEL || process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || '',
+
+  GROQ_API_KEY: process.env.GROQ_API_KEY || '',
+  GROQ_MODEL: process.env.GROQ_MODEL || process.env.AI_MODEL || 'llama-3.3-70b-versatile',
+
+  AI_FALLBACK_PROVIDER: (process.env.AI_FALLBACK_PROVIDER || '').toLowerCase().trim(),
+  AI_PROVIDER_TIMEOUT_MS: getPositiveInteger('AI_PROVIDER_TIMEOUT_MS', 30000),
+
   DATA_SOURCE: databaseProvider,
   USE_MOCK_DATA: false
 };
+
+// ── AI Provider startup validation ──────────────────────────────────
+const validProviders = ['openai', 'groq'];
+if (!validProviders.includes(env.AI_PROVIDER)) {
+  throw new Error(
+    `[FATAL CONFIGURATION ERROR] AI_PROVIDER="${env.AI_PROVIDER}" is not supported. Valid values: ${validProviders.join(', ')}`
+  );
+}
+if (env.AI_FALLBACK_PROVIDER && !validProviders.includes(env.AI_FALLBACK_PROVIDER)) {
+  throw new Error(
+    `[FATAL CONFIGURATION ERROR] AI_FALLBACK_PROVIDER="${env.AI_FALLBACK_PROVIDER}" is not supported. Valid values: ${validProviders.join(', ')}`
+  );
+}

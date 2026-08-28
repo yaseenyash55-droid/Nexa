@@ -9,6 +9,7 @@ import { mediaApi } from '../../api/media.api.js';
 import { getMediaUrl, handleImageError } from '../../utils/media.js';
 import { EmojiPickerPopover } from '../ui/EmojiPickerPopover.js';
 import { GifPickerModal } from '../ui/GifPickerModal.js';
+import { AiWritingAssistantModal } from './AiWritingAssistantModal.js';
 
 interface PostComposerProps {
   onPostCreated?: () => void;
@@ -40,6 +41,7 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
 
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isGifModalOpen, setIsGifModalOpen] = useState(false);
+  const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
   const [showPostingGuide, setShowPostingGuide] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -293,6 +295,17 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
             <span className="hidden sm:inline">GIF</span>
           </button>
 
+          {/* ✨ Improve with NEXA AI Button */}
+          <button
+            type="button"
+            onClick={() => setIsAiAssistantOpen(true)}
+            className="p-2 rounded-lg transition-all flex items-center gap-1.5 text-xs font-semibold text-aurora-cyan bg-brand-600/15 hover:bg-brand-600/30 border border-brand-500/40 hover:border-brand-500/60 shadow-sm"
+            title="Improve with NEXA AI"
+          >
+            <Sparkles className="w-4 h-4 text-aurora-cyan animate-pulse-slow" />
+            <span className="inline">✨ AI Write</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setShowPostingGuide(!showPostingGuide)}
@@ -326,6 +339,18 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPostCreated }) => 
           onClose={() => setIsGifModalOpen(false)}
           onSelectGif={(gifUrl) => {
             setImageUrl(gifUrl);
+          }}
+        />
+
+        {/* ✨ NEXA AI Post Writing Assistant Modal */}
+        <AiWritingAssistantModal
+          isOpen={isAiAssistantOpen}
+          onClose={() => setIsAiAssistantOpen(false)}
+          currentText={content}
+          onAccept={(suggestedText) => {
+            setContent(suggestedText);
+            setFeedback({ type: 'success', text: 'AI suggestion applied to your draft!' });
+            setTimeout(() => setFeedback(null), 4000);
           }}
         />
       </div>

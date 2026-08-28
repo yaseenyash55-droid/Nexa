@@ -11,13 +11,11 @@ const dbConfig = {
 
 const MIGRATIONS_DIR = path.resolve(process.cwd(), '../database');
 
-const MIGRATION_FILES = [
-  '07_migration_ledger.sql',
-  '02_schema.sql',
-  '05_security_privacy_migrations.sql',
-  '06_resumable_uploads_and_outbox_migrations.sql',
-  '08_account_lockout_migrations.sql'
-];
+  // Dynamically discover all .sql migration files in the database directory, sorted alphabetically to ensure proper order.
+  const MIGRATION_FILES = fs
+    .readdirSync(MIGRATIONS_DIR)
+    .filter((file) => file.endsWith('.sql'))
+    .sort();
 
 async function calculateChecksum(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');

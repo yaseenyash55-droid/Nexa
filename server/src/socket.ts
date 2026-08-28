@@ -4,6 +4,7 @@ import { Redis } from 'ioredis';
 import { verifyAccessToken } from './utils/jwt.js';
 import { getMessageRepository } from './repositories/factory.js';
 import { fcmNotificationService } from './services/fcm.service.js';
+import { aiMentionAssistantService } from './ai/messaging/mention.service.js';
 import { logger } from './utils/logger.js';
 
 export function setupSocketCluster(io: Server): void {
@@ -348,6 +349,21 @@ export class NexaRealtimeServer {
       content: content.trim()
     });
     this.emitToUser(receiverId, 'message:created', msg);
+
+    // Asynchronously check for @nexa mention in direct message
+    if (aiMentionAssistantService.isNexaMention(content)) {
+      aiMentionAssistantService
+        .handleMention({
+          senderId,
+          content: content.trim(),
+          directReceiverId: receiverId,
+          messageId: msg.messageId
+        })
+        .catch((err) => {
+          logger.error({ err, senderId, receiverId }, 'Background @nexa mention handler failed');
+        });
+    }
+
     return msg;
   }
 

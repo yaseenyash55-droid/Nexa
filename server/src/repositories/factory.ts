@@ -1,6 +1,21 @@
 import { env } from '../config/env.js';
 import { getRepositoryManager } from './index.js';
-import { IUserRepository, IPostRepository, ICommentRepository, INotificationRepository, IStoryRepository, IReelRepository, IMessageRepository, IAuthRepository, ISecurityRepository, IFcmTokenRepository, IPrivacyRepository } from './types.js';
+import {
+  IUserRepository,
+  IPostRepository,
+  ICommentRepository,
+  INotificationRepository,
+  IStoryRepository,
+  IReelRepository,
+  IMessageRepository,
+  IAuthRepository,
+  ISecurityRepository,
+  IFcmTokenRepository,
+  IPrivacyRepository,
+  IAiRepository,
+  IRagDocumentRepository,
+  IAiMemoryRepository
+} from './types.js';
 import { GroupRepository, OracleGroupRepository } from './group.repository.js';
 import { BroadcastRepository, OracleBroadcastRepository } from './broadcast.repository.js';
 import { PostgresGroupRepository } from './postgres/group.postgres.repo.js';
@@ -54,6 +69,18 @@ export function getFcmTokenRepository(): IFcmTokenRepository {
 
 export function getPrivacyRepository(): IPrivacyRepository {
   return getRepositoryManager().privacyRepo;
+}
+
+export function getAiRepository(): IAiRepository {
+  return getRepositoryManager().aiRepo;
+}
+
+export function getRagDocumentRepository(): IRagDocumentRepository {
+  return getRepositoryManager().ragRepo;
+}
+
+export function getAiMemoryRepository(): IAiMemoryRepository {
+  return getRepositoryManager().memoryRepo;
 }
 
 export function getGroupRepository(): GroupRepository {

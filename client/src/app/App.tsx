@@ -22,7 +22,7 @@ import { NotFoundPage } from '../pages/NotFoundPage.js';
 import { AboutPage } from '../pages/AboutPage.js';
 import { ContactPage } from '../pages/ContactPage.js';
 import { PrivacyPage } from '../pages/PrivacyPage.js';
-
+import { NexaAiPage } from '../pages/NexaAiPage.js';
 import { initializeLiveUpdates } from '../utils/capacitorLiveUpdates.js';
 import { webFcmService } from '../services/fcm.service.js';
 import { MusicProvider } from '../contexts/MusicContext.js';
@@ -116,6 +116,8 @@ export const App: React.FC = () => {
                 <Route path="/insights" element={<ProtectedRoute><Navigate to="/settings?tab=insights" replace /></ProtectedRoute>} />
                 <Route path="/moderation" element={<ProtectedRoute><Navigate to="/settings?tab=moderation" replace /></ProtectedRoute>} />
                 <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
+                <Route path="/ai" element={<ProtectedRoute><NexaAiPage /></ProtectedRoute>} />
+                <Route path="/nexa-ai" element={<ProtectedRoute><Navigate to="/ai" replace /></ProtectedRoute>} />
 
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>

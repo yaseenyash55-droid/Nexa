@@ -4,34 +4,100 @@ import { ConversationSummary, Message } from '../../types/index.js';
 
 interface RawMessageRow {
   message_id: number | string;
-  sender_id: number | string;
+  sender_id?: number | string | null;
   receiver_id: number | string;
   content: string;
   read_at?: Date | string | null;
   is_unsent: boolean;
   created_at: Date | string;
-  sender_username: string;
-  sender_display_name: string;
+  sender_username?: string | null;
+  sender_display_name?: string | null;
   sender_profile_image?: string | null;
+  sender_type?: string | null;
+  ai_agent?: string | null;
+  trigger_message_id?: number | string | null;
 }
 
 export class PostgresMessageRepository implements IMessageRepository {
   private mapRowToMessage(row: RawMessageRow): Message {
     const isUnsent = Boolean(row.is_unsent);
+    const isAi = (row.sender_type || '').toLowerCase() === 'ai' || row.sender_id === null;
+
     return {
       messageId: Number(row.message_id),
-      senderId: Number(row.sender_id),
+      senderId: isAi ? null : Number(row.sender_id),
       receiverId: Number(row.receiver_id),
+      senderType: isAi ? 'ai' : 'user',
+      aiAgent: isAi ? (row.ai_agent || 'nexa') : undefined,
+      triggerMessageId: row.trigger_message_id ? Number(row.trigger_message_id) : null,
       sender: {
-        userId: Number(row.sender_id),
-        username: row.sender_username,
-        displayName: row.sender_display_name,
-        profileImageUrl: row.sender_profile_image ?? undefined
+        userId: isAi ? 0 : Number(row.sender_id),
+        username: isAi ? 'nexa' : (row.sender_username || 'user'),
+        displayName: isAi ? 'NEXA AI' : (row.sender_display_name || 'User'),
+        profileImageUrl: isAi ? '/nexa-ai-avatar.png' : (row.sender_profile_image ?? undefined)
       },
       content: isUnsent ? 'Message unsent' : row.content,
       isRead: Boolean(row.read_at),
       isUnsent,
       createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString()
+    };
+  }
+
+  async findAiResponseByTrigger(triggerMessageId: number, aiAgent = 'nexa'): Promise<Message | null> {
+    const sql = `
+      SELECT m.message_id, m.sender_id, m.receiver_id, m.content, m.read_at, m.is_unsent, m.created_at,
+             m.sender_type, m.ai_agent, m.trigger_message_id,
+             u.username AS sender_username, u.display_name AS sender_display_name, u.profile_image_url AS sender_profile_image
+      FROM messages m
+      LEFT JOIN users u ON m.sender_id = u.user_id
+      WHERE m.trigger_message_id = $1
+        AND m.sender_type = 'ai'
+        AND m.ai_agent = $2
+      LIMIT 1
+    `;
+    const res = await executePostgresSql<RawMessageRow>(sql, [triggerMessageId, aiAgent]);
+    const row = res.rows?.[0];
+    return row ? this.mapRowToMessage(row) : null;
+  }
+
+  async sendAiMessage(msg: { receiverId: number; content: string; aiAgent?: string; triggerMessageId?: number | null }): Promise<Message> {
+    const agentName = msg.aiAgent || 'nexa';
+
+    if (msg.triggerMessageId) {
+      const existing = await this.findAiResponseByTrigger(msg.triggerMessageId, agentName);
+      if (existing) return existing;
+    }
+
+    const sql = `
+      INSERT INTO messages (sender_id, receiver_id, content, sender_type, ai_agent, trigger_message_id)
+      VALUES (NULL, $1, $2, 'ai', $3, $4)
+      ON CONFLICT (trigger_message_id, ai_agent) WHERE trigger_message_id IS NOT NULL AND sender_type = 'ai'
+      DO UPDATE SET content = messages.content
+      RETURNING message_id, created_at, trigger_message_id
+    `;
+    const res = await executePostgresSql<{
+      message_id: number | string;
+      created_at: Date | string;
+      trigger_message_id?: number | string | null;
+    }>(sql, [msg.receiverId, msg.content.trim(), agentName, msg.triggerMessageId ?? null]);
+
+    const row = res.rows[0];
+    return {
+      messageId: Number(row.message_id),
+      senderId: null,
+      receiverId: msg.receiverId,
+      senderType: 'ai',
+      aiAgent: agentName,
+      triggerMessageId: msg.triggerMessageId ?? null,
+      sender: {
+        userId: 0,
+        username: 'nexa',
+        displayName: 'NEXA AI',
+        profileImageUrl: '/nexa-ai-avatar.png'
+      },
+      content: msg.content.trim(),
+      isRead: false,
+      createdAt: new Date(row.created_at).toISOString()
     };
   }
 
@@ -87,11 +153,13 @@ export class PostgresMessageRepository implements IMessageRepository {
   async getMessagesBetweenUsers(userA: number, userB: number): Promise<Message[]> {
     const sql = `
       SELECT m.message_id, m.sender_id, m.receiver_id, m.content, m.read_at, m.is_unsent, m.created_at,
+             m.sender_type, m.ai_agent, m.trigger_message_id,
              u.username AS sender_username, u.display_name AS sender_display_name, u.profile_image_url AS sender_profile_image
       FROM messages m
-      JOIN users u ON m.sender_id = u.user_id
+      LEFT JOIN users u ON m.sender_id = u.user_id
       WHERE (m.sender_id = $1 AND m.receiver_id = $2)
          OR (m.sender_id = $2 AND m.receiver_id = $1)
+         OR (m.sender_id IS NULL AND (m.receiver_id = $1 OR m.receiver_id = $2))
       ORDER BY m.created_at ASC
     `;
     const res = await executePostgresSql<RawMessageRow>(sql, [userA, userB]);
@@ -158,13 +226,28 @@ export class PostgresMessageRepository implements IMessageRepository {
     }));
   }
 
-  async unsendMessage(messageId: number, senderId: number): Promise<boolean> {
-    const sql = `
+  async unsendMessage(messageId: number, senderId: number): Promise<{ success: boolean; receiverId: number }> {
+    const findSql = `
+      SELECT receiver_id
+      FROM messages
+      WHERE message_id = $1 AND sender_id = $2 AND is_unsent = FALSE
+    `;
+    const findRes = await executePostgresSql(findSql, [messageId, senderId]);
+    if (findRes.rows.length === 0) {
+      return { success: false, receiverId: 0 };
+    }
+
+    const receiverId = Number(findRes.rows[0].receiver_id);
+
+    const updateSql = `
       UPDATE messages
       SET is_unsent = TRUE
       WHERE message_id = $1 AND sender_id = $2 AND is_unsent = FALSE
     `;
-    const res = await executePostgresSql(sql, [messageId, senderId]);
-    return res.rowCount > 0;
+    const updateRes = await executePostgresSql(updateSql, [messageId, senderId]);
+    return {
+      success: (updateRes.rowCount || 0) > 0,
+      receiverId
+    };
   }
 }

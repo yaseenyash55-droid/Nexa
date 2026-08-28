@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../types/index.js';
 import { getGroupRepository } from '../repositories/factory.js';
 import { realtimeServer } from '../socket.js';
+import { aiMentionAssistantService } from '../ai/messaging/mention.service.js';
 import { sendError } from '../utils/response.js';
 
 export async function createGroup(req: AuthenticatedRequest, res: Response) {
@@ -120,6 +121,20 @@ export async function sendGroupMessage(req: AuthenticatedRequest, res: Response)
       if (member.userId !== currentUserId) {
         realtimeServer.emitToUser(member.userId, 'group:message:created', msg);
       }
+    }
+
+    // Asynchronously check for @nexa mention in group chat
+    if (aiMentionAssistantService.isNexaMention(content)) {
+      aiMentionAssistantService
+        .handleMention({
+          senderId: currentUserId,
+          content: content.trim(),
+          groupId,
+          messageId: msg.messageId
+        })
+        .catch(() => {
+          // safe swallow
+        });
     }
 
     return res.status(201).json({ data: msg });

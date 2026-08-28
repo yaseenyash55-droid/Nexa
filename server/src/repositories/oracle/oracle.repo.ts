@@ -10,6 +10,9 @@ import { OracleAuthRepository } from './auth.oracle.repo.js';
 import { OracleSecurityRepository } from './security.oracle.repo.js';
 import { OracleFcmTokenRepository } from './fcm.oracle.repo.js';
 import { oraclePrivacyRepo } from './privacy.oracle.repo.js';
+import { OracleAiRepository } from './ai.oracle.repo.js';
+import { OracleRagDocumentRepository } from './rag.oracle.repo.js';
+import { OracleAiMemoryRepository } from './memory.oracle.repo.js';
 
 export const oracleRepositoryManager: IRepositoryManager = {
   userRepo: new OracleUserRepository(),
@@ -23,6 +26,9 @@ export const oracleRepositoryManager: IRepositoryManager = {
   securityRepo: new OracleSecurityRepository(),
   fcmTokenRepo: new OracleFcmTokenRepository(),
   privacyRepo: oraclePrivacyRepo,
+  aiRepo: new OracleAiRepository(),
+  ragRepo: new OracleRagDocumentRepository(),
+  memoryRepo: new OracleAiMemoryRepository(),
   get users() { return this.userRepo; },
   get posts() { return this.postRepo; },
   get comments() { return this.commentRepo; },
@@ -33,5 +39,8 @@ export const oracleRepositoryManager: IRepositoryManager = {
   get auth() { return this.authRepo; },
   get security() { return this.securityRepo; },
   get fcmTokens() { return this.fcmTokenRepo; },
-  get privacy() { return this.privacyRepo; }
+  get privacy() { return this.privacyRepo; },
+  get ai() { return this.aiRepo; },
+  get rag() { return this.ragRepo; },
+  get memories() { return this.memoryRepo; }
 };

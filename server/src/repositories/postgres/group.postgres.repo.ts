@@ -161,28 +161,109 @@ export class PostgresGroupRepository implements GroupRepository {
 
   async getGroupMessages(groupId: number): Promise<GroupMessage[]> {
     const res = await executePostgresSql(
-      `SELECT gm.message_id, gm.group_id, gm.sender_id, gm.content, gm.created_at,
+      `SELECT gm.message_id, gm.group_id, gm.sender_id, gm.content, gm.created_at, gm.sender_type, gm.ai_agent, gm.trigger_message_id,
               u.username, u.display_name, u.profile_image_url
        FROM group_messages gm
-       INNER JOIN users u ON gm.sender_id = u.user_id
+       LEFT JOIN users u ON gm.sender_id = u.user_id
        WHERE gm.group_id = $1
        ORDER BY gm.created_at ASC`,
       [groupId]
     );
 
-    return (res.rows || []).map((r: any) => ({
-      messageId: Number(r.message_id),
-      groupId: Number(r.group_id),
-      senderId: Number(r.sender_id),
-      content: r.content,
-      createdAt: new Date(r.created_at).toISOString(),
+    return (res.rows || []).map((r: any) => {
+      const isAi = (r.sender_type || '').toLowerCase() === 'ai' || r.sender_id === null;
+      return {
+        messageId: Number(r.message_id),
+        groupId: Number(r.group_id),
+        senderId: isAi ? null : Number(r.sender_id),
+        senderType: isAi ? 'ai' : 'user',
+        aiAgent: isAi ? (r.ai_agent || 'nexa') : undefined,
+        triggerMessageId: r.trigger_message_id ? Number(r.trigger_message_id) : null,
+        content: r.content,
+        createdAt: new Date(r.created_at).toISOString(),
+        sender: {
+          userId: isAi ? 0 : Number(r.sender_id),
+          username: isAi ? 'nexa' : (r.username || 'user'),
+          displayName: isAi ? 'NEXA AI' : (r.display_name || 'User'),
+          profileImageUrl: isAi ? '/nexa-ai-avatar.png' : (r.profile_image_url || null)
+        }
+      };
+    });
+  }
+
+  async findAiGroupResponseByTrigger(groupId: number, triggerMessageId: number, aiAgent = 'nexa'): Promise<GroupMessage | null> {
+    const res = await executePostgresSql(
+      `SELECT gm.message_id, gm.group_id, gm.sender_id, gm.content, gm.created_at, gm.sender_type, gm.ai_agent, gm.trigger_message_id,
+              u.username, u.display_name, u.profile_image_url
+       FROM group_messages gm
+       LEFT JOIN users u ON gm.sender_id = u.user_id
+       WHERE gm.group_id = $1
+         AND gm.trigger_message_id = $2
+         AND gm.sender_type = 'ai'
+         AND gm.ai_agent = $3
+       LIMIT 1`,
+      [groupId, triggerMessageId, aiAgent]
+    );
+
+    const row = (res.rows || [])[0] as any;
+    if (!row) return null;
+
+    return {
+      messageId: Number(row.message_id),
+      groupId: Number(row.group_id),
+      senderId: null,
+      senderType: 'ai',
+      aiAgent,
+      triggerMessageId: row.trigger_message_id ? Number(row.trigger_message_id) : null,
+      content: row.content,
+      createdAt: new Date(row.created_at).toISOString(),
       sender: {
-        userId: Number(r.sender_id),
-        username: r.username,
-        displayName: r.display_name,
-        profileImageUrl: r.profile_image_url
+        userId: 0,
+        username: 'nexa',
+        displayName: 'NEXA AI',
+        profileImageUrl: '/nexa-ai-avatar.png'
       }
-    }));
+    };
+  }
+
+  async sendAiGroupMessage(groupId: number, content: string, aiAgent = 'nexa', triggerMessageId?: number | null): Promise<GroupMessage> {
+    const agentName = aiAgent || 'nexa';
+
+    if (triggerMessageId) {
+      const existing = await this.findAiGroupResponseByTrigger(groupId, triggerMessageId, agentName);
+      if (existing) return existing;
+    }
+
+    return withPostgresTransaction(async (conn) => {
+      const result = await conn.query(
+        `INSERT INTO group_messages (group_id, sender_id, content, sender_type, ai_agent, trigger_message_id, created_at)
+         VALUES ($1, NULL, $2, 'ai', $3, $4, CURRENT_TIMESTAMP)
+         ON CONFLICT (trigger_message_id, ai_agent) WHERE trigger_message_id IS NOT NULL AND sender_type = 'ai'
+         DO UPDATE SET content = group_messages.content
+         RETURNING message_id, created_at, trigger_message_id`,
+        [groupId, content.trim(), agentName, triggerMessageId ?? null]
+      );
+
+      const messageId = Number(result.rows[0].message_id);
+      const createdAt = new Date(result.rows[0].created_at).toISOString();
+
+      return {
+        messageId,
+        groupId,
+        senderId: null,
+        senderType: 'ai',
+        aiAgent: agentName,
+        triggerMessageId: triggerMessageId ?? null,
+        content: content.trim(),
+        createdAt,
+        sender: {
+          userId: 0,
+          username: 'nexa',
+          displayName: 'NEXA AI',
+          profileImageUrl: '/nexa-ai-avatar.png'
+        }
+      };
+    });
   }
 
   async sendGroupMessage(groupId: number, senderId: number, content: string): Promise<GroupMessage> {

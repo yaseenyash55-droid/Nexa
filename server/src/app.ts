@@ -20,6 +20,7 @@ import { groupRouter } from './routes/group.routes.js';
 import { broadcastRouter } from './routes/broadcast.routes.js';
 import { callRouter } from './routes/call.routes.js';
 import { exploreRouter } from './routes/explore.routes.js';
+import { aiRouter } from './routes/ai.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { httpsEnforcementMiddleware, trafficMonitorMiddleware, botProtectionMiddleware } from './middleware/trafficMonitor.middleware.js';
 import { globalApiRateLimiter } from './middleware/rateLimit.middleware.js';
@@ -85,6 +86,7 @@ app.use('/api/groups', groupRouter);
 app.use('/api/broadcasts', broadcastRouter);
 app.use('/api/calls', callRouter);
 app.use('/api/explore', exploreRouter);
+app.use('/api/ai', aiRouter);
 app.use('/api', socialRouter);
 
 // API Welcome Endpoint

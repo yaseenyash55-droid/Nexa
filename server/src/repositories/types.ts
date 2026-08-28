@@ -103,6 +103,8 @@ export interface IReelRepository {
 
 export interface IMessageRepository {
   sendMessage(msg: { senderId: number; receiverId: number; content: string }): Promise<Message>;
+  sendAiMessage(msg: { receiverId: number; content: string; aiAgent?: string; triggerMessageId?: number | null }): Promise<Message>;
+  findAiResponseByTrigger?(triggerKey: string, aiAgent?: string): Promise<Message | null>;
   getMessagesBetweenUsers(userA: number, userB: number): Promise<Message[]>;
   markMessageAsRead(messageId: number, receiverUserId: number): Promise<{ rowsAffected: number; readAt: Date | null; senderId: number | null }>;
   getConversations(userId: number): Promise<ConversationSummary[]>;
@@ -201,6 +203,9 @@ export interface IPrivacyRepository {
   }): Promise<{ actionId: number }>;
 }
 
+export { IAiRepository, IRagDocumentRepository, IAiMemoryRepository, AiPreference, AiMemory } from '../types/ai.types.js';
+import { IAiRepository, IRagDocumentRepository, IAiMemoryRepository } from '../types/ai.types.js';
+
 export interface IRepositoryManager {
   userRepo: IUserRepository;
   postRepo: IPostRepository;
@@ -213,6 +218,9 @@ export interface IRepositoryManager {
   securityRepo: ISecurityRepository;
   fcmTokenRepo: IFcmTokenRepository;
   privacyRepo: IPrivacyRepository;
+  aiRepo: IAiRepository;
+  ragRepo: IRagDocumentRepository;
+  memoryRepo: IAiMemoryRepository;
   users: IUserRepository;
   posts: IPostRepository;
   comments: ICommentRepository;
@@ -224,4 +232,7 @@ export interface IRepositoryManager {
   security: ISecurityRepository;
   fcmTokens: IFcmTokenRepository;
   privacy: IPrivacyRepository;
+  ai: IAiRepository;
+  rag: IRagDocumentRepository;
+  memories: IAiMemoryRepository;
 }

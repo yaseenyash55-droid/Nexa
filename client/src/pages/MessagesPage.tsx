@@ -229,6 +229,21 @@ const MessageContent: React.FC<{ content: string; isSelf?: boolean }> = ({ conte
     );
   }
 
+  if (content.startsWith('🤖 **NEXA AI**:') || content.startsWith('🤖 NEXA AI:')) {
+    const aiText = content.replace(/^🤖\s*\*\*NEXA AI\*\*:\s*/i, '').replace(/^🤖\s*NEXA AI:\s*/i, '').trim();
+    return (
+      <div className="space-y-1.5 p-1 rounded-xl bg-gradient-to-tr from-brand-950/40 via-slate-900/60 to-aurora-cyan/10 border border-brand-500/30 shadow-glow-brand">
+        <div className="flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-bold text-aurora-cyan uppercase tracking-wider">
+          <Sparkles className="w-3 h-3 text-aurora-cyan animate-pulse" />
+          <span>NEXA AI Assistant</span>
+        </div>
+        <p className="leading-relaxed whitespace-pre-line text-xs text-slate-100 font-sans px-1 pb-1">
+          {aiText}
+        </p>
+      </div>
+    );
+  }
+
   return <p className="leading-relaxed whitespace-pre-line">{content}</p>;
 };
 
@@ -830,9 +845,32 @@ export const MessagesPage: React.FC = () => {
 
           {/* Conversation List */}
           <div className="flex-1 overflow-y-auto divide-y divide-slate-800/50">
+            {chatType === 'direct' && (
+              <a
+                href="/ai"
+                className="flex items-center gap-3 p-3 bg-gradient-to-r from-brand-900/30 via-indigo-900/20 to-aurora-cyan/10 hover:from-brand-900/50 hover:to-aurora-cyan/20 border-b border-brand-500/20 transition-all group cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-brand-600 via-indigo-500 to-aurora-cyan p-0.5 flex-shrink-0 shadow-glow-brand ring-2 ring-brand-500/30">
+                  <div className="w-full h-full bg-background-card/90 rounded-full flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-aurora-cyan animate-pulse-slow" />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-100 flex items-center gap-1">
+                      ✨ NEXA AI
+                      <span className="px-1.5 py-0.2 bg-brand-500/20 text-brand-300 text-[9px] font-semibold rounded-full border border-brand-500/30">Assistant</span>
+                    </span>
+                    <span className="text-[10px] text-aurora-cyan font-medium">Online</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 truncate">Ask questions, generate captions, summarize & translate</p>
+                </div>
+              </a>
+            )}
+
             {chatType === 'direct' ? (
               displayDirectItems.items.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-400">No conversations found</div>
+                <div className="p-6 text-center text-xs text-slate-400">No direct conversations found</div>
               ) : (
                 displayDirectItems.items.map((item: any) => {
                   if (displayDirectItems.type === 'conversations') {

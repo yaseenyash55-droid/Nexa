@@ -60,6 +60,10 @@ export async function closeOraclePool(): Promise<void> {
   }
 }
 
+export function isOraclePoolInitialized(): boolean {
+  return pool !== null;
+}
+
 export async function getConnection(): Promise<any> {
   if (!pool) {
     throw new Error('Oracle Connection Pool is not initialized');

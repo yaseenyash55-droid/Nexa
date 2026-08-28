@@ -116,14 +116,20 @@ CREATE INDEX IF NOT EXISTS idx_notif_recipient ON notifications (recipient_user_
 -- 9. DIRECT MESSAGES TABLE
 CREATE TABLE IF NOT EXISTS messages (
   message_id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  sender_id               BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  sender_id               BIGINT REFERENCES users(user_id) ON DELETE CASCADE,
   receiver_id             BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   content                 VARCHAR(4000) NOT NULL,
+  sender_type             VARCHAR(10) DEFAULT 'user' NOT NULL CHECK (sender_type IN ('user', 'ai')),
+  ai_agent                VARCHAR(30),
   read_at                 TIMESTAMPTZ,
   is_unsent               BOOLEAN DEFAULT FALSE NOT NULL,
   created_at              TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  CONSTRAINT chk_messages_participants CHECK (sender_id <> receiver_id),
-  CONSTRAINT chk_messages_content CHECK (LENGTH(TRIM(content)) BETWEEN 1 AND 4000)
+  CONSTRAINT chk_messages_participants CHECK (sender_id IS NULL OR sender_id <> receiver_id),
+  CONSTRAINT chk_messages_content CHECK (LENGTH(TRIM(content)) BETWEEN 1 AND 4000),
+  CONSTRAINT chk_messages_ai_integrity CHECK (
+    (sender_type = 'user' AND sender_id IS NOT NULL) OR
+    (sender_type = 'ai' AND sender_id IS NULL AND ai_agent IS NOT NULL)
+  )
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages (sender_id, receiver_id, message_id);
@@ -200,10 +206,16 @@ CREATE TABLE IF NOT EXISTS group_members (
 CREATE TABLE IF NOT EXISTS group_messages (
   message_id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   group_id                BIGINT NOT NULL REFERENCES groups(group_id) ON DELETE CASCADE,
-  sender_id               BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  sender_id               BIGINT REFERENCES users(user_id) ON DELETE CASCADE,
   content                 VARCHAR(4000) NOT NULL,
+  sender_type             VARCHAR(10) DEFAULT 'user' NOT NULL CHECK (sender_type IN ('user', 'ai')),
+  ai_agent                VARCHAR(30),
   created_at              TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  CONSTRAINT chk_group_message_content CHECK (LENGTH(TRIM(content)) BETWEEN 1 AND 4000)
+  CONSTRAINT chk_group_message_content CHECK (LENGTH(TRIM(content)) BETWEEN 1 AND 4000),
+  CONSTRAINT chk_group_messages_ai_integrity CHECK (
+    (sender_type = 'user' AND sender_id IS NOT NULL) OR
+    (sender_type = 'ai' AND sender_id IS NULL AND ai_agent IS NOT NULL)
+  )
 );
 
 CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members (user_id, group_id);
