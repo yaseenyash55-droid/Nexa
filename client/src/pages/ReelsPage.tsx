@@ -11,9 +11,11 @@ import { ReportModal } from '../components/ui/ReportModal.js';
 import { useAuth } from '../contexts/AuthContext.js';
 import { mediaApi } from '../api/media.api.js';
 import { getMediaUrl, handleImageError } from '../utils/media.js';
+import { useToast } from '../contexts/ToastContext.js';
 
 export const ReelsPage: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAddReelOpen, setIsAddReelOpen] = useState(false);
   const [videoUrl, setVideoUrl] = useState('');
@@ -101,7 +103,7 @@ export const ReelsPage: React.FC = () => {
               if (user) {
                 setIsAddReelOpen(true);
               } else {
-                alert('🔒 Authentication Required\n\nPlease log in to upload Bytes.');
+                toast.error('Authentication required to upload Bytes.');
                 window.location.href = '/login';
               }
             }}
@@ -129,7 +131,7 @@ export const ReelsPage: React.FC = () => {
                 if (user) {
                   setIsAddReelOpen(true);
                 } else {
-                  alert('🔒 Authentication Required\n\nPlease log in to upload Bytes.');
+                  toast.error('Authentication required to upload Bytes.');
                   window.location.href = '/login';
                 }
               }}
@@ -253,6 +255,7 @@ export const ReelsPage: React.FC = () => {
 
 const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => void }> = ({ reel, isMuted, onToggleMute }) => {
   const { user: currentUser, requireAuth } = useAuth();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLiked, setIsLiked] = useState(reel.isLiked || false);
   const [likesCount, setLikesCount] = useState(reel.likesCount || 0);
@@ -358,6 +361,7 @@ const ReelCard: React.FC<{ reel: Reel; isMuted: boolean; onToggleMute: () => voi
           onClick={() => {
             if (navigator.clipboard) {
               navigator.clipboard.writeText(window.location.href);
+              toast.success('Link copied to clipboard!');
             }
           }}
           className="flex flex-col items-center gap-1 text-white group"

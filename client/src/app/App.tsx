@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '../contexts/AuthContext.js';
 import { ThemeProvider } from '../contexts/ThemeContext.js';
+import { ToastProvider } from '../contexts/ToastContext.js';
 
 import { HomePage } from '../pages/HomePage.js';
 import { ExplorePage } from '../pages/ExplorePage.js';
@@ -80,9 +81,10 @@ export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <AuthProvider>
-          <MusicProvider>
-            <AppNotificationInitializer />
+        <ToastProvider>
+          <AuthProvider>
+            <MusicProvider>
+              <AppNotificationInitializer />
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<HomePage />} />
@@ -125,6 +127,7 @@ export const App: React.FC = () => {
             </BrowserRouter>
           </MusicProvider>
         </AuthProvider>
+        </ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

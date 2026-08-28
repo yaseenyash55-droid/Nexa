@@ -12,6 +12,7 @@ import { MediaPreviewModal } from '../ui/MediaPreviewModal.js';
 import { PostOptionsModal } from './PostOptionsModal.js';
 import { ReportModal } from '../ui/ReportModal.js';
 import { getMediaUrl, handleImageError } from '../../utils/media.js';
+import { useToast } from '../../contexts/ToastContext.js';
 
 interface PostCardProps {
   post: Post;
@@ -19,6 +20,7 @@ interface PostCardProps {
 
 export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const { user: currentUser, requireAuth } = useAuth();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showComments, setShowComments] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -66,11 +68,11 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
       queryClient.invalidateQueries({ queryKey: ['posts'] });
       queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
-      alert('✔ Post removed successfully!');
+      toast.success('Post removed successfully!');
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.error?.message || err?.message || 'Failed to remove post';
-      alert('✖ Failed to remove post: ' + msg);
+      toast.error('Failed to remove post: ' + msg);
     }
   });
 
@@ -82,10 +84,10 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
       queryClient.invalidateQueries({ queryKey: ['posts'] });
       queryClient.invalidateQueries({ queryKey: ['user-posts'] });
-      alert('✔ Post updated successfully!');
+      toast.success('Post updated successfully!');
     },
     onError: (err: any) => {
-      alert('✖ Failed to update post: ' + (err?.response?.data?.error?.message || err?.message || 'Error'));
+      toast.error('Failed to update post: ' + (err?.response?.data?.error?.message || err?.message || 'Error'));
     }
   });
 
@@ -130,7 +132,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
             type="button"
             onClick={() => {
               if (post.isMock) {
-                alert('This is a preview post. Options are disabled.');
+                toast.info('This is a preview post. Options are disabled.');
                 return;
               }
               setIsOptionsOpen(true);
@@ -183,7 +185,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
           <button
             onClick={() => {
               if (post.isMock) {
-                alert('This is a preview post. Likes are disabled.');
+                toast.info('This is a preview post. Likes are disabled.');
                 return;
               }
               requireAuth(() => likeMutation.mutate(), 'Log in to like posts.');
@@ -199,7 +201,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
           <button
             onClick={() => {
               if (post.isMock) {
-                alert('This is a preview post. Comments are disabled.');
+                toast.info('This is a preview post. Comments are disabled.');
                 return;
               }
               setShowComments(!showComments);
@@ -216,7 +218,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
             onClick={() => {
               const postUrl = `${window.location.origin}/profile/${post.author.username}#post-${post.postId}`;
               navigator.clipboard.writeText(postUrl);
-              alert('Post link copied to clipboard!');
+              toast.success('Post link copied to clipboard!');
             }}
             className="p-1.5 hover:text-cyan-400 transition-colors"
             title="Share post link"
@@ -227,7 +229,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
           <button
             onClick={() => {
               if (post.isMock) {
-                alert('This is a preview post. Bookmarks are disabled.');
+                toast.info('This is a preview post. Bookmarks are disabled.');
                 return;
               }
               requireAuth(() => bookmarkMutation.mutate(), 'Log in to save posts.');

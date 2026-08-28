@@ -3,7 +3,8 @@ import { createHmac } from 'node:crypto';
 import { env } from '../config/env.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { AuthenticatedRequest } from '../types/index.js';
-import { sendSuccess } from '../utils/response.js';
+import { sendSuccess, sendError } from '../utils/response.js';
+import { AccessToken } from 'livekit-server-sdk';
 
 export const callRouter = Router();
 
@@ -56,4 +57,35 @@ callRouter.get('/ice-config', requireAuth, (req, res) => {
       }
     ]
   });
+});
+
+callRouter.post('/token', requireAuth, async (req, res) => {
+  const { roomName } = req.body;
+  if (!roomName) {
+    return sendError(res, 400, 'Room name is required');
+  }
+
+  const user = (req as AuthenticatedRequest).user!;
+  
+  if (!env.LIVEKIT_API_KEY || !env.LIVEKIT_API_SECRET) {
+    return sendError(res, 500, 'LiveKit credentials not configured');
+  }
+
+  try {
+    const at = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
+      identity: user.userId.toString(),
+      name: user.displayName,
+    });
+
+    at.addGrant({ roomJoin: true, room: roomName, canPublish: true, canSubscribe: true });
+
+    const token = await at.toJwt();
+    
+    return sendSuccess(res, {
+      token,
+      url: env.LIVEKIT_URL
+    });
+  } catch (error: any) {
+    return sendError(res, 500, 'Failed to generate token: ' + error.message);
+  }
 });

@@ -308,6 +308,10 @@ export const env = {
   WEBRTC_TURN_SHARED_SECRET: webRtcTurnSharedSecret,
   WEBRTC_TURN_CREDENTIAL_TTL_SECONDS: webRtcTurnCredentialTtlSeconds,
 
+  LIVEKIT_URL: process.env.LIVEKIT_URL || '',
+  LIVEKIT_API_KEY: process.env.LIVEKIT_API_KEY || '',
+  LIVEKIT_API_SECRET: process.env.LIVEKIT_API_SECRET || '',
+
   REDIS_URL: process.env.REDIS_URL || '',
 
   AI_ENABLED: getBoolean('AI_ENABLED', true),

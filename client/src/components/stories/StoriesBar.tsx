@@ -11,6 +11,7 @@ import { Modal } from '../ui/Modal.js';
 import { Button } from '../ui/Button.js';
 import { getMediaUrl, handleImageError } from '../../utils/media.js';
 import { StoryEditor } from './StoryEditor.js';
+import { useToast } from '../../contexts/ToastContext.js';
 
 const StoryMusicOverlay: React.FC<{ musicTrackId: string }> = ({ musicTrackId }) => {
   const [track, setTrack] = useState<any | null>(null);
@@ -88,6 +89,7 @@ const StoryMusicOverlay: React.FC<{ musicTrackId: string }> = ({ musicTrackId })
 
 export const StoriesBar: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAddStoryOpen, setIsAddStoryOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -159,7 +161,7 @@ export const StoriesBar: React.FC = () => {
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.error?.message || err?.message || 'Failed to share Cosmic';
-      alert('✖ Failed to share Cosmic: ' + msg);
+      toast.error('Failed to share Cosmic: ' + msg);
     }
   });
 

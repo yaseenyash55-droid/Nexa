@@ -1,0 +1,7 @@
+[35m.env.example[m[36m:[m[32m11[m[36m:[m# [1;31mpostgresql://[mpostgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?sslmode=require
+[35m.env.example[m[36m:[m[32m12[m[36m:[m[1;31mDATABASE_URL=postgresql://postgres:your_password_here@[mlocalhost:5432/nexa_db
+[35mserver/.env.example[m[36m:[m[32m10[m[36m:[m# Example for Supabase Pooler: [1;31mpostgresql://[mpostgres.[REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?sslmode=require
+[35mserver/.env.example[m[36m:[m[32m11[m[36m:[m[1;31mDATABASE_URL=postgresql://postgres:YOUR_PASSWORD_HERE@[mlocalhost:5432/nexa_db
+[35mserver/scripts/test_postgres_connection.ts[m[36m:[m[32m11[m[36m:[m    console.log('Example: [1;31mDATABASE_URL="postgresql://postgres:[PASSWORD]@[m[HOST]:[PORT]/postgres?sslmode=require"\n');
+[35mserver/tests/postgres.migration.test.ts[m[36m:[m[32m25[m[36m:[m      const raw = '[1;31mpostgresql://[mpostgres:secretpassword123@db.supabase.co:5432/postgres';
+[35mserver/tests/postgres.migration.test.ts[m[36m:[m[32m27[m[36m:[m      expect(sanitized).toBe('[1;31mpostgresql://[mpostgres:***@db.supabase.co:5432/postgres');

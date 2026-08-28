@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { Home, Compass, Bookmark, Bell, User as UserIcon, PlusCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.js';
+import { useToast } from '../../contexts/ToastContext.js';
 
 interface MobileBottomNavigationProps {
   onOpenComposer?: () => void;
@@ -9,6 +10,7 @@ interface MobileBottomNavigationProps {
 
 export const MobileBottomNavigation: React.FC<MobileBottomNavigationProps> = ({ onOpenComposer }) => {
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const items = [
     { to: '/', label: 'Home', icon: <Home className="w-5 h-5" /> },
@@ -42,7 +44,7 @@ export const MobileBottomNavigation: React.FC<MobileBottomNavigationProps> = ({ 
             if (user) {
               onOpenComposer();
             } else {
-              alert('🔒 Authentication Required\n\nPlease log in to create posts.');
+              toast.error('Authentication required to create posts.');
               window.location.href = '/login';
             }
           }}
