@@ -240,49 +240,36 @@ export class PostgresMessageRepository implements IMessageRepository {
     }));
   }
 
-  async unsendMessage(messageId: number, senderId: number): Promise<{ success: boolean; receiverId: number }> {
-    const findSql = `
-      SELECT sender_id, receiver_id, created_at, is_unsent
-      FROM messages
-      WHERE message_id = $1
-    `;
-    const findRes = await executePostgresSql<any>(findSql, [messageId]);
-    const row = findRes.rows?.[0];
-
-    if (!row) {
-      throw { statusCode: 404, code: 'MESSAGE_NOT_FOUND', message: 'Message not found' };
-    }
-
-    const dbSenderId = Number(row.sender_id);
-    const dbReceiverId = Number(row.receiver_id);
-    const dbCreatedAt = row.created_at;
-    const dbIsUnsent = Boolean(row.is_unsent);
-
-    if (dbSenderId !== senderId) {
-      throw { statusCode: 403, code: 'FORBIDDEN', message: 'You can only unsend your own messages' };
-    }
-
-    if (dbIsUnsent) {
-      return { success: true, receiverId: dbReceiverId };
-    }
-
-    // Time window check (1 hour)
-    const messageTime = new Date(dbCreatedAt).getTime();
-    const oneHourAgo = Date.now() - 60 * 60 * 1000;
-    if (messageTime < oneHourAgo) {
-      throw { statusCode: 400, code: 'UNSEND_WINDOW_EXPIRED', message: 'You can only unsend messages within 1 hour of sending.' };
-    }
-
-    const updateSql = `
+  async unsendMessage(
+    messageId: number,
+    senderId: number
+  ): Promise<{ success: boolean; receiverId: number }> {
+    const sql = `
       UPDATE messages
       SET is_unsent = TRUE
       WHERE message_id = $1
+        AND sender_id = $2
+        AND is_unsent = FALSE
+      RETURNING receiver_id
     `;
-    await executePostgresSql(updateSql, [messageId]);
+
+    const res = await executePostgresSql<{ receiver_id: number }>(
+      sql,
+      [messageId, senderId]
+    );
+
+    const row = res.rows?.[0];
+
+    if (!row) {
+      return {
+        success: false,
+        receiverId: 0
+      };
+    }
 
     return {
       success: true,
-      receiverId: dbReceiverId
+      receiverId: Number(row.receiver_id)
     };
   }
 }
