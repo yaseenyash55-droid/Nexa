@@ -1,3 +1,6 @@
+import axios from 'axios';
+import { env } from '../config/env.js';
+
 export interface LicensedTrack {
   trackId: string;
   title: string;
@@ -15,7 +18,21 @@ export interface LicensedTrack {
   };
 }
 
+export interface NexaMusicTrack {
+  id: string;
+  title: string;
+  artist: string;
+  album?: string;
+  artworkUrl?: string;
+  audioUrl: string;
+  shareUrl?: string;
+  duration: number;
+  provider: 'jamendo' | 'spotify' | string;
+}
+
 export class MusicLicensingService {
+  private readonly JAMENDO_BASE_URL = 'https://api.jamendo.com/v3.0';
+
   private developmentCatalog: LicensedTrack[] = [
     {
       trackId: 'jamendo-track-101',
@@ -48,20 +65,6 @@ export class MusicLicensingService {
         allowCommercial: true,
         attributionRequired: true
       }
-    },
-    {
-      trackId: 'jamendo-track-restricted-nd',
-      title: 'Restricted Audio (No-Derivatives)',
-      artistName: 'Acoustic Sound',
-      durationSeconds: 120,
-      audioUrl: 'https://example.com/restricted-nd.mp3',
-      license: {
-        code: 'CC-BY-ND-4.0',
-        name: 'Creative Commons Attribution-NoDerivatives 4.0',
-        allowDerivatives: false,
-        allowCommercial: true,
-        attributionRequired: true
-      }
     }
   ];
 
@@ -83,26 +86,70 @@ export class MusicLicensingService {
     track?: LicensedTrack;
   } {
     const track = this.developmentCatalog.find((t) => t.trackId === trackId);
-
     if (!track) {
       return { allowed: false, reason: 'Track unknown or missing from licensed catalog. Failed closed.' };
     }
-
-    if (!track.license.allowDerivatives) {
-      return {
-        allowed: false,
-        reason: `Track license (${track.license.code}) strictly prohibits audiovisual derivatives/editing (No-Derivatives).`
-      };
-    }
-
-    if (isCommercialDeployment && !track.license.allowCommercial) {
-      return {
-        allowed: false,
-        reason: `Track license (${track.license.code}) prohibits commercial usage.`
-      };
-    }
-
+    if (!track.license.allowDerivatives) return { allowed: false, reason: 'No-Derivatives' };
+    if (isCommercialDeployment && !track.license.allowCommercial) return { allowed: false, reason: 'Non-Commercial only' };
     return { allowed: true, track };
+  }
+
+  // --- Real Jamendo Integration ---
+  
+  private transformJamendoTrack(track: any): NexaMusicTrack {
+    return {
+      id: track.id,
+      title: track.name,
+      artist: track.artist_name,
+      album: track.album_name,
+      artworkUrl: track.image || track.album_image,
+      audioUrl: track.audio,
+      shareUrl: track.shareurl,
+      duration: track.duration,
+      provider: 'jamendo'
+    };
+  }
+
+  public async getTracks(params: { search?: string; tags?: string; id?: string; limit?: number }): Promise<NexaMusicTrack[]> {
+    if (!env.JAMENDO_CLIENT_ID) {
+      // Fallback to mock catalog for unified UI
+      const mock = this.searchLicensedCatalog(params.search).map(t => ({
+        id: t.trackId,
+        title: t.title,
+        artist: t.artistName,
+        album: t.albumName,
+        artworkUrl: t.coverArtUrl,
+        audioUrl: t.audioUrl,
+        shareUrl: '',
+        duration: t.durationSeconds,
+        provider: 'jamendo'
+      }));
+      if (params.id) return mock.filter(m => m.id === params.id);
+      return mock;
+    }
+
+    try {
+      const response = await axios.get(`${this.JAMENDO_BASE_URL}/tracks/`, {
+        params: {
+          client_id: env.JAMENDO_CLIENT_ID,
+          format: 'jsonpretty',
+          limit: params.limit || 20,
+          search: params.search || undefined,
+          tags: params.tags || undefined,
+          id: params.id || undefined,
+          include: 'musicinfo'
+        },
+        timeout: 10000
+      });
+
+      if (response.data && response.data.results) {
+        return response.data.results.map(this.transformJamendoTrack);
+      }
+      return [];
+    } catch (error) {
+      console.error('[MusicLicensingService] Jamendo API Error:', error);
+      throw new Error('Failed to fetch from Jamendo catalog');
+    }
   }
 }
 

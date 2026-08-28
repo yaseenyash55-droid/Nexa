@@ -311,6 +311,8 @@ export const env = {
   LIVEKIT_URL: process.env.LIVEKIT_URL || '',
   LIVEKIT_API_KEY: process.env.LIVEKIT_API_KEY || '',
   LIVEKIT_API_SECRET: process.env.LIVEKIT_API_SECRET || '',
+  
+  JAMENDO_CLIENT_ID: process.env.JAMENDO_CLIENT_ID || '',
 
   REDIS_URL: process.env.REDIS_URL || '',
 

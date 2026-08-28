@@ -6,11 +6,41 @@ import { sendSuccess, sendError } from '../utils/response.js';
 
 export const musicRouter = Router();
 
-musicRouter.get('/catalog', async (req, res, next) => {
+musicRouter.get('/tracks', async (req, res, next) => {
   try {
-    const query = req.query.q as string | undefined;
-    const tracks = musicLicensingService.searchLicensedCatalog(query);
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+    const tracks = await musicLicensingService.getTracks({ limit });
     return sendSuccess(res, tracks);
+  } catch (err) {
+    next(err);
+  }
+});
+
+musicRouter.get('/search', async (req, res, next) => {
+  try {
+    const q = req.query.q as string;
+    const tracks = await musicLicensingService.getTracks({ search: q });
+    return sendSuccess(res, tracks);
+  } catch (err) {
+    next(err);
+  }
+});
+
+musicRouter.get('/genres/:genre', async (req, res, next) => {
+  try {
+    const genre = req.params.genre;
+    const tracks = await musicLicensingService.getTracks({ tags: genre });
+    return sendSuccess(res, tracks);
+  } catch (err) {
+    next(err);
+  }
+});
+
+musicRouter.get('/tracks/:trackId', async (req, res, next) => {
+  try {
+    const tracks = await musicLicensingService.getTracks({ id: req.params.trackId });
+    if (tracks.length === 0) return sendError(res, 'NOT_FOUND', 'Track not found', 404);
+    return sendSuccess(res, tracks[0]);
   } catch (err) {
     next(err);
   }

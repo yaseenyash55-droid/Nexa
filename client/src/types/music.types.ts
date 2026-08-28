@@ -23,3 +23,15 @@ export interface JamendoApiResponse {
   };
   results: JamendoTrack[];
 }
+
+export interface NexaMusicTrack {
+  id: string;
+  title: string;
+  artist: string;
+  album?: string;
+  artworkUrl?: string;
+  audioUrl: string;
+  shareUrl?: string;
+  duration: number;
+  provider: 'jamendo' | 'spotify' | string;
+}
