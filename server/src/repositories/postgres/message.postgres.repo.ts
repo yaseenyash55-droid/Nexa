@@ -43,7 +43,21 @@ export class PostgresMessageRepository implements IMessageRepository {
     };
   }
 
-  async findAiResponseByTrigger(triggerMessageId: number, aiAgent = 'nexa'): Promise<Message | null> {
+  async findAiResponseByTrigger(triggerKey: string | number, aiAgent = 'nexa'): Promise<Message | null> {
+    let triggerId: number | null = null;
+    if (typeof triggerKey === 'number') {
+      triggerId = triggerKey;
+    } else {
+      const parts = triggerKey.split(':');
+      const last = parts[parts.length - 1];
+      const parsed = parseInt(last, 10);
+      if (!isNaN(parsed)) {
+        triggerId = parsed;
+      }
+    }
+
+    if (!triggerId) return null;
+
     const sql = `
       SELECT m.message_id, m.sender_id, m.receiver_id, m.content, m.read_at, m.is_unsent, m.created_at,
              m.sender_type, m.ai_agent, m.trigger_message_id,
@@ -55,7 +69,7 @@ export class PostgresMessageRepository implements IMessageRepository {
         AND m.ai_agent = $2
       LIMIT 1
     `;
-    const res = await executePostgresSql<RawMessageRow>(sql, [triggerMessageId, aiAgent]);
+    const res = await executePostgresSql<RawMessageRow>(sql, [triggerId, aiAgent]);
     const row = res.rows?.[0];
     return row ? this.mapRowToMessage(row) : null;
   }
@@ -228,26 +242,47 @@ export class PostgresMessageRepository implements IMessageRepository {
 
   async unsendMessage(messageId: number, senderId: number): Promise<{ success: boolean; receiverId: number }> {
     const findSql = `
-      SELECT receiver_id
+      SELECT sender_id, receiver_id, created_at, is_unsent
       FROM messages
-      WHERE message_id = $1 AND sender_id = $2 AND is_unsent = FALSE
+      WHERE message_id = $1
     `;
-    const findRes = await executePostgresSql(findSql, [messageId, senderId]);
-    if (findRes.rows.length === 0) {
-      return { success: false, receiverId: 0 };
+    const findRes = await executePostgresSql<any>(findSql, [messageId]);
+    const row = findRes.rows?.[0];
+
+    if (!row) {
+      throw { statusCode: 404, code: 'MESSAGE_NOT_FOUND', message: 'Message not found' };
     }
 
-    const receiverId = Number(findRes.rows[0].receiver_id);
+    const dbSenderId = Number(row.sender_id);
+    const dbReceiverId = Number(row.receiver_id);
+    const dbCreatedAt = row.created_at;
+    const dbIsUnsent = Boolean(row.is_unsent);
+
+    if (dbSenderId !== senderId) {
+      throw { statusCode: 403, code: 'FORBIDDEN', message: 'You can only unsend your own messages' };
+    }
+
+    if (dbIsUnsent) {
+      return { success: true, receiverId: dbReceiverId };
+    }
+
+    // Time window check (1 hour)
+    const messageTime = new Date(dbCreatedAt).getTime();
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    if (messageTime < oneHourAgo) {
+      throw { statusCode: 400, code: 'UNSEND_WINDOW_EXPIRED', message: 'You can only unsend messages within 1 hour of sending.' };
+    }
 
     const updateSql = `
       UPDATE messages
       SET is_unsent = TRUE
-      WHERE message_id = $1 AND sender_id = $2 AND is_unsent = FALSE
+      WHERE message_id = $1
     `;
-    const updateRes = await executePostgresSql(updateSql, [messageId, senderId]);
+    await executePostgresSql(updateSql, [messageId]);
+
     return {
-      success: (updateRes.rowCount || 0) > 0,
-      receiverId
+      success: true,
+      receiverId: dbReceiverId
     };
   }
 }
