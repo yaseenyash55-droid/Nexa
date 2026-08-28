@@ -23,19 +23,27 @@ async function runPostgresMigrations() {
     await client.connect();
     logger.info('Connected to PostgreSQL successfully.');
 
-    const schemaPath = path.resolve(process.cwd(), '../database/postgres/01_schema.sql');
-    const altSchemaPath = path.resolve(process.cwd(), 'database/postgres/01_schema.sql');
-    const targetPath = fs.existsSync(schemaPath) ? schemaPath : altSchemaPath;
+    const migrationsDir = path.resolve(process.cwd(), '../database/postgres');
+    const altMigrationsDir = path.resolve(process.cwd(), 'database/postgres');
+    const targetDir = fs.existsSync(migrationsDir) ? migrationsDir : altMigrationsDir;
 
-    if (!fs.existsSync(targetPath)) {
-      throw new Error(`Schema file not found at: ${targetPath}`);
+    if (!fs.existsSync(targetDir)) {
+      throw new Error(`Migrations directory not found at: ${targetDir}`);
     }
 
-    const sqlContent = fs.readFileSync(targetPath, 'utf8');
-    logger.info(`Applying DDL schema from ${targetPath}...`);
+    const files = fs.readdirSync(targetDir)
+      .filter(f => f.endsWith('.sql'))
+      .sort();
 
-    await client.query(sqlContent);
-    logger.info('PostgreSQL DDL schema applied successfully! All tables, indexes, and constraints are in place.');
+    for (const file of files) {
+      const filePath = path.join(targetDir, file);
+      logger.info(`Applying migration: ${file}...`);
+      const sqlContent = fs.readFileSync(filePath, 'utf8');
+      await client.query(sqlContent);
+      logger.info(`Successfully applied ${file}.`);
+    }
+
+    logger.info('All PostgreSQL migrations applied successfully!');
   } catch (err) {
     logger.error({ err }, 'Error applying PostgreSQL migrations');
     process.exit(1);
