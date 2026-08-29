@@ -174,6 +174,19 @@ data class MessageAttachment(
     fun resolvedUrl(): String? = url ?: resolvedMusic()?.audioUrl
 }
 
+data class ReactionSummary(
+    @SerializedName("reaction") val reaction: String,
+    @SerializedName("count") val count: Int,
+    @SerializedName("reactedByMe") val reactedByMe: Boolean
+)
+
+data class ReplyPreview(
+    @SerializedName("messageId") val messageId: Int,
+    @SerializedName("senderName") val senderName: String?,
+    @SerializedName("contentPreview") val contentPreview: String?,
+    @SerializedName("isUnsent") val isUnsent: Boolean? = false
+)
+
 data class Message(
     @SerializedName("messageId") val messageId: Int,
     @SerializedName("senderId") val senderId: Int? = null,
@@ -181,15 +194,30 @@ data class Message(
     @SerializedName("content") val content: String = "",
     @SerializedName("attachments") val attachments: List<MessageAttachment> = emptyList(),
     @SerializedName("isRead") val isRead: Boolean = false,
+    @SerializedName("senderType") val senderType: String? = null,
     @SerializedName("aiAgent") val aiAgent: String? = null,
     @SerializedName("triggerMessageId") val triggerMessageId: Int? = null,
+    @SerializedName("editedAt") val editedAt: String? = null,
+    @SerializedName("replyToMessageId") val replyToMessageId: Int? = null,
+    @SerializedName("replyPreview") val replyPreview: ReplyPreview? = null,
+    @SerializedName("reactions") val reactions: List<ReactionSummary>? = null,
+    @SerializedName("isUnsent") val isUnsent: Boolean? = false,
     @SerializedName("createdAt") val createdAt: String? = null
 )
 
 data class SendDirectMessageRequest(
     @SerializedName("receiverId") val receiverId: Int,
     @SerializedName("content") val content: String = "",
+    @SerializedName("replyToMessageId") val replyToMessageId: Int? = null,
     @SerializedName("attachments") val attachments: List<MessageAttachment>? = null
+)
+
+data class EditMessageRequest(
+    @SerializedName("content") val content: String
+)
+
+data class AddReactionRequest(
+    @SerializedName("reaction") val reaction: String
 )
 
 data class MarkReadResponse(
@@ -282,13 +310,20 @@ data class GroupMessage(
     @SerializedName("sender") val sender: GroupSender? = null,
     @SerializedName("content") val content: String = "",
     @SerializedName("attachments") val attachments: List<MessageAttachment> = emptyList(),
+    @SerializedName("senderType") val senderType: String? = null,
     @SerializedName("aiAgent") val aiAgent: String? = null,
     @SerializedName("triggerMessageId") val triggerMessageId: Int? = null,
+    @SerializedName("editedAt") val editedAt: String? = null,
+    @SerializedName("replyToMessageId") val replyToMessageId: Int? = null,
+    @SerializedName("replyPreview") val replyPreview: ReplyPreview? = null,
+    @SerializedName("reactions") val reactions: List<ReactionSummary>? = null,
+    @SerializedName("isUnsent") val isUnsent: Boolean? = false,
     @SerializedName("createdAt") val createdAt: String? = null
 )
 
 data class SendGroupMessageRequest(
     @SerializedName("content") val content: String = "",
+    @SerializedName("replyToMessageId") val replyToMessageId: Int? = null,
     @SerializedName("attachments") val attachments: List<MessageAttachment>? = null
 )
 
@@ -349,7 +384,12 @@ data class DisplayMessage(
     val isRead: Boolean = false,
     val attachments: List<MessageAttachment> = emptyList(),
     val isAi: Boolean = false,
-    val aiAgent: String? = null
+    val aiAgent: String? = null,
+    val editedAt: String? = null,
+    val isUnsent: Boolean = false,
+    val replyToMessageId: Int? = null,
+    val replyPreview: ReplyPreview? = null,
+    val reactions: List<ReactionSummary>? = null
 )
 
 data class Comment(

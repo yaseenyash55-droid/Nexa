@@ -107,6 +107,24 @@ export interface Reel {
   createdAt: string;
 }
 
+export interface MessageReaction {
+  reactionId: number;
+  messageId?: number | null;
+  groupMessageId?: number | null;
+  userId: number;
+  reaction: string;
+  username?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReactionSummary {
+  reaction: string;
+  count: number;
+  /** userId of the authenticated viewer if they placed this reaction, else null */
+  myReactionId?: number | null;
+}
+
 export interface Message {
   messageId: number;
   senderId?: number | null;
@@ -123,6 +141,10 @@ export interface Message {
   senderType?: 'user' | 'ai';
   aiAgent?: string;
   triggerMessageId?: number | null;
+  replyToMessageId?: number | null;
+  replyPreview?: { senderId?: number | null; senderName: string; content: string } | null;
+  editedAt?: string | null;
+  reactions?: ReactionSummary[];
   attachments?: any[];
   createdAt: string;
 }
@@ -176,6 +198,11 @@ export interface GroupMessage {
   senderType?: 'user' | 'ai';
   aiAgent?: string;
   triggerMessageId?: number | null;
+  replyToMessageId?: number | null;
+  replyPreview?: { senderId?: number | null; senderName: string; content: string } | null;
+  editedAt?: string | null;
+  isUnsent?: boolean;
+  reactions?: ReactionSummary[];
   attachments?: any[];
   createdAt: string;
 }

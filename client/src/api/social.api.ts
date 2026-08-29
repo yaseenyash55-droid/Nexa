@@ -1,5 +1,5 @@
 import { api } from './client.js';
-import { Story, Reel, Message, ApiResponse } from '../types/index.js';
+import { Story, Reel, Message, ApiResponse, ReactionSummary } from '../types/index.js';
 
 export interface ConversationSummary {
   otherUserId: number;
@@ -71,13 +71,33 @@ export const socialApi = {
     return res.data.data;
   },
 
-  sendMessage: async (receiverId: number, content?: string, attachments?: any[]): Promise<Message> => {
-    const res = await api.post<ApiResponse<Message>>('/messages', { receiverId, content, attachments });
+  sendMessage: async (receiverId: number, content?: string, attachments?: any[], replyToMessageId?: number | null): Promise<Message> => {
+    const res = await api.post<ApiResponse<Message>>('/messages', { receiverId, content, attachments, replyToMessageId });
     return res.data.data;
   },
 
   markMessageRead: async (messageId: number): Promise<{ rowsAffected: number; read: boolean; readAt: string | null }> => {
     const res = await api.post<ApiResponse<{ rowsAffected: number; read: boolean; readAt: string | null }>>(`/messages/${messageId}/read`);
+    return res.data.data;
+  },
+
+  unsendMessage: async (messageId: number): Promise<{ success: boolean; messageId: number }> => {
+    const res = await api.delete(`/messages/${messageId}`);
+    return res.data.data;
+  },
+
+  editMessage: async (messageId: number, content: string): Promise<{ success: boolean; messageId: number; editedAt: string }> => {
+    const res = await api.patch(`/messages/${messageId}`, { content });
+    return res.data.data;
+  },
+
+  addReaction: async (messageId: number, reaction: string): Promise<{ success: boolean; reactions: ReactionSummary[] }> => {
+    const res = await api.put(`/messages/${messageId}/reaction`, { reaction });
+    return res.data.data;
+  },
+
+  removeReaction: async (messageId: number): Promise<{ success: boolean; reactions: ReactionSummary[] }> => {
+    const res = await api.delete(`/messages/${messageId}/reaction`);
     return res.data.data;
   }
 };

@@ -19,6 +19,48 @@
         android:paddingHorizontal="10dp"
         android:paddingVertical="8dp">
 
+        <!-- Unsent State Indicator -->
+        <TextView
+            android:id="@+id/tvUnsent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🚫 This message was unsent"
+            android:textColor="#A5B4FC"
+            android:textSize="14sp"
+            android:textStyle="italic"
+            android:visibility="gone" />
+
+        <!-- Reply Preview -->
+        <LinearLayout
+            android:id="@+id/layoutReplyPreview"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:background="#33000000"
+            android:orientation="vertical"
+            android:padding="6dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvReplySender"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Sender"
+                android:textColor="#A5B4FC"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvReplyContent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Message preview..."
+                android:textColor="#C7D2FE"
+                android:textSize="11sp" />
+        </LinearLayout>
+
         <!-- Music Track Card -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardMusicTrack"
@@ -167,6 +209,17 @@
                 android:textStyle="bold"
                 android:visibility="gone" />
 
+            
+            <TextView
+                android:id="@+id/tvEdited"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:text="(edited)"
+                android:textColor="#A5B4FC"
+                android:textSize="10sp"
+                android:textStyle="italic"
+                android:visibility="gone" />
             <TextView
                 android:id="@+id/tvTime"
                 android:layout_width="wrap_content"
@@ -175,5 +228,14 @@
                 android:textSize="10sp"
                 tools:text="12:45" />
         </LinearLayout>
+
+        <!-- Reactions Container -->
+        <LinearLayout
+            android:id="@+id/layoutReactions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal"
+            android:visibility="gone" />
     </LinearLayout>
 </LinearLayout>

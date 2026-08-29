@@ -69,4 +69,30 @@ interface GroupApi {
         @Path("id") groupId: Int,
         @Body request: com.nexa.social.data.models.SendGroupMessageRequest
     ): Response<ApiResponse<GroupMessage>>
+
+    @POST("groups/{id}/messages/{messageId}/reactions")
+    suspend fun addGroupReaction(
+        @Path("id") groupId: Int,
+        @Path("messageId") messageId: Int,
+        @Body request: com.nexa.social.data.models.AddReactionRequest
+    ): Response<ApiResponse<GroupMessage>>
+
+    @DELETE("groups/{id}/messages/{messageId}/reactions")
+    suspend fun removeGroupReaction(
+        @Path("id") groupId: Int,
+        @Path("messageId") messageId: Int
+    ): Response<ApiResponse<GroupMessage>>
+
+    @retrofit2.http.PUT("groups/{id}/messages/{messageId}")
+    suspend fun editGroupMessage(
+        @Path("id") groupId: Int,
+        @Path("messageId") messageId: Int,
+        @Body request: com.nexa.social.data.models.EditMessageRequest
+    ): Response<ApiResponse<GroupMessage>>
+
+    @DELETE("groups/{id}/messages/{messageId}")
+    suspend fun unsendGroupMessage(
+        @Path("id") groupId: Int,
+        @Path("messageId") messageId: Int
+    ): Response<ApiResponse<Unit>>
 }

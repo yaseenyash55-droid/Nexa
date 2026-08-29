@@ -405,4 +405,120 @@ export class OracleMessageRepository implements IMessageRepository {
       return { success: true, receiverId: dbReceiverId };
     });
   }
+  async getMessageParticipants(messageId: number): Promise<{ senderId: number | null; receiverId: number } | null> {
+    const res = await executeSql<{ SENDER_ID: number | null; RECEIVER_ID: number }>(
+      `SELECT SENDER_ID, RECEIVER_ID FROM MESSAGES WHERE MESSAGE_ID = :messageId`,
+      { messageId }
+    );
+    const row = (res.rows as any[])?.[0];
+    if (!row) return null;
+    return {
+      senderId: row.SENDER_ID ? Number(row.SENDER_ID) : null,
+      receiverId: Number(row.RECEIVER_ID)
+    };
+  }
+
+  // -----------------------------------------------------------------
+  // Edit a DM — only the original sender may edit (Oracle version).
+  // -----------------------------------------------------------------
+  async editMessage(
+    messageId: number,
+    senderId: number,
+    content: string
+  ): Promise<{ success: boolean; editedAt: Date | string }> {
+    const trimmed = content.trim();
+    if (!trimmed) throw { statusCode: 400, code: 'INVALID_INPUT', message: 'Content cannot be empty' };
+    return withTransaction(async (conn) => {
+      const res = await conn.execute(
+        `UPDATE MESSAGES
+         SET CONTENT = :content, EDITED_AT = SYSTIMESTAMP
+         WHERE MESSAGE_ID = :messageId
+           AND SENDER_ID   = :senderId
+           AND IS_UNSENT   = 0
+           AND SENDER_TYPE = 'user'`,
+        { content: trimmed, messageId, senderId }
+      );
+      const affected = (res.rowsAffected ?? 0);
+      if (!affected) return { success: false, editedAt: new Date() };
+      const ts = await conn.execute(
+        `SELECT EDITED_AT FROM MESSAGES WHERE MESSAGE_ID = :messageId`,
+        { messageId }
+      );
+      const row = (ts.rows as any[])?.[0];
+      const editedAt = row?.EDITED_AT ?? row?.[0] ?? new Date();
+      return { success: true, editedAt };
+    });
+  }
+  // -----------------------------------------------------------------
+  // Upsert a reaction on a DM (Oracle MERGE).
+  // -----------------------------------------------------------------
+  async upsertReaction(
+    messageId: number,
+    userId: number,
+    reaction: string
+  ): Promise<{ reactionId: number; updatedAt: string }> {
+    return withTransaction(async (conn) => {
+      await conn.execute(
+        `MERGE INTO MESSAGE_REACTIONS tgt
+         USING DUAL
+         ON (tgt.MESSAGE_ID = :messageId AND tgt.USER_ID = :userId)
+         WHEN MATCHED THEN
+           UPDATE SET REACTION = :reaction, UPDATED_AT = SYSTIMESTAMP
+         WHEN NOT MATCHED THEN
+           INSERT (MESSAGE_ID, USER_ID, REACTION, CREATED_AT, UPDATED_AT)
+           VALUES (:messageId, :userId, :reaction, SYSTIMESTAMP, SYSTIMESTAMP)`,
+        { messageId, userId, reaction }
+      );
+      const res = await conn.execute(
+        `SELECT REACTION_ID, UPDATED_AT
+         FROM MESSAGE_REACTIONS
+         WHERE MESSAGE_ID = :messageId AND USER_ID = :userId`,
+        { messageId, userId }
+      );
+      const row = (res.rows as any[])?.[0];
+      const reactionId = Number(row?.REACTION_ID ?? row?.[0] ?? 0);
+      const updatedAt = new Date(row?.UPDATED_AT ?? row?.[1] ?? new Date()).toISOString();
+      return { reactionId, updatedAt };
+    });
+  }
+  // -----------------------------------------------------------------
+  // Remove a reaction from a DM.
+  // -----------------------------------------------------------------
+  async removeReaction(
+    messageId: number,
+    userId: number
+  ): Promise<{ success: boolean }> {
+    return withTransaction(async (conn) => {
+      const res = await conn.execute(
+        `DELETE FROM MESSAGE_REACTIONS WHERE MESSAGE_ID = :messageId AND USER_ID = :userId`,
+        { messageId, userId }
+      );
+      return { success: Boolean(res.rowsAffected && res.rowsAffected > 0) };
+    });
+  }
+  // -----------------------------------------------------------------
+  // Aggregate reactions for a DM into summary rows.
+  // -----------------------------------------------------------------
+  async getReactions(
+    messageId: number,
+    viewerUserId?: number
+  ): Promise<import('../../types/index.js').ReactionSummary[]> {
+    const sql = `
+      SELECT REACTION,
+             COUNT(*) AS CNT,
+             MAX(CASE WHEN USER_ID = :viewerUserId THEN REACTION_ID ELSE NULL END) AS MY_REACTION_ID
+      FROM MESSAGE_REACTIONS
+      WHERE MESSAGE_ID = :messageId
+      GROUP BY REACTION
+      ORDER BY CNT DESC
+    `;
+    const res = await executeSql<{
+      REACTION: string; CNT: number | string; MY_REACTION_ID: number | null
+    }>(sql, { messageId, viewerUserId: viewerUserId ?? 0 });
+    return (res.rows || []).map((r) => ({
+      reaction: r.REACTION,
+      count: Number(r.CNT),
+      myReactionId: r.MY_REACTION_ID ? Number(r.MY_REACTION_ID) : null
+    }));
+  }
 }

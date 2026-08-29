@@ -1,5 +1,5 @@
 import { api } from './client.js';
-import { User, ApiResponse } from '../types/index.js';
+import { User, ApiResponse, ReactionSummary } from '../types/index.js';
 
 export interface Group {
   groupId: number;
@@ -24,7 +24,7 @@ export interface GroupMember {
 export interface GroupMessage {
   messageId: number;
   groupId: number;
-  senderId: number;
+  senderId?: number | null;
   sender: {
     userId: number;
     username: string;
@@ -32,6 +32,14 @@ export interface GroupMessage {
     profileImageUrl?: string | null;
   };
   content: string;
+  senderType?: 'user' | 'ai';
+  aiAgent?: string;
+  isUnsent?: boolean;
+  editedAt?: string | null;
+  replyToMessageId?: number | null;
+  replyPreview?: { senderId?: number | null; senderName: string; content: string } | null;
+  reactions?: ReactionSummary[];
+  attachments?: any[];
   createdAt: string;
 }
 
@@ -51,8 +59,28 @@ export const groupsApi = {
     return res.data.data;
   },
 
-  sendGroupMessage: async (groupId: number, content?: string, attachments?: any[]): Promise<GroupMessage> => {
-    const res = await api.post<ApiResponse<GroupMessage>>(`/groups/${groupId}/messages`, { content, attachments });
+  sendGroupMessage: async (groupId: number, content?: string, attachments?: any[], replyToMessageId?: number | null): Promise<GroupMessage> => {
+    const res = await api.post<ApiResponse<GroupMessage>>(`/groups/${groupId}/messages`, { content, attachments, replyToMessageId });
+    return res.data.data;
+  },
+
+  unsendGroupMessage: async (groupId: number, messageId: number): Promise<{ success: boolean; messageId: number }> => {
+    const res = await api.delete(`/groups/${groupId}/messages/${messageId}`);
+    return res.data.data;
+  },
+
+  editGroupMessage: async (groupId: number, messageId: number, content: string): Promise<{ success: boolean; messageId: number; editedAt: string }> => {
+    const res = await api.patch(`/groups/${groupId}/messages/${messageId}`, { content });
+    return res.data.data;
+  },
+
+  addGroupReaction: async (groupId: number, messageId: number, reaction: string): Promise<{ success: boolean; reactions: ReactionSummary[] }> => {
+    const res = await api.put(`/groups/${groupId}/messages/${messageId}/reaction`, { reaction });
+    return res.data.data;
+  },
+
+  removeGroupReaction: async (groupId: number, messageId: number): Promise<{ success: boolean; reactions: ReactionSummary[] }> => {
+    const res = await api.delete(`/groups/${groupId}/messages/${messageId}/reaction`);
     return res.data.data;
   },
 

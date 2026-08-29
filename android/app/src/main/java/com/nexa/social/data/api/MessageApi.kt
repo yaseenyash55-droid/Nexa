@@ -38,4 +38,26 @@ interface MessageApi {
 
     @GET("broadcasts")
     suspend fun getUserBroadcasts(): Response<ApiResponse<List<Broadcast>>>
+
+    @POST("messages/{messageId}/reactions")
+    suspend fun addReaction(
+        @Path("messageId") messageId: Int,
+        @Body request: com.nexa.social.data.models.AddReactionRequest
+    ): Response<ApiResponse<Message>>
+
+    @retrofit2.http.DELETE("messages/{messageId}/reactions")
+    suspend fun removeReaction(
+        @Path("messageId") messageId: Int
+    ): Response<ApiResponse<Message>>
+
+    @retrofit2.http.PUT("messages/{messageId}")
+    suspend fun editMessage(
+        @Path("messageId") messageId: Int,
+        @Body request: com.nexa.social.data.models.EditMessageRequest
+    ): Response<ApiResponse<Message>>
+
+    @retrofit2.http.DELETE("messages/{messageId}")
+    suspend fun unsendMessage(
+        @Path("messageId") messageId: Int
+    ): Response<ApiResponse<Unit>>
 }

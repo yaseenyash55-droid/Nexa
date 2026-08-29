@@ -1,4 +1,4 @@
-import { User, Post, Comment, Notification, Story, Reel, Message, ConversationSummary, PaginatedResult } from '../types/index.js';
+import { User, Post, Comment, Notification, Story, Reel, Message, GroupMessage, ConversationSummary, PaginatedResult, MessageReaction, ReactionSummary } from '../types/index.js';
 
 export interface IUserRepository {
   createUser(user: {
@@ -102,13 +102,18 @@ export interface IReelRepository {
 }
 
 export interface IMessageRepository {
-  sendMessage(msg: { senderId: number; receiverId: number; content: string; attachments?: any[] }): Promise<Message>;
+  sendMessage(msg: { senderId: number; receiverId: number; content: string; attachments?: any[]; replyToMessageId?: number | null }): Promise<Message>;
   sendAiMessage(msg: { receiverId: number; content: string; aiAgent?: string; triggerMessageId?: number | null; attachments?: any[] }): Promise<Message>;
   findAiResponseByTrigger?(triggerKey: string | number, aiAgent?: string): Promise<Message | null>;
   getMessagesBetweenUsers(userA: number, userB: number): Promise<Message[]>;
+  getMessageParticipants(messageId: number): Promise<{ senderId: number | null; receiverId: number } | null>;
   markMessageAsRead(messageId: number, receiverUserId: number): Promise<{ rowsAffected: number; readAt: Date | null; senderId: number | null }>;
   getConversations(userId: number): Promise<ConversationSummary[]>;
   unsendMessage(messageId: number, senderId: number): Promise<{ success: boolean; receiverId: number }>;
+  editMessage(messageId: number, senderId: number, content: string): Promise<{ success: boolean; editedAt: Date | string }>;
+  upsertReaction(messageId: number, userId: number, reaction: string): Promise<{ reactionId: number; updatedAt: string }>;
+  removeReaction(messageId: number, userId: number): Promise<{ success: boolean }>;
+  getReactions(messageId: number, viewerUserId?: number): Promise<ReactionSummary[]>;
 }
 
 export interface IAuthRepository {

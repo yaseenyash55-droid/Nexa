@@ -17,6 +17,7 @@ import com.nexa.social.data.models.AiUpdatePreferencesRequest
 import com.nexa.social.data.models.AiWritingRequest
 import com.nexa.social.data.models.AiWritingResponse
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -297,7 +298,6 @@ class AiRepository(
         }
 
         return object : CancellableStream {
-            override val job: Job = job
             override fun cancel() {
                 job.cancel()
                 try {

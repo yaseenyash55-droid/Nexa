@@ -101,6 +101,12 @@ export interface Reel {
   createdAt: string;
 }
 
+export interface ReactionSummary {
+  reaction: string;
+  count: number;
+  myReactionId?: number | null;
+}
+
 export interface Message {
   messageId: number;
   senderId?: number | null;
@@ -116,6 +122,10 @@ export interface Message {
   isUnsent?: boolean;
   senderType?: 'user' | 'ai';
   aiAgent?: string;
+  replyToMessageId?: number | null;
+  replyPreview?: { senderId?: number | null; senderName: string; content: string } | null;
+  editedAt?: string | null;
+  reactions?: ReactionSummary[];
   createdAt: string;
 }
 

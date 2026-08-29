@@ -10,6 +10,8 @@ interface RawMessageRow {
   read_at?: Date | string | null;
   is_unsent: boolean;
   created_at: Date | string;
+  edited_at?: Date | string | null;
+  reply_to_message_id?: number | string | null;
   sender_username?: string | null;
   sender_display_name?: string | null;
   sender_profile_image?: string | null;
@@ -39,6 +41,8 @@ export class PostgresMessageRepository implements IMessageRepository {
       content: isUnsent ? 'Message unsent' : row.content,
       isRead: Boolean(row.read_at),
       isUnsent,
+      editedAt: row.edited_at ? new Date(row.edited_at).toISOString() : null,
+      replyToMessageId: row.reply_to_message_id ? Number(row.reply_to_message_id) : null,
       createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString()
     };
   }
@@ -115,21 +119,21 @@ export class PostgresMessageRepository implements IMessageRepository {
     };
   }
 
-  async sendMessage(msg: { senderId: number; receiverId: number; content: string; attachments?: any[] }): Promise<Message> {
+  async sendMessage(msg: { senderId: number; receiverId: number; content: string; attachments?: any[]; replyToMessageId?: number | null }): Promise<Message> {
     if ((!msg.content || !msg.content.trim()) && (!msg.attachments || msg.attachments.length === 0)) {
       throw new Error('Message content or attachments are required');
     }
 
     const sql = `
-      INSERT INTO messages (sender_id, receiver_id, content)
-      VALUES ($1, $2, $3)
+      INSERT INTO messages (sender_id, receiver_id, content, reply_to_message_id)
+      VALUES ($1, $2, $3, $4)
       RETURNING message_id, created_at
     `;
 
     const res = await executePostgresSql<{
       message_id: number | string;
       created_at: Date | string;
-    }>(sql, [msg.senderId, msg.receiverId, msg.content?.trim() || '']);
+    }>(sql, [msg.senderId, msg.receiverId, msg.content?.trim() || '', msg.replyToMessageId ?? null]);
 
     const createdRow = res.rows[0];
     const messageId = Number(createdRow.message_id);
@@ -201,6 +205,7 @@ export class PostgresMessageRepository implements IMessageRepository {
       },
       content: msg.content?.trim() || '',
       attachments: savedAttachments.length > 0 ? savedAttachments : undefined,
+      replyToMessageId: msg.replyToMessageId ?? null,
       isRead: false,
       createdAt: new Date(createdRow.created_at).toISOString()
     };
@@ -209,7 +214,7 @@ export class PostgresMessageRepository implements IMessageRepository {
   async getMessagesBetweenUsers(userA: number, userB: number): Promise<Message[]> {
     const sql = `
       SELECT m.message_id, m.sender_id, m.receiver_id, m.content, m.read_at, m.is_unsent, m.created_at,
-             m.sender_type, m.ai_agent, m.trigger_message_id,
+             m.sender_type, m.ai_agent, m.trigger_message_id, m.reply_to_message_id, m.edited_at,
              u.username AS sender_username, u.display_name AS sender_display_name, u.profile_image_url AS sender_profile_image
       FROM messages m
       LEFT JOIN users u ON m.sender_id = u.user_id
@@ -355,4 +360,107 @@ export class PostgresMessageRepository implements IMessageRepository {
       receiverId: Number(row.receiver_id)
     };
   }
+
+
+  async getMessageParticipants(messageId: number): Promise<{ senderId: number | null; receiverId: number } | null> {
+    const sql = `SELECT sender_id, receiver_id FROM messages WHERE message_id = $1 LIMIT 1`;
+    const res = await executePostgresSql<{ sender_id: number | null; receiver_id: number }>(sql, [messageId]);
+    const row = res.rows?.[0];
+    if (!row) return null;
+    return { senderId: row.sender_id ? Number(row.sender_id) : null, receiverId: Number(row.receiver_id) };
+  }
+
+  // -----------------------------------------------------------------
+  // Edit a DM — only the original sender may edit their own message.
+  // Returns success=false if no matching row was updated.
+  // -----------------------------------------------------------------
+  async editMessage(
+    messageId: number,
+    senderId: number,
+    content: string
+  ): Promise<{ success: boolean; editedAt: Date | string }> {
+    const trimmed = content.trim();
+    if (!trimmed) throw { statusCode: 400, code: 'INVALID_INPUT', message: 'Content cannot be empty' };
+
+    const sql = `
+      UPDATE messages
+      SET content = $1, edited_at = NOW()
+      WHERE message_id = $2
+        AND sender_id   = $3
+        AND is_unsent   = FALSE
+        AND sender_type = 'user'
+      RETURNING edited_at
+    `;
+    const res = await executePostgresSql<{ edited_at: Date }>(sql, [trimmed, messageId, senderId]);
+    const row = res.rows?.[0];
+    if (!row) return { success: false, editedAt: new Date() };
+    return { success: true, editedAt: row.edited_at };
+  }
+
+  // -----------------------------------------------------------------
+  // Upsert a reaction on a DM.
+  // Uses INSERT … ON CONFLICT to handle the unique (message_id, user_id) constraint.
+  // -----------------------------------------------------------------
+  async upsertReaction(
+    messageId: number,
+    userId: number,
+    reaction: string
+  ): Promise<{ reactionId: number; updatedAt: string }> {
+    const sql = `
+      INSERT INTO message_reactions (message_id, user_id, reaction, created_at, updated_at)
+      VALUES ($1, $2, $3, NOW(), NOW())
+      ON CONFLICT (message_id, user_id)
+      DO UPDATE SET reaction = EXCLUDED.reaction, updated_at = NOW()
+      RETURNING reaction_id, updated_at
+    `;
+    const res = await executePostgresSql<{ reaction_id: number; updated_at: Date }>(
+      sql,
+      [messageId, userId, reaction]
+    );
+    const row = res.rows[0];
+    return { reactionId: Number(row.reaction_id), updatedAt: new Date(row.updated_at).toISOString() };
+  }
+
+  // -----------------------------------------------------------------
+  // Remove a reaction from a DM.
+  // -----------------------------------------------------------------
+  async removeReaction(
+    messageId: number,
+    userId: number
+  ): Promise<{ success: boolean }> {
+    const sql = `
+      DELETE FROM message_reactions
+      WHERE message_id = $1 AND user_id = $2
+    `;
+    const res = await executePostgresSql(sql, [messageId, userId]);
+    return { success: Boolean(res.rowCount && res.rowCount > 0) };
+  }
+
+  // -----------------------------------------------------------------
+  // Aggregate reactions for a DM into summary rows.
+  // -----------------------------------------------------------------
+  async getReactions(
+    messageId: number,
+    viewerUserId?: number
+  ): Promise<import('../../types/index.js').ReactionSummary[]> {
+    const sql = `
+      SELECT reaction,
+             COUNT(*)::int AS count,
+             MAX(CASE WHEN user_id = $2 THEN reaction_id ELSE NULL END) AS my_reaction_id
+      FROM message_reactions
+      WHERE message_id = $1
+      GROUP BY reaction
+      ORDER BY count DESC
+    `;
+    const res = await executePostgresSql<{ reaction: string; count: number; my_reaction_id: number | null }>(
+      sql,
+      [messageId, viewerUserId ?? 0]
+    );
+    return (res.rows || []).map((r) => ({
+      reaction: r.reaction,
+      count: Number(r.count),
+      myReactionId: r.my_reaction_id ? Number(r.my_reaction_id) : null
+    }));
+  }
+
 }

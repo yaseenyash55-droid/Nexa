@@ -41,9 +41,15 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import android.widget.LinearLayout
+import android.widget.TextView
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import android.util.TypedValue
+import android.view.Gravity
+import com.nexa.social.data.models.ReplyPreview
+import com.nexa.social.data.models.ReactionSummary
 
 class ChatActivity : AppCompatActivity() {
 
@@ -168,6 +174,8 @@ class ChatActivity : AppCompatActivity() {
         SocketManager.unregisterMessageListener()
         SocketManager.unregisterMessageReadListener()
         SocketManager.unregisterGroupMessageListener()
+        SocketManager.unregisterMessageInteractionListeners()
+        SocketManager.unregisterGroupMessageInteractionListeners()
         stopTypingRunnable?.let { mainHandler.removeCallbacks(it) }
         try { cameraTempFile?.delete() } catch (_: Exception) {}
     }
@@ -250,6 +258,9 @@ class ChatActivity : AppCompatActivity() {
             chatTheme = currentTheme,
             onMarkAsReadClick = { msg ->
                 markSingleMessageAsRead(msg)
+            },
+            onMessageLongClick = { msg, view ->
+                showMessageActionsBottomSheet(msg)
             }
         )
 
@@ -257,6 +268,169 @@ class ChatActivity : AppCompatActivity() {
             stackFromEnd = true
         }
         binding.rvMessages.adapter = adapter
+    }
+
+    private fun dpToPx(dp: Int): Int {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            dp.toFloat(),
+            resources.displayMetrics
+        ).toInt()
+    }
+
+    private fun showMessageActionsBottomSheet(message: DisplayMessage) {
+        val bottomSheetDialog = BottomSheetDialog(this)
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(16))
+            setBackgroundColor(resources.getColor(android.R.color.background_dark, theme))
+        }
+
+        val title = TextView(this).apply {
+            text = "Message Actions"
+            textSize = 16f
+            setTextColor(resources.getColor(android.R.color.white, theme))
+            setPadding(0, 0, 0, dpToPx(16))
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        layout.addView(title)
+
+        fun addAction(label: String, onClick: () -> Unit) {
+            val tv = TextView(this@ChatActivity).apply {
+                text = label
+                textSize = 15f
+                setTextColor(resources.getColor(android.R.color.white, theme))
+                setPadding(dpToPx(16), dpToPx(12), dpToPx(16), dpToPx(12))
+                setOnClickListener {
+                    onClick()
+                    bottomSheetDialog.dismiss()
+                }
+            }
+            layout.addView(tv)
+        }
+
+        if (!message.isUnsent) {
+            addAction("Reply") {
+                handleReply(message)
+            }
+
+            if (message.isSelf) {
+                addAction("Edit") {
+                    handleEditMessage(message)
+                }
+                addAction("Unsend") {
+                    confirmUnsendMessage(message)
+                }
+            }
+        }
+
+        // Simple reactions for now
+        if (message.isUnsent) {
+            val unTv = TextView(this).apply {
+                text = "Message unsent. No actions available."
+                setTextColor(resources.getColor(android.R.color.white, theme))
+                setPadding(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(16))
+            }
+            layout.addView(unTv)
+            bottomSheetDialog.setContentView(layout)
+            bottomSheetDialog.show()
+            return
+        }
+        val reactions = listOf("👍", "❤️", "😂", "😮", "😢", "🔥")
+        val reactionsLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, dpToPx(16), 0, dpToPx(8))
+        }
+        for (r in reactions) {
+            val tv = TextView(this).apply {
+                text = r
+                textSize = 24f
+                setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
+                setOnClickListener {
+                    handleAddReaction(message, r)
+                    bottomSheetDialog.dismiss()
+                }
+            }
+            reactionsLayout.addView(tv)
+        }
+        layout.addView(reactionsLayout)
+
+        bottomSheetDialog.setContentView(layout)
+        bottomSheetDialog.show()
+    }
+
+    private var editingMessageId: Int? = null
+    private var replyingToMessageId: Int? = null
+
+    private fun handleReply(message: DisplayMessage) {
+        replyingToMessageId = message.id
+        binding.etMessage.hint = "Replying to ${message.senderName ?: "message"}..."
+        binding.etMessage.requestFocus()
+    }
+
+    private fun handleEditMessage(message: DisplayMessage) {
+        editingMessageId = message.id
+        binding.etMessage.setText(message.content)
+        binding.etMessage.setSelection(message.content.length)
+        binding.etMessage.requestFocus()
+    }
+
+    private fun confirmUnsendMessage(message: DisplayMessage) {
+        AlertDialog.Builder(this)
+            .setTitle("Unsend Message")
+            .setMessage("Are you sure you want to unsend this message? It will be removed for everyone.")
+            .setPositiveButton("Unsend") { _, _ ->
+                performUnsend(message.id)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun performUnsend(messageId: Int) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val response = if (chatType == "direct") {
+                    NexaApiClient.messageApi.unsendMessage(messageId)
+                } else {
+                    NexaApiClient.groupApi.unsendGroupMessage(targetId, messageId)
+                }
+                if (response.isSuccessful) {
+                    withContext(Dispatchers.Main) {
+                        // Optimistically remove from adapter
+                        val currentList = adapter.getItems().toMutableList()
+                        val idx = currentList.indexOfFirst { it.id == messageId }
+                        if (idx >= 0) {
+                            val updatedMsg = currentList[idx].copy(isUnsent = true, content = "This message was unsent.", attachments = emptyList())
+                            adapter.addMessage(updatedMsg)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@ChatActivity, "Failed to unsend: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun handleAddReaction(message: DisplayMessage, reaction: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val response = if (chatType == "direct") {
+                    NexaApiClient.messageApi.addReaction(message.id, com.nexa.social.data.models.AddReactionRequest(reaction))
+                } else {
+                    NexaApiClient.groupApi.addGroupReaction(targetId, message.id, com.nexa.social.data.models.AddReactionRequest(reaction))
+                }
+                if (response.isSuccessful) {
+                    // Reaction added, socket should receive it or we can manually update
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@ChatActivity, "Failed to add reaction: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     private fun loadCachedMessages() {
@@ -302,6 +476,32 @@ class ChatActivity : AppCompatActivity() {
                     }
                 }
             }
+            SocketManager.registerMessageInteractionListeners(
+                onEdit = { msg ->
+                    val current = adapter.getItems().toMutableList()
+                    val idx = current.indexOfFirst { it.id == msg.messageId }
+                    if (idx >= 0) {
+                        val updated = current[idx].copy(content = msg.content, editedAt = msg.createdAt)
+                        adapter.addMessage(updated)
+                    }
+                },
+                onUnsend = { msgId ->
+                    val current = adapter.getItems().toMutableList()
+                    val idx = current.indexOfFirst { it.id == msgId }
+                    if (idx >= 0) {
+                        val updated = current[idx].copy(isUnsent = true)
+                        adapter.addMessage(updated)
+                    }
+                },
+                onReaction = { msg ->
+                    val current = adapter.getItems().toMutableList()
+                    val idx = current.indexOfFirst { it.id == msg.messageId }
+                    if (idx >= 0) {
+                        val updated = current[idx].copy(reactions = msg.reactions)
+                        adapter.addMessage(updated)
+                    }
+                }
+            )
         } else {
             SocketManager.registerGroupMessageListener { groupMsg ->
                 val isAi = groupMsg.aiAgent == "nexa" || groupMsg.senderId == null || groupMsg.content.startsWith("🤖 **NEXA AI**")
@@ -323,6 +523,32 @@ class ChatActivity : AppCompatActivity() {
                     binding.rvMessages.smoothScrollToPosition(adapter.itemCount - 1)
                 }
             }
+            SocketManager.registerGroupMessageInteractionListeners(
+                onEdit = { msg ->
+                    val current = adapter.getItems().toMutableList()
+                    val idx = current.indexOfFirst { it.id == msg.messageId }
+                    if (idx >= 0) {
+                        val updated = current[idx].copy(content = msg.content, editedAt = msg.createdAt)
+                        adapter.addMessage(updated)
+                    }
+                },
+                onUnsend = { msgId ->
+                    val current = adapter.getItems().toMutableList()
+                    val idx = current.indexOfFirst { it.id == msgId }
+                    if (idx >= 0) {
+                        val updated = current[idx].copy(isUnsent = true)
+                        adapter.addMessage(updated)
+                    }
+                },
+                onReaction = { msg ->
+                    val current = adapter.getItems().toMutableList()
+                    val idx = current.indexOfFirst { it.id == msg.messageId }
+                    if (idx >= 0) {
+                        val updated = current[idx].copy(reactions = msg.reactions)
+                        adapter.addMessage(updated)
+                    }
+                }
+            )
         }
     }
 
@@ -808,10 +1034,31 @@ class ChatActivity : AppCompatActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
+                if (editingMessageId != null) {
+                    val editReq = com.nexa.social.data.models.EditMessageRequest(content)
+                    val res = if (chatType == "direct") {
+                        NexaApiClient.messageApi.editMessage(editingMessageId!!, editReq)
+                    } else {
+                        NexaApiClient.groupApi.editGroupMessage(targetId, editingMessageId!!, editReq)
+                    }
+                    if (!res.isSuccessful) {
+                        throw IllegalStateException(res.body()?.error?.message ?: "Server rejected edit (${res.code()})")
+                    }
+                    val msg = res.body()?.data
+                    withContext(Dispatchers.Main) {
+                        binding.btnSend.isEnabled = true
+                        binding.etMessage.setText("")
+                        editingMessageId = null
+                        binding.etMessage.hint = "Message..."
+                    }
+                    return@launch
+                }
+
                 if (chatType == "direct") {
                     val req = SendDirectMessageRequest(
                         receiverId = targetId,
                         content = content,
+                        replyToMessageId = replyingToMessageId,
                         attachments = attachmentsToSend
                     )
                     val res = NexaApiClient.messageApi.sendMessage(req)
@@ -825,6 +1072,8 @@ class ChatActivity : AppCompatActivity() {
                         binding.btnSend.isEnabled = true
                         binding.etMessage.setText("")
                         clearPendingAttachment()
+                        replyingToMessageId = null
+                        binding.etMessage.hint = "Message..."
                         localChatStorage.clearDraft(currentUserId, targetId, chatType)
                         if (msg != null) {
                             val displayMsg = DisplayMessage(
@@ -835,7 +1084,9 @@ class ChatActivity : AppCompatActivity() {
                                 isSelf = true,
                                 timestamp = msg.createdAt,
                                 isRead = false,
-                                attachments = msg.attachments
+                                attachments = msg.attachments,
+                                replyToMessageId = msg.replyToMessageId,
+                                replyPreview = msg.replyPreview
                             )
                             adapter.addMessage(displayMsg)
                             localChatStorage.addMessage(currentUserId, targetId, chatType, displayMsg)
@@ -845,6 +1096,7 @@ class ChatActivity : AppCompatActivity() {
                 } else {
                     val req = SendGroupMessageRequest(
                         content = content,
+                        replyToMessageId = replyingToMessageId,
                         attachments = attachmentsToSend
                     )
                     val res = NexaApiClient.groupApi.sendGroupMessage(targetId, req)
@@ -858,6 +1110,8 @@ class ChatActivity : AppCompatActivity() {
                         binding.btnSend.isEnabled = true
                         binding.etMessage.setText("")
                         clearPendingAttachment()
+                        replyingToMessageId = null
+                        binding.etMessage.hint = "Message..."
                         localChatStorage.clearDraft(currentUserId, targetId, chatType)
                         if (msg != null) {
                             val displayMsg = DisplayMessage(
@@ -868,7 +1122,9 @@ class ChatActivity : AppCompatActivity() {
                                 isSelf = true,
                                 timestamp = msg.createdAt,
                                 isRead = false,
-                                attachments = msg.attachments
+                                attachments = msg.attachments,
+                                replyToMessageId = msg.replyToMessageId,
+                                replyPreview = msg.replyPreview
                             )
                             adapter.addMessage(displayMsg)
                             localChatStorage.addMessage(currentUserId, targetId, chatType, displayMsg)

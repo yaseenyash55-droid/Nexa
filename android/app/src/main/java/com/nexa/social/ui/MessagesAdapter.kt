@@ -25,7 +25,8 @@ import com.nexa.social.utils.MusicPlayerManager
 class MessagesAdapter(
     private val currentUserId: Int,
     private var chatTheme: ChatTheme = ChatTheme.INDIGO_DEFAULT,
-    private val onMarkAsReadClick: ((DisplayMessage) -> Unit)? = null
+    private val onMarkAsReadClick: ((DisplayMessage) -> Unit)? = null,
+    private val onMessageLongClick: ((DisplayMessage, View) -> Unit)? = null
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), MusicPlayerManager.PlayerListener {
 
     private val messages = mutableListOf<DisplayMessage>()
@@ -147,6 +148,11 @@ class MessagesAdapter(
             is SentViewHolder -> holder.bind(msg, chatTheme)
             is ReceivedViewHolder -> holder.bind(msg, chatTheme)
         }
+
+        holder.itemView.setOnLongClickListener {
+            onMessageLongClick?.invoke(msg, it)
+            true
+        }
     }
 
     override fun getItemCount(): Int = messages.size
@@ -181,8 +187,37 @@ class MessagesAdapter(
         private val layoutFileAttachment: View? = itemView.findViewById(R.id.layoutFileAttachment)
         private val tvFileName: TextView? = itemView.findViewById(R.id.tvFileName)
 
-        fun bind(msg: DisplayMessage, theme: ChatTheme) {
+        
+        private val tvUnsent: TextView? = itemView.findViewById(R.id.tvUnsent)
+        private val layoutReplyPreview: View? = itemView.findViewById(R.id.layoutReplyPreview)
+        private val tvReplySender: TextView? = itemView.findViewById(R.id.tvReplySender)
+        private val tvReplyContent: TextView? = itemView.findViewById(R.id.tvReplyContent)
+        private val tvEdited: TextView? = itemView.findViewById(R.id.tvEdited)
+        private val layoutReactions: android.widget.LinearLayout? = itemView.findViewById(R.id.layoutReactions)
+fun bind(msg: DisplayMessage, theme: ChatTheme) {
             bubbleLayout?.background = theme.createSentBubbleDrawable()
+
+            bindInteractions(msg, tvUnsent, layoutReplyPreview, tvReplySender, tvReplyContent, tvEdited, layoutReactions, itemView.context)
+            if (msg.isUnsent) {
+                // Hide main content views since it's unsent
+                tvContent?.visibility = View.GONE
+                try {
+                    val cardMedia = itemView.findViewById<View>(R.id.cardMedia)
+                    cardMedia?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val layoutFileAttachment = itemView.findViewById<View>(R.id.layoutFileAttachment)
+                    layoutFileAttachment?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val ivMusicCover = itemView.findViewById<View>(R.id.ivMusicCover)
+                    ivMusicCover?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val cardVideo = itemView.findViewById<View>(R.id.cardVideo)
+                    cardVideo?.visibility = View.GONE
+                } catch (e: Exception) {}
+            }
             tvContent.setTextColor(theme.sentTextColor)
 
             bindStructuredOrLegacyAttachments(
@@ -220,8 +255,37 @@ class MessagesAdapter(
         private val layoutFileAttachment: View? = itemView.findViewById(R.id.layoutFileAttachment)
         private val tvFileName: TextView? = itemView.findViewById(R.id.tvFileName)
 
-        fun bind(msg: DisplayMessage, theme: ChatTheme) {
+        
+        private val tvUnsent: TextView? = itemView.findViewById(R.id.tvUnsent)
+        private val layoutReplyPreview: View? = itemView.findViewById(R.id.layoutReplyPreview)
+        private val tvReplySender: TextView? = itemView.findViewById(R.id.tvReplySender)
+        private val tvReplyContent: TextView? = itemView.findViewById(R.id.tvReplyContent)
+        private val tvEdited: TextView? = itemView.findViewById(R.id.tvEdited)
+        private val layoutReactions: android.widget.LinearLayout? = itemView.findViewById(R.id.layoutReactions)
+fun bind(msg: DisplayMessage, theme: ChatTheme) {
             bubbleLayout?.background = theme.createReceivedBubbleDrawable()
+
+            bindInteractions(msg, tvUnsent, layoutReplyPreview, tvReplySender, tvReplyContent, tvEdited, layoutReactions, itemView.context)
+            if (msg.isUnsent) {
+                // Hide main content views since it's unsent
+                tvContent?.visibility = View.GONE
+                try {
+                    val cardMedia = itemView.findViewById<View>(R.id.cardMedia)
+                    cardMedia?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val layoutFileAttachment = itemView.findViewById<View>(R.id.layoutFileAttachment)
+                    layoutFileAttachment?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val ivMusicCover = itemView.findViewById<View>(R.id.ivMusicCover)
+                    ivMusicCover?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val cardVideo = itemView.findViewById<View>(R.id.cardVideo)
+                    cardVideo?.visibility = View.GONE
+                } catch (e: Exception) {}
+            }
             tvContent.setTextColor(theme.receivedTextColor)
             if (msg.isAi || msg.aiAgent == "nexa" || msg.senderName == "NEXA AI") {
                 tvSenderName.text = "✨ NEXA AI"
@@ -282,7 +346,14 @@ class MessagesAdapter(
         private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
         private val tvReadStatus: TextView? = itemView.findViewById(R.id.tvReadStatus)
 
-        fun bind(
+        
+        private val tvUnsent: TextView? = itemView.findViewById(R.id.tvUnsent)
+        private val layoutReplyPreview: View? = itemView.findViewById(R.id.layoutReplyPreview)
+        private val tvReplySender: TextView? = itemView.findViewById(R.id.tvReplySender)
+        private val tvReplyContent: TextView? = itemView.findViewById(R.id.tvReplyContent)
+        private val tvEdited: TextView? = itemView.findViewById(R.id.tvEdited)
+        private val layoutReactions: android.widget.LinearLayout? = itemView.findViewById(R.id.layoutReactions)
+fun bind(
             msg: DisplayMessage,
             music: MusicMetadata?,
             theme: ChatTheme,
@@ -292,6 +363,28 @@ class MessagesAdapter(
             durMs: Long
         ) {
             bubbleLayout?.background = theme.createSentBubbleDrawable()
+
+            bindInteractions(msg, tvUnsent, layoutReplyPreview, tvReplySender, tvReplyContent, tvEdited, layoutReactions, itemView.context)
+            if (msg.isUnsent) {
+                // Hide main content views since it's unsent
+                tvContent?.visibility = View.GONE
+                try {
+                    val cardMedia = itemView.findViewById<View>(R.id.cardMedia)
+                    cardMedia?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val layoutFileAttachment = itemView.findViewById<View>(R.id.layoutFileAttachment)
+                    layoutFileAttachment?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val ivMusicCover = itemView.findViewById<View>(R.id.ivMusicCover)
+                    ivMusicCover?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val cardVideo = itemView.findViewById<View>(R.id.cardVideo)
+                    cardVideo?.visibility = View.GONE
+                } catch (e: Exception) {}
+            }
 
             if (music != null) {
                 tvMusicTitle.text = music.title
@@ -363,7 +456,14 @@ class MessagesAdapter(
         private val btnMarkRead: TextView? = itemView.findViewById(R.id.btnMarkRead)
         private val tvReadStatus: TextView? = itemView.findViewById(R.id.tvReadStatus)
 
-        fun bind(
+        
+        private val tvUnsent: TextView? = itemView.findViewById(R.id.tvUnsent)
+        private val layoutReplyPreview: View? = itemView.findViewById(R.id.layoutReplyPreview)
+        private val tvReplySender: TextView? = itemView.findViewById(R.id.tvReplySender)
+        private val tvReplyContent: TextView? = itemView.findViewById(R.id.tvReplyContent)
+        private val tvEdited: TextView? = itemView.findViewById(R.id.tvEdited)
+        private val layoutReactions: android.widget.LinearLayout? = itemView.findViewById(R.id.layoutReactions)
+fun bind(
             msg: DisplayMessage,
             music: MusicMetadata?,
             theme: ChatTheme,
@@ -373,6 +473,28 @@ class MessagesAdapter(
             durMs: Long
         ) {
             bubbleLayout?.background = theme.createReceivedBubbleDrawable()
+
+            bindInteractions(msg, tvUnsent, layoutReplyPreview, tvReplySender, tvReplyContent, tvEdited, layoutReactions, itemView.context)
+            if (msg.isUnsent) {
+                // Hide main content views since it's unsent
+                tvContent?.visibility = View.GONE
+                try {
+                    val cardMedia = itemView.findViewById<View>(R.id.cardMedia)
+                    cardMedia?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val layoutFileAttachment = itemView.findViewById<View>(R.id.layoutFileAttachment)
+                    layoutFileAttachment?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val ivMusicCover = itemView.findViewById<View>(R.id.ivMusicCover)
+                    ivMusicCover?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val cardVideo = itemView.findViewById<View>(R.id.cardVideo)
+                    cardVideo?.visibility = View.GONE
+                } catch (e: Exception) {}
+            }
 
             if (!msg.senderName.isNullOrEmpty()) {
                 tvSenderName.text = msg.senderName
@@ -448,8 +570,37 @@ class MessagesAdapter(
         private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
         private val tvReadStatus: TextView? = itemView.findViewById(R.id.tvReadStatus)
 
-        fun bind(msg: DisplayMessage, videoUrl: String?, theme: ChatTheme) {
+        
+        private val tvUnsent: TextView? = itemView.findViewById(R.id.tvUnsent)
+        private val layoutReplyPreview: View? = itemView.findViewById(R.id.layoutReplyPreview)
+        private val tvReplySender: TextView? = itemView.findViewById(R.id.tvReplySender)
+        private val tvReplyContent: TextView? = itemView.findViewById(R.id.tvReplyContent)
+        private val tvEdited: TextView? = itemView.findViewById(R.id.tvEdited)
+        private val layoutReactions: android.widget.LinearLayout? = itemView.findViewById(R.id.layoutReactions)
+fun bind(msg: DisplayMessage, videoUrl: String?, theme: ChatTheme) {
             bubbleLayout?.background = theme.createSentBubbleDrawable()
+
+            bindInteractions(msg, tvUnsent, layoutReplyPreview, tvReplySender, tvReplyContent, tvEdited, layoutReactions, itemView.context)
+            if (msg.isUnsent) {
+                // Hide main content views since it's unsent
+                tvContent?.visibility = View.GONE
+                try {
+                    val cardMedia = itemView.findViewById<View>(R.id.cardMedia)
+                    cardMedia?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val layoutFileAttachment = itemView.findViewById<View>(R.id.layoutFileAttachment)
+                    layoutFileAttachment?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val ivMusicCover = itemView.findViewById<View>(R.id.ivMusicCover)
+                    ivMusicCover?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val cardVideo = itemView.findViewById<View>(R.id.cardVideo)
+                    cardVideo?.visibility = View.GONE
+                } catch (e: Exception) {}
+            }
 
             if (videoUrl != null) {
                 imgVideoThumbnail.load(videoUrl) {
@@ -504,8 +655,37 @@ class MessagesAdapter(
         private val btnMarkRead: TextView? = itemView.findViewById(R.id.btnMarkRead)
         private val tvReadStatus: TextView? = itemView.findViewById(R.id.tvReadStatus)
 
-        fun bind(msg: DisplayMessage, videoUrl: String?, theme: ChatTheme) {
+        
+        private val tvUnsent: TextView? = itemView.findViewById(R.id.tvUnsent)
+        private val layoutReplyPreview: View? = itemView.findViewById(R.id.layoutReplyPreview)
+        private val tvReplySender: TextView? = itemView.findViewById(R.id.tvReplySender)
+        private val tvReplyContent: TextView? = itemView.findViewById(R.id.tvReplyContent)
+        private val tvEdited: TextView? = itemView.findViewById(R.id.tvEdited)
+        private val layoutReactions: android.widget.LinearLayout? = itemView.findViewById(R.id.layoutReactions)
+fun bind(msg: DisplayMessage, videoUrl: String?, theme: ChatTheme) {
             bubbleLayout?.background = theme.createReceivedBubbleDrawable()
+
+            bindInteractions(msg, tvUnsent, layoutReplyPreview, tvReplySender, tvReplyContent, tvEdited, layoutReactions, itemView.context)
+            if (msg.isUnsent) {
+                // Hide main content views since it's unsent
+                tvContent?.visibility = View.GONE
+                try {
+                    val cardMedia = itemView.findViewById<View>(R.id.cardMedia)
+                    cardMedia?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val layoutFileAttachment = itemView.findViewById<View>(R.id.layoutFileAttachment)
+                    layoutFileAttachment?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val ivMusicCover = itemView.findViewById<View>(R.id.ivMusicCover)
+                    ivMusicCover?.visibility = View.GONE
+                } catch (e: Exception) {}
+                try {
+                    val cardVideo = itemView.findViewById<View>(R.id.cardVideo)
+                    cardVideo?.visibility = View.GONE
+                } catch (e: Exception) {}
+            }
 
             if (!msg.senderName.isNullOrEmpty()) {
                 tvSenderName.text = msg.senderName
@@ -562,6 +742,61 @@ class MessagesAdapter(
     }
 
     companion object {
+        fun bindInteractions(
+            msg: DisplayMessage,
+            tvUnsent: TextView?,
+            layoutReplyPreview: View?,
+            tvReplySender: TextView?,
+            tvReplyContent: TextView?,
+            tvEdited: TextView?,
+            layoutReactions: android.widget.LinearLayout?,
+            context: android.content.Context
+        ) {
+            if (msg.isUnsent) {
+                tvUnsent?.visibility = View.VISIBLE
+            } else {
+                tvUnsent?.visibility = View.GONE
+            }
+
+            if (msg.replyPreview != null && !msg.isUnsent) {
+                layoutReplyPreview?.visibility = View.VISIBLE
+                tvReplySender?.text = msg.replyPreview.senderName ?: "Someone"
+                tvReplyContent?.text = msg.replyPreview.contentPreview
+            } else {
+                layoutReplyPreview?.visibility = View.GONE
+            }
+
+            if (msg.editedAt != null && !msg.isUnsent) {
+                tvEdited?.visibility = View.VISIBLE
+            } else {
+                tvEdited?.visibility = View.GONE
+            }
+
+            layoutReactions?.removeAllViews()
+            if (!msg.reactions.isNullOrEmpty() && !msg.isUnsent) {
+                layoutReactions?.visibility = View.VISIBLE
+                for (reaction in msg.reactions) {
+                    val tv = TextView(context).apply {
+                        text = "${reaction.reaction} ${reaction.count}"
+                        textSize = 10f
+                        setTextColor(android.graphics.Color.WHITE)
+                        background = context.getDrawable(R.drawable.bg_unread_badge)
+                        backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#33000000"))
+                        setPadding(12, 6, 12, 6)
+                        layoutParams = android.widget.LinearLayout.LayoutParams(
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            setMargins(0, 0, 8, 0)
+                        }
+                    }
+                    layoutReactions?.addView(tv)
+                }
+            } else {
+                layoutReactions?.visibility = View.GONE
+            }
+        }
+
         private const val TYPE_SENT_DEFAULT = 1
         private const val TYPE_RECEIVED_DEFAULT = 2
         private const val TYPE_SENT_MUSIC = 3
@@ -574,6 +809,8 @@ class MessagesAdapter(
         private val fileRegex = Regex("""(?:📁\s*\[File\]\s*)(https?://\S+)""", RegexOption.IGNORE_CASE)
         private val gifRegex = Regex("""^\[GIF:\s*(https?://\S+?)\]$""", RegexOption.IGNORE_CASE)
         private val musicRegex = Regex("""🎵\s*\[Music\]\s*([^—\n]+)\s*—\s*([^\n]+)\s*(https?://\S+)""", RegexOption.IGNORE_CASE)
+
+        
 
         fun getMusicAttachment(msg: DisplayMessage): MusicMetadata? {
             val structured = msg.attachments.firstOrNull { it.type == "music" }
@@ -630,8 +867,8 @@ class MessagesAdapter(
                     } catch (_: Exception) {}
                 }
                 layoutFileAttachment?.visibility = View.GONE
-                if (msg.content.isNotBlank()) {
-                    tvContent.text = msg.content
+                if (msg.content.isNotBlank() || msg.isUnsent) {
+                    tvContent.text = (msg.content)
                     tvContent.visibility = View.VISIBLE
                 } else {
                     tvContent.visibility = View.GONE
@@ -652,8 +889,8 @@ class MessagesAdapter(
                     } catch (_: Exception) {}
                 }
                 cardMedia?.visibility = View.GONE
-                if (msg.content.isNotBlank()) {
-                    tvContent.text = msg.content
+                if (msg.content.isNotBlank() || msg.isUnsent) {
+                    tvContent.text = (msg.content)
                     tvContent.visibility = View.VISIBLE
                 } else {
                     tvContent.visibility = View.GONE
@@ -710,8 +947,8 @@ class MessagesAdapter(
                 }
 
                 layoutFileAttachment?.visibility = View.GONE
-                if (cleanText.isNotEmpty()) {
-                    tvContent.text = cleanText
+                if (cleanText.isNotEmpty() || msg.isUnsent) {
+                    tvContent.text = (cleanText)
                     tvContent.visibility = View.VISIBLE
                 } else {
                     tvContent.visibility = View.GONE
@@ -748,8 +985,8 @@ class MessagesAdapter(
                 }
 
                 cardMedia?.visibility = View.GONE
-                if (cleanText.isNotEmpty()) {
-                    tvContent.text = cleanText
+                if (cleanText.isNotEmpty() || msg.isUnsent) {
+                    tvContent.text = (cleanText)
                     tvContent.visibility = View.VISIBLE
                 } else {
                     tvContent.visibility = View.GONE
@@ -760,7 +997,7 @@ class MessagesAdapter(
             // Normal text message
             cardMedia?.visibility = View.GONE
             layoutFileAttachment?.visibility = View.GONE
-            tvContent.text = msg.content
+            tvContent.text = (msg.content)
             tvContent.visibility = View.VISIBLE
         }
 
@@ -783,4 +1020,6 @@ class MessagesAdapter(
             return "%d:%02d".format(mins, secs)
         }
     }
+
+    // Moved formatMessageText to existing companion object
 }

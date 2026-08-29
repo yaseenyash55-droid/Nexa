@@ -1,17 +1,23 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { AppShell } from '../components/layout/AppShell.js';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { socialApi } from '../api/social.api.js';
 import { usersApi } from '../api/users.api.js';
 import { groupsApi, Group, GroupMessage } from '../api/groups.api.js';
 import { broadcastsApi, Broadcast } from '../api/broadcasts.api.js';
-import { Message, User } from '../types/index.js';
+import { Message, User, ReactionSummary } from '../types/index.js';
 import { Avatar } from '../components/ui/Avatar.js';
-import { Send, MessageSquare, Search, CheckCheck, Check, Phone, Video, ShieldCheck, Users, Plus, Radio, FileText, Download, Sparkles, Smile, Image as ImageIcon, Settings } from 'lucide-react';
+import { Send, MessageSquare, Search, CheckCheck, Check, Phone, Video, ShieldCheck, Users, Plus, Radio, FileText, Download, Sparkles, Smile, Image as ImageIcon, Settings, MoreHorizontal } from 'lucide-react';
 import { CallModal } from '../components/chat/CallModal.js';
 import { CreateGroupModal } from '../components/chat/CreateGroupModal.js';
 import { CreateBroadcastModal } from '../components/chat/CreateBroadcastModal.js';
 import { GroupInfoModal } from '../components/chat/GroupInfoModal.js';
+import { MessageActionMenu } from '../components/chat/MessageActionMenu.js';
+import { ReplyPreview } from '../components/chat/ReplyPreview.js';
+import { EditMessageComposer } from '../components/chat/EditMessageComposer.js';
+import { UnsendMessageDialog } from '../components/chat/UnsendMessageDialog.js';
+
+
 import { useAuth } from '../contexts/AuthContext.js';
 import { formatDistanceToNow } from 'date-fns';
 import { io, Socket } from 'socket.io-client';
@@ -29,6 +35,7 @@ import { mediaCache } from '../utils/mediaCache.js';
 
 import { CachedMedia } from '../components/chat/CachedMedia.js';
 import { ImageMessageCard, VideoMessageCard, FileMessageCard } from '../components/chat/MediaMessageCards.js';
+import { useLongPress } from '../hooks/useLongPress.js';
 
 const MessageContent: React.FC<{ content: string; isSelf?: boolean, message?: any }> = ({ content, message }) => {
   // 1. Check if content has photo URL (e.g. 📷 [Photo] https://... or direct image URL)
@@ -72,7 +79,9 @@ const MessageContent: React.FC<{ content: string; isSelf?: boolean, message?: an
   });
 
   if (structuredAttachments && structuredAttachments.length > 0) {
-    return (
+  
+
+  return (
       <div className="space-y-1.5">
         {structuredAttachments}
         {content && <p className="leading-relaxed whitespace-pre-line text-xs">{content}</p>}
@@ -186,6 +195,104 @@ const MessageContent: React.FC<{ content: string; isSelf?: boolean, message?: an
   return <p className="leading-relaxed whitespace-pre-line">{content}</p>;
 };
 
+
+import { MessageReactions } from '../components/chat/MessageReactions.js';
+
+interface InteractiveBubbleProps {
+  message: Message | GroupMessage;
+  isSelf: boolean;
+  currentUser: User | null;
+  decryptedInfo: { text: string; isEncrypted: boolean };
+  currentChatTheme: any;
+  kind: 'dm' | 'group';
+  onActionTrigger: (e: React.TouchEvent | React.MouseEvent, msg: Message | GroupMessage, kind: 'dm' | 'group', element: HTMLElement) => void;
+  onReactionToggle: (reaction: string, msg: Message | GroupMessage, kind: 'dm' | 'group') => void;
+}
+
+const InteractiveMessageBubble: React.FC<InteractiveBubbleProps> = ({
+  message, isSelf, currentUser, decryptedInfo, currentChatTheme, kind, onActionTrigger, onReactionToggle
+}) => {
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  
+  const handlers = useLongPress({
+    onLongPress: (e) => {
+      if (bubbleRef.current) {
+        onActionTrigger(e, message, kind, bubbleRef.current);
+      }
+    },
+    delay: 500,
+  });
+
+  const isUnsent = (message as any).isUnsent;
+
+  return (
+    <div
+      className={`flex ${isSelf ? 'justify-end' : 'justify-start'} group/bubble relative`}
+      {...handlers}
+    >
+      <div
+        ref={bubbleRef}
+        className={`max-w-[80%] sm:max-w-md px-4 py-2.5 rounded-2xl text-xs space-y-1 ${
+          isUnsent 
+            ? 'bg-slate-800/50 text-slate-500 italic border border-slate-700/50'
+            : isSelf
+              ? `${currentChatTheme.senderBubble} rounded-br-none shadow-glow-brand`
+              : `${currentChatTheme.receiverBubble} rounded-bl-none`
+        }`}
+      >
+        {isUnsent ? (
+          <div className="flex items-center gap-2">
+             <span className="text-slate-500 italic">🚫 This message was unsent</span>
+          </div>
+        ) : (
+          <>
+            {message.replyPreview && (
+              <div className="mb-2 p-2 bg-black/20 rounded border-l-2 border-brand-500 text-[10px] opacity-80">
+                <div className="font-bold text-brand-300">{message.replyPreview.senderName || 'Original message'}</div>
+                <div className="truncate">{message.replyPreview.content || 'Original message unavailable'}</div>
+              </div>
+            )}
+            <MessageContent content={decryptedInfo.text} isSelf={isSelf} message={message} />
+            <div className={`flex items-center justify-end gap-1.5 text-[9px] ${isSelf ? 'text-brand-200' : 'text-slate-400'}`}>
+              {(message as any).editedAt && <span className="italic opacity-70">(edited)</span>}
+              <span>{formatDistanceToNow(new Date(message.createdAt), { addSuffix: true })}</span>
+              {isSelf && (
+                <span title={(message as Message).isRead ? 'Read' : 'Sent'}>
+                  {(message as Message).isRead
+                    ? <CheckCheck className="w-3 h-3 text-cyan-300" />
+                    : <Check className="w-3 h-3" />}
+                </span>
+              )}
+            </div>
+            
+            {message.reactions && message.reactions.length > 0 && (
+              <MessageReactions
+                reactions={message.reactions}
+                onReactionClick={(reaction) => onReactionToggle(reaction, message, kind)}
+              />
+            )}
+          </>
+        )}
+      </div>
+      
+      {!isUnsent && (
+        <div className={`absolute top-1 hidden group-hover/bubble:flex items-center gap-1 ${isSelf ? '-left-8' : '-right-8'}`}>
+          <button
+            onClick={(e) => {
+              if (bubbleRef.current) {
+                onActionTrigger(e, message, kind, bubbleRef.current);
+              }
+            }}
+            className="p-1 rounded-full bg-slate-800 text-slate-400 hover:text-white shadow hover:bg-slate-700 transition"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const MessagesPage: React.FC = () => {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
@@ -246,6 +353,31 @@ export const MessagesPage: React.FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const readRequestsRef = useRef(new Set<number>());
+
+  // ── Message interaction state ─────────────────────────────────
+  
+  const activeMenuAnchorRef = useRef<HTMLElement | null>(null);
+
+
+
+  const [actionMenuTarget, setActionMenuTarget] = useState<{
+    message: Message | GroupMessage;
+    kind: 'dm' | 'group';
+  } | null>(null);
+
+  const [replyTarget, setReplyTarget] = useState<Message | GroupMessage | null>(null);
+
+  const [editTarget, setEditTarget] = useState<{
+    message: Message | GroupMessage;
+    kind: 'dm' | 'group';
+  } | null>(null);
+
+  const [unsendTarget, setUnsendTarget] = useState<{
+    message: Message | GroupMessage;
+    kind: 'dm' | 'group';
+  } | null>(null);
+
+  const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
     callModalOpenRef.current = callModalState.isOpen;
@@ -325,7 +457,7 @@ export const MessagesPage: React.FC = () => {
   const isPostingDisabled = Boolean(selectedGroup?.onlyAdminsCanPost && !isCurrentGroupAdmin);
 
   // Send Direct Message (TLS-Protected)
-  const sendDirectMessageMutation = useMutation<Message, Error, { text?: string; attachments?: any[] } | string>({
+  const sendDirectMessageMutation = useMutation<Message, Error, { text?: string; attachments?: any[]; replyToMessageId?: number | null } | string>({
     mutationFn: async (payload) => {
       const isString = typeof payload === 'string';
       const textToSend = isString ? payload : payload.text;
@@ -351,7 +483,7 @@ export const MessagesPage: React.FC = () => {
   });
 
   // Send Group Message
-  const sendGroupMessageMutation = useMutation<GroupMessage, Error, { text?: string; attachments?: any[] } | string>({
+  const sendGroupMessageMutation = useMutation<GroupMessage, Error, { text?: string; attachments?: any[]; replyToMessageId?: number | null } | string>({
     mutationFn: async (payload) => {
       const isString = typeof payload === 'string';
       const textToSend = isString ? payload : payload.text;
@@ -374,6 +506,116 @@ export const MessagesPage: React.FC = () => {
       );
     }
   });
+
+  // ── DM: unsend ───────────────────────────────────────────────
+  const unsendDmMutation = useMutation({
+    mutationFn: (messageId: number) => socialApi.unsendMessage(messageId),
+    onSuccess: (_, messageId) => {
+      queryClient.setQueryData<Message[]>(['messages', selectedUser?.userId], (current = []) =>
+        current.map((m) => m.messageId === messageId ? { ...m, isUnsent: true, content: 'You unsent a message' } : m)
+      );
+      setUnsendTarget(null);
+    },
+    onError: () => { setUnsendTarget(null); }
+  });
+
+  // ── DM: edit ─────────────────────────────────────────────────
+  const editDmMutation = useMutation({
+    mutationFn: ({ messageId, content }: { messageId: number; content: string }) =>
+      socialApi.editMessage(messageId, content),
+    onSuccess: (result, { messageId, content }) => {
+      queryClient.setQueryData<Message[]>(['messages', selectedUser?.userId], (current = []) =>
+        current.map((m) => m.messageId === messageId
+          ? { ...m, content, editedAt: result.editedAt }
+          : m)
+      );
+      setEditTarget(null);
+      setEditError(null);
+    },
+    onError: () => { setEditError('Failed to save edit. Please try again.'); }
+  });
+
+  // ── DM: react ────────────────────────────────────────────────
+  const reactDmMutation = useMutation({
+    mutationFn: ({ messageId, reaction }: { messageId: number; reaction: string }) =>
+      socialApi.addReaction(messageId, reaction),
+    onSuccess: (result, { messageId }) => {
+      queryClient.setQueryData<Message[]>(['messages', selectedUser?.userId], (current = []) =>
+        current.map((m) => m.messageId === messageId ? { ...m, reactions: result.reactions } : m)
+      );
+    }
+  });
+
+  const removeReactDmMutation = useMutation({
+    mutationFn: (messageId: number) => socialApi.removeReaction(messageId),
+    onSuccess: (result, messageId) => {
+      queryClient.setQueryData<Message[]>(['messages', selectedUser?.userId], (current = []) =>
+        current.map((m) => m.messageId === messageId ? { ...m, reactions: result.reactions } : m)
+      );
+    }
+  });
+
+  // ── Group: unsend ─────────────────────────────────────────────
+  const unsendGroupMutation = useMutation({
+    mutationFn: ({ groupId, messageId }: { groupId: number; messageId: number }) =>
+      groupsApi.unsendGroupMessage(groupId, messageId),
+    onSuccess: (_, { messageId }) => {
+      queryClient.setQueryData<GroupMessage[]>(['group-messages', selectedGroup?.groupId], (current = []) =>
+        current.map((m) => m.messageId === messageId ? { ...m, isUnsent: true, content: 'You unsent a message' } : m)
+      );
+      setUnsendTarget(null);
+    },
+    onError: () => { setUnsendTarget(null); }
+  });
+
+  // ── Group: edit ───────────────────────────────────────────────
+  const editGroupMutation = useMutation({
+    mutationFn: ({ groupId, messageId, content }: { groupId: number; messageId: number; content: string }) =>
+      groupsApi.editGroupMessage(groupId, messageId, content),
+    onSuccess: (result, { messageId, content }) => {
+      queryClient.setQueryData<GroupMessage[]>(['group-messages', selectedGroup?.groupId], (current = []) =>
+        current.map((m) => m.messageId === messageId
+          ? { ...m, content, editedAt: result.editedAt }
+          : m)
+      );
+      setEditTarget(null);
+      setEditError(null);
+    },
+    onError: () => { setEditError('Failed to save edit. Please try again.'); }
+  });
+
+  // ── Group: react ──────────────────────────────────────────────
+  const reactGroupMutation = useMutation({
+    mutationFn: ({ groupId, messageId, reaction }: { groupId: number; messageId: number; reaction: string }) =>
+      groupsApi.addGroupReaction(groupId, messageId, reaction),
+    onSuccess: (result, { messageId }) => {
+      queryClient.setQueryData<GroupMessage[]>(['group-messages', selectedGroup?.groupId], (current = []) =>
+        current.map((m) => m.messageId === messageId ? { ...m, reactions: result.reactions } : m)
+      );
+    }
+  });
+
+  const removeReactGroupMutation = useMutation({
+    mutationFn: ({ groupId, messageId }: { groupId: number; messageId: number }) =>
+      groupsApi.removeGroupReaction(groupId, messageId),
+    onSuccess: (result, { messageId }) => {
+      queryClient.setQueryData<GroupMessage[]>(['group-messages', selectedGroup?.groupId], (current = []) =>
+        current.map((m) => m.messageId === messageId ? { ...m, reactions: result.reactions } : m)
+      );
+    }
+  });
+
+  const toggleReaction = useCallback((reaction: string, msg: Message | GroupMessage, kind: 'dm' | 'group') => {
+    const hasReacted = msg.reactions?.some(r => r.reaction === reaction && !!r.myReactionId);
+    if (kind === 'dm') {
+      if (hasReacted) removeReactDmMutation.mutate(msg.messageId);
+      else reactDmMutation.mutate({ messageId: msg.messageId, reaction });
+    } else {
+      if (hasReacted) removeReactGroupMutation.mutate({ messageId: msg.messageId, groupId: (msg as any).groupId || selectedGroup?.groupId || 0 });
+      else reactGroupMutation.mutate({ messageId: msg.messageId, groupId: (msg as any).groupId || selectedGroup?.groupId || 0, reaction });
+    }
+  }, [reactDmMutation, removeReactDmMutation, reactGroupMutation, removeReactGroupMutation, selectedGroup]);
+
 
   // Decrypt direct messages asynchronously
   useEffect(() => {
@@ -472,6 +714,47 @@ export const MessagesPage: React.FC = () => {
       );
     });
 
+    // ── New interaction events ─────────────────────────────────
+    socket.on('message:unsent', ({ messageId }: { messageId: number }) => {
+      queryClient.setQueriesData<Message[]>({ queryKey: ['messages'] }, (current = []) =>
+        current.map((m) => m.messageId === messageId
+          ? { ...m, isUnsent: true, content: 'This message was unsent' }
+          : m)
+      );
+    });
+
+    socket.on('message:edited', ({ messageId, content, editedAt }: { messageId: number; content: string; editedAt: string }) => {
+      queryClient.setQueriesData<Message[]>({ queryKey: ['messages'] }, (current = []) =>
+        current.map((m) => m.messageId === messageId ? { ...m, content, editedAt } : m)
+      );
+    });
+
+    socket.on('message:reaction:updated', ({ messageId, reactions }: { messageId: number; reactions: ReactionSummary[] }) => {
+      queryClient.setQueriesData<Message[]>({ queryKey: ['messages'] }, (current = []) =>
+        current.map((m) => m.messageId === messageId ? { ...m, reactions } : m)
+      );
+    });
+
+    socket.on('group:message:unsent', ({ groupId, messageId }: { groupId: number; messageId: number }) => {
+      queryClient.setQueryData<GroupMessage[]>(['group-messages', groupId], (current = []) =>
+        current.map((m) => m.messageId === messageId
+          ? { ...m, isUnsent: true, content: 'This message was unsent' }
+          : m)
+      );
+    });
+
+    socket.on('group:message:edited', ({ groupId, messageId, content, editedAt }: { groupId: number; messageId: number; content: string; editedAt: string }) => {
+      queryClient.setQueryData<GroupMessage[]>(['group-messages', groupId], (current = []) =>
+        current.map((m) => m.messageId === messageId ? { ...m, content, editedAt } : m)
+      );
+    });
+
+    socket.on('group:message:reaction:updated', ({ groupId, messageId, reactions }: { groupId: number; messageId: number; reactions: ReactionSummary[] }) => {
+      queryClient.setQueryData<GroupMessage[]>(['group-messages', groupId], (current = []) =>
+        current.map((m) => m.messageId === messageId ? { ...m, reactions } : m)
+      );
+    });
+
     socket.on('typing:start', ({ userId, username }: { userId: number; username: string }) => {
       const activeUser = selectedUserRef.current;
       if (activeUser && userId === activeUser.userId) {
@@ -527,6 +810,7 @@ export const MessagesPage: React.FC = () => {
     });
 
     return () => {
+      socket.removeAllListeners();
       socket.disconnect();
       socketRef.current = null;
       setRealtimeSocket(null);
@@ -1062,32 +1346,21 @@ export const MessagesPage: React.FC = () => {
                   messages.map((m) => {
                     const isSelf = m.senderId === currentUser?.userId;
                     const decryptedInfo = decryptedMap[m.messageId] || { text: m.content, isEncrypted: m.content.startsWith('E2EE::') };
-
                     return (
-                      <div
+                      <InteractiveMessageBubble
                         key={m.messageId}
-                        className={`flex ${isSelf ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-[80%] sm:max-w-md px-4 py-2.5 rounded-2xl text-xs space-y-1 ${
-                            isSelf
-                              ? `${currentChatTheme.senderBubble} rounded-br-none shadow-glow-brand`
-                              : `${currentChatTheme.receiverBubble} rounded-bl-none`
-                          }`}
-                        >
-                          <MessageContent content={decryptedInfo.text} isSelf={isSelf} message={m} />
-                          <div className={`flex items-center justify-end gap-1.5 text-[9px] ${isSelf ? 'text-brand-200' : 'text-slate-400'}`}>
-                            <span>{formatDistanceToNow(new Date(m.createdAt), { addSuffix: true })}</span>
-                            {isSelf && (
-                              <span title={m.isRead ? 'Read' : 'Sent'}>
-                                {m.isRead
-                                  ? <CheckCheck className="w-3 h-3 text-cyan-300" />
-                                  : <Check className="w-3 h-3" />}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                        message={m}
+                        isSelf={isSelf}
+                        currentUser={currentUser}
+                        decryptedInfo={decryptedInfo}
+                        currentChatTheme={currentChatTheme}
+                        kind="dm"
+                        onActionTrigger={(e, msg, kind, el) => {
+                          setActionMenuTarget({ message: msg, kind });
+                          activeMenuAnchorRef.current = el;
+                        }}
+                        onReactionToggle={toggleReaction}
+                      />
                     );
                   })
                 )}
@@ -1110,19 +1383,45 @@ export const MessagesPage: React.FC = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Chat Input Form */}
-              <ChatComposer
-                target={{ type: 'direct', userId: selectedUser.userId }}
-                disabled={sendDirectMessageMutation.isPending}
-                onSend={async (payload) => {
-                  if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-                  if (socketRef.current && isEmittingTypingRef.current) {
-                    socketRef.current.emit('typing:stop', { receiverId: selectedUser.userId });
-                    isEmittingTypingRef.current = false;
-                  }
-                  await sendDirectMessageMutation.mutateAsync(payload);
-                }}
-              />
+              {/* Chat Input Form / Editor */}
+              {editTarget?.kind === 'dm' && editTarget.message ? (
+                <EditMessageComposer
+                  initialContent={editTarget.message.content}
+                  onSave={async (content) => {
+                    await editDmMutation.mutateAsync({ messageId: editTarget.message.messageId, content });
+                    setEditTarget(null);
+                  }}
+                  onCancel={() => setEditTarget(null)}
+                  isSaving={editDmMutation.isPending}
+                />
+              ) : (
+                <div className="flex flex-col">
+                  {replyTarget && (
+                    <ReplyPreview
+                      message={replyTarget}
+                      onCancel={() => setReplyTarget(null)}
+                    />
+                  )}
+                  <ChatComposer
+                    target={{ type: 'direct', userId: selectedUser.userId }}
+                    disabled={sendDirectMessageMutation.isPending}
+                    onSend={async (payload) => {
+                      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+                      if (socketRef.current && isEmittingTypingRef.current) {
+                        socketRef.current.emit('typing:stop', { receiverId: selectedUser.userId });
+                        isEmittingTypingRef.current = false;
+                      }
+                      
+                      const sendPayload = typeof payload === 'string' 
+                        ? { text: payload, replyToMessageId: replyTarget?.messageId }
+                        : { ...payload, replyToMessageId: replyTarget?.messageId };
+                        
+                      await sendDirectMessageMutation.mutateAsync(sendPayload);
+                      setReplyTarget(null);
+                    }}
+                  />
+                </div>
+              )}
             </>
           ) : chatType === 'groups' && selectedGroup ? (
             <>
@@ -1218,14 +1517,36 @@ export const MessagesPage: React.FC = () => {
                 <div className="p-4 border-t border-slate-800/80 bg-slate-900/60 text-center text-xs text-slate-400 font-medium">
                   🔒 Only group admins can send messages in this group.
                 </div>
-              ) : (
-                <ChatComposer
-                  target={{ type: 'group', groupId: selectedGroup.groupId }}
-                  disabled={sendGroupMessageMutation.isPending}
-                  onSend={async (payload) => {
-                    await sendGroupMessageMutation.mutateAsync(payload);
+              ) : editTarget?.kind === 'group' && editTarget.message ? (
+                <EditMessageComposer
+                  initialContent={editTarget.message.content}
+                  onSave={async (content) => {
+                    await editGroupMutation.mutateAsync({ messageId: editTarget.message.messageId, groupId: selectedGroup.groupId, content });
+                    setEditTarget(null);
                   }}
+                  onCancel={() => setEditTarget(null)}
+                  isSaving={editGroupMutation.isPending}
                 />
+              ) : (
+                <div className="flex flex-col">
+                  {replyTarget && (
+                    <ReplyPreview
+                      message={replyTarget}
+                      onCancel={() => setReplyTarget(null)}
+                    />
+                  )}
+                  <ChatComposer
+                    target={{ type: 'group', groupId: selectedGroup.groupId }}
+                    disabled={sendGroupMessageMutation.isPending}
+                    onSend={async (payload) => {
+                      const sendPayload = typeof payload === 'string' 
+                        ? { text: payload, replyToMessageId: replyTarget?.messageId }
+                        : { ...payload, replyToMessageId: replyTarget?.messageId };
+                      await sendGroupMessageMutation.mutateAsync(sendPayload);
+                      setReplyTarget(null);
+                    }}
+                  />
+                </div>
               )}
             </>
           ) : chatType === 'broadcasts' && selectedBroadcast ? (
@@ -1330,6 +1651,60 @@ export const MessagesPage: React.FC = () => {
           }
         }}
       />
+
+      {actionMenuTarget && (
+        <MessageActionMenu
+          isOpen={!!actionMenuTarget}
+          onClose={() => setActionMenuTarget(null)}
+          isSelf={actionMenuTarget.message.senderId === currentUser?.userId}
+          canReact={true}
+          canReply={true}
+          canCopy={true}
+          canEdit={actionMenuTarget.message.senderId === currentUser?.userId && (actionMenuTarget.message as any).aiAgent !== 'nexa'}
+          canUnsend={actionMenuTarget.message.senderId === currentUser?.userId && (actionMenuTarget.message as any).aiAgent !== 'nexa'}
+          onReact={(emoji) => {
+            toggleReaction(emoji, actionMenuTarget.message, actionMenuTarget.kind);
+            setActionMenuTarget(null);
+          }}
+          onRemoveReaction={() => {
+            // we need to know the current reaction, but for now just skip
+            setActionMenuTarget(null);
+          }}
+          onReply={() => {
+            setReplyTarget(actionMenuTarget.message);
+            setActionMenuTarget(null);
+          }}
+          onCopy={() => {
+            navigator.clipboard.writeText(actionMenuTarget.message.content);
+            setActionMenuTarget(null);
+          }}
+          onEdit={() => {
+            setEditTarget(actionMenuTarget);
+            setActionMenuTarget(null);
+          }}
+          onUnsend={() => {
+            setUnsendTarget(actionMenuTarget);
+            setActionMenuTarget(null);
+          }}
+          anchorRef={activeMenuAnchorRef}
+        />
+      )}
+
+      {unsendTarget && (
+        <UnsendMessageDialog
+          isOpen={!!unsendTarget}
+          onCancel={() => setUnsendTarget(null)}
+          onConfirm={async () => {
+             if (unsendTarget.kind === 'dm') {
+               await unsendDmMutation.mutateAsync(unsendTarget.message.messageId);
+             } else {
+               await unsendGroupMutation.mutateAsync({ messageId: unsendTarget.message.messageId, groupId: selectedGroup?.groupId || 0 });
+             }
+             setUnsendTarget(null);
+          }}
+        />
+      )}
+
     </AppShell>
   );
 };

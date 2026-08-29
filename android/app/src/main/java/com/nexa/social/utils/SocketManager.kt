@@ -48,7 +48,14 @@ object SocketManager {
 
     private var messageListener: ((Message) -> Unit)? = null
     private var messageReadListener: ((messageId: Int, readAt: String?) -> Unit)? = null
+    private var messageEditedListener: ((Message) -> Unit)? = null
+    private var messageUnsentListener: ((messageId: Int) -> Unit)? = null
+    private var messageReactionListener: ((Message) -> Unit)? = null
+    
     private var groupMessageListener: ((GroupMessage) -> Unit)? = null
+    private var groupMessageEditedListener: ((GroupMessage) -> Unit)? = null
+    private var groupMessageUnsentListener: ((messageId: Int) -> Unit)? = null
+    private var groupMessageReactionListener: ((GroupMessage) -> Unit)? = null
     private var typingStartListener: ((userId: Int, username: String?) -> Unit)? = null
     private var typingStopListener: ((userId: Int) -> Unit)? = null
     private var incomingCallListener: ((IncomingCall) -> Unit)? = null
@@ -140,6 +147,74 @@ object SocketManager {
                         if (BuildConfig.DEBUG) {
                             Log.e(TAG, "Error parsing group message payload", e)
                         }
+                    }
+                }
+            }
+
+            socket?.on("message:edited") { args ->
+                if (args.isNotEmpty()) {
+                    try {
+                        val message = gson.fromJson(args[0].toString(), Message::class.java)
+                        mainHandler.post { messageEditedListener?.invoke(message) }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error parsing message:edited payload", e)
+                    }
+                }
+            }
+
+            socket?.on("message:reaction:updated") { args ->
+                if (args.isNotEmpty()) {
+                    try {
+                        val message = gson.fromJson(args[0].toString(), Message::class.java)
+                        mainHandler.post { messageReactionListener?.invoke(message) }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error parsing message:reaction:updated payload", e)
+                    }
+                }
+            }
+
+            socket?.on("message:unsent") { args ->
+                if (args.isNotEmpty()) {
+                    try {
+                        val json = if (args[0] is JSONObject) args[0] as JSONObject else JSONObject(args[0].toString())
+                        val messageId = json.optInt("messageId")
+                        mainHandler.post { messageUnsentListener?.invoke(messageId) }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error parsing message:unsent payload", e)
+                    }
+                }
+            }
+
+            socket?.on("group:message:edited") { args ->
+                if (args.isNotEmpty()) {
+                    try {
+                        val message = gson.fromJson(args[0].toString(), GroupMessage::class.java)
+                        mainHandler.post { groupMessageEditedListener?.invoke(message) }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error parsing group:message:edited payload", e)
+                    }
+                }
+            }
+
+            socket?.on("group:message:reaction:updated") { args ->
+                if (args.isNotEmpty()) {
+                    try {
+                        val message = gson.fromJson(args[0].toString(), GroupMessage::class.java)
+                        mainHandler.post { groupMessageReactionListener?.invoke(message) }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error parsing group:message:reaction:updated payload", e)
+                    }
+                }
+            }
+
+            socket?.on("group:message:unsent") { args ->
+                if (args.isNotEmpty()) {
+                    try {
+                        val json = if (args[0] is JSONObject) args[0] as JSONObject else JSONObject(args[0].toString())
+                        val messageId = json.optInt("messageId")
+                        mainHandler.post { groupMessageUnsentListener?.invoke(messageId) }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error parsing group:message:unsent payload", e)
                     }
                 }
             }
@@ -318,6 +393,38 @@ object SocketManager {
 
     fun unregisterGroupMessageListener() {
         groupMessageListener = null
+    }
+
+    fun registerMessageInteractionListeners(
+        onEdit: ((Message) -> Unit)? = null,
+        onUnsend: ((Int) -> Unit)? = null,
+        onReaction: ((Message) -> Unit)? = null
+    ) {
+        messageEditedListener = onEdit
+        messageUnsentListener = onUnsend
+        messageReactionListener = onReaction
+    }
+
+    fun unregisterMessageInteractionListeners() {
+        messageEditedListener = null
+        messageUnsentListener = null
+        messageReactionListener = null
+    }
+
+    fun registerGroupMessageInteractionListeners(
+        onEdit: ((GroupMessage) -> Unit)? = null,
+        onUnsend: ((Int) -> Unit)? = null,
+        onReaction: ((GroupMessage) -> Unit)? = null
+    ) {
+        groupMessageEditedListener = onEdit
+        groupMessageUnsentListener = onUnsend
+        groupMessageReactionListener = onReaction
+    }
+
+    fun unregisterGroupMessageInteractionListeners() {
+        groupMessageEditedListener = null
+        groupMessageUnsentListener = null
+        groupMessageReactionListener = null
     }
 
     fun setTypingListeners(

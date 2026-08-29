@@ -16,7 +16,8 @@ data class AiMessage(
     @SerializedName("role") val role: String, // "user" | "assistant" | "system"
     @SerializedName("content") val content: String,
     @SerializedName("createdAt") val createdAt: String? = null,
-    val isStreaming: Boolean = false
+    val isStreaming: Boolean = false,
+    val isError: Boolean = false
 )
 
 data class AiConversationDetails(
@@ -33,7 +34,13 @@ data class AiChatResponse(
     @SerializedName("message") val message: String,
     @SerializedName("conversationId") val conversationId: Int,
     @SerializedName("provider") val provider: String? = null,
-    @SerializedName("model") val model: String? = null
+    @SerializedName("model") val model: String? = null,
+    @SerializedName("sources") val sources: List<AiSource>? = null
+)
+
+data class AiSource(
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("source") val source: String? = null
 )
 
 data class AiWritingRequest(
@@ -82,10 +89,23 @@ data class AiCreateMemoryRequest(
     @SerializedName("category") val category: String = "general"
 )
 
+data class AiProviderCapabilities(
+    @SerializedName("text") val text: Boolean? = null,
+    @SerializedName("streaming") val streaming: Boolean? = null,
+    @SerializedName("vision") val vision: Boolean? = null,
+    @SerializedName("tools") val tools: Boolean? = null,
+    @SerializedName("structuredOutput") val structuredOutput: Boolean? = null,
+    @SerializedName("embeddings") val embeddings: Boolean? = null
+)
+
 data class AiStatus(
     @SerializedName("enabled") val enabled: Boolean,
     @SerializedName("provider") val provider: String? = null,
-    @SerializedName("model") val model: String? = null
+    @SerializedName("model") val model: String? = null,
+    @SerializedName("available") val available: Boolean? = null,
+    @SerializedName("capabilities") val capabilities: AiProviderCapabilities? = null,
+    @SerializedName("fallbackProvider") val fallbackProvider: String? = null,
+    @SerializedName("fallbackAvailable") val fallbackAvailable: Boolean? = null
 )
 
 data class AiCreateConversationRequest(

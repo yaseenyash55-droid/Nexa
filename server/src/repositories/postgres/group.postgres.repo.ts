@@ -1,6 +1,6 @@
 import { executePostgresSql, withPostgresTransaction } from '../../db/postgres.pool.js';
 import { GroupRepository } from '../group.repository.js';
-import { Group, GroupMember, GroupMessage, CreateGroupParams } from '../../types/index.js';
+import { Group, GroupMember, GroupMessage, CreateGroupParams, ReactionSummary } from '../../types/index.js';
 
 export class PostgresGroupRepository implements GroupRepository {
   async createGroup(params: CreateGroupParams): Promise<Group> {
@@ -308,13 +308,13 @@ export class PostgresGroupRepository implements GroupRepository {
     });
   }
 
-  async sendGroupMessage(groupId: number, senderId: number, content: string, attachments?: any[]): Promise<GroupMessage> {
+  async sendGroupMessage(groupId: number, senderId: number, content: string, attachments?: any[], replyToMessageId?: number | null): Promise<GroupMessage> {
     return withPostgresTransaction(async (conn) => {
       const result = await conn.query(
-        `INSERT INTO group_messages (group_id, sender_id, content, created_at)
-         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+        `INSERT INTO group_messages (group_id, sender_id, content, reply_to_message_id, created_at)
+         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
          RETURNING message_id, created_at`,
-        [groupId, senderId, content.trim()]
+        [groupId, senderId, content.trim(), replyToMessageId ?? null]
       );
 
       const messageId = Number(result.rows[0].message_id);
@@ -366,6 +366,7 @@ export class PostgresGroupRepository implements GroupRepository {
         groupId,
         senderId,
         content: content.trim(),
+        replyToMessageId: replyToMessageId ?? null,
         attachments: savedAttachments.length > 0 ? savedAttachments : undefined,
         createdAt,
         sender: {
@@ -376,5 +377,84 @@ export class PostgresGroupRepository implements GroupRepository {
         }
       };
     });
+  }
+
+  async unsendGroupMessage(messageId: number, senderId: number, groupId: number): Promise<{ success: boolean }> {
+    const sql = `
+      UPDATE group_messages
+      SET is_unsent = TRUE
+      WHERE message_id = $1
+        AND sender_id  = $2
+        AND group_id   = $3
+        AND is_unsent  = FALSE
+    `;
+    const res = await executePostgresSql(sql, [messageId, senderId, groupId]);
+    return { success: Boolean(res.rowCount && res.rowCount > 0) };
+  }
+
+  async editGroupMessage(messageId: number, senderId: number, groupId: number, content: string): Promise<{ success: boolean; editedAt: Date | string }> {
+    const trimmed = content.trim();
+    if (!trimmed) throw { statusCode: 400, code: 'INVALID_INPUT', message: 'Content cannot be empty' };
+    const sql = `
+      UPDATE group_messages
+      SET content = $1, edited_at = NOW()
+      WHERE message_id = $2
+        AND sender_id  = $3
+        AND group_id   = $4
+        AND is_unsent  = FALSE
+        AND sender_type = 'user'
+      RETURNING edited_at
+    `;
+    const res = await executePostgresSql<{ edited_at: Date }>(sql, [trimmed, messageId, senderId, groupId]);
+    const row = res.rows?.[0];
+    if (!row) return { success: false, editedAt: new Date() };
+    return { success: true, editedAt: row.edited_at };
+  }
+
+  async upsertGroupReaction(groupMessageId: number, userId: number, reaction: string): Promise<{ reactionId: number; updatedAt: string }> {
+    const sql = `
+      INSERT INTO message_reactions (group_message_id, user_id, reaction, created_at, updated_at)
+      VALUES ($1, $2, $3, NOW(), NOW())
+      ON CONFLICT (group_message_id, user_id)
+      DO UPDATE SET reaction = EXCLUDED.reaction, updated_at = NOW()
+      RETURNING reaction_id, updated_at
+    `;
+    const res = await executePostgresSql<{ reaction_id: number; updated_at: Date }>(sql, [groupMessageId, userId, reaction]);
+    const row = res.rows[0];
+    return { reactionId: Number(row.reaction_id), updatedAt: new Date(row.updated_at).toISOString() };
+  }
+
+  async removeGroupReaction(groupMessageId: number, userId: number): Promise<{ success: boolean }> {
+    const sql = `DELETE FROM message_reactions WHERE group_message_id = $1 AND user_id = $2`;
+    const res = await executePostgresSql(sql, [groupMessageId, userId]);
+    return { success: Boolean(res.rowCount && res.rowCount > 0) };
+  }
+
+  async getGroupReactions(groupMessageId: number, viewerUserId?: number): Promise<ReactionSummary[]> {
+    const sql = `
+      SELECT reaction,
+             COUNT(*)::int AS count,
+             MAX(CASE WHEN user_id = $2 THEN reaction_id ELSE NULL END) AS my_reaction_id
+      FROM message_reactions
+      WHERE group_message_id = $1
+      GROUP BY reaction
+      ORDER BY count DESC
+    `;
+    const res = await executePostgresSql<{ reaction: string; count: number; my_reaction_id: number | null }>(
+      sql, [groupMessageId, viewerUserId ?? 0]
+    );
+    return (res.rows || []).map((r) => ({
+      reaction: r.reaction,
+      count: Number(r.count),
+      myReactionId: r.my_reaction_id ? Number(r.my_reaction_id) : null
+    }));
+  }
+
+  async isGroupMember(groupId: number, userId: number): Promise<boolean> {
+    const res = await executePostgresSql(
+      `SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2 LIMIT 1`,
+      [groupId, userId]
+    );
+    return Boolean(res.rows?.length);
   }
 }

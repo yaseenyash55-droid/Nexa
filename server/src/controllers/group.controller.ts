@@ -91,7 +91,7 @@ export async function sendGroupMessage(req: AuthenticatedRequest, res: Response)
     }
 
     const groupId = parseInt(req.params.id, 10);
-    const { content, attachments } = req.body;
+    const { content, attachments, replyToMessageId } = req.body;
 
     if (isNaN(groupId) || (!content?.trim() && (!attachments || attachments.length === 0))) {
       return sendError(res, 'VALIDATION_ERROR', 'Group ID and message content or attachments are required', 400);
@@ -125,7 +125,7 @@ export async function sendGroupMessage(req: AuthenticatedRequest, res: Response)
       }
     }
 
-    const msg = await repo.sendGroupMessage(groupId, currentUserId, content ? content.trim() : '', Array.isArray(attachments) ? attachments : undefined);
+    const msg = await repo.sendGroupMessage(groupId, currentUserId, content ? content.trim() : '', Array.isArray(attachments) ? attachments : undefined, replyToMessageId ? Number(replyToMessageId) : null);
     
     // Broadcast via Socket.IO to group members
     for (const member of members) {

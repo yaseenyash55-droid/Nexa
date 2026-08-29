@@ -1,5 +1,5 @@
 import oracledb from 'oracledb';
-import { Group, GroupMember, GroupMessage, CreateGroupParams } from '../types/index.js';
+import { Group, GroupMember, GroupMessage, CreateGroupParams, ReactionSummary } from '../types/index.js';
 import { executeSql, withTransaction } from '../db/pool.js';
 
 export interface GroupRepository {
@@ -10,11 +10,17 @@ export interface GroupRepository {
   addGroupMember(groupId: number, userId: number, role?: 'ADMIN' | 'MEMBER'): Promise<void>;
   removeGroupMember(groupId: number, userId: number): Promise<boolean>;
   getGroupMessages(groupId: number): Promise<GroupMessage[]>;
-  sendGroupMessage(groupId: number, senderId: number, content: string, attachments?: any[]): Promise<GroupMessage>;
+  sendGroupMessage(groupId: number, senderId: number, content: string, attachments?: any[], replyToMessageId?: number | null): Promise<GroupMessage>;
   sendAiGroupMessage(groupId: number, content: string, aiAgent?: string, triggerMessageId?: number | null): Promise<GroupMessage>;
   findAiGroupResponseByTrigger?(groupId: number, triggerMessageId: number, aiAgent?: string): Promise<GroupMessage | null>;
   updateGroupSettings(groupId: number, settings: { onlyAdminsCanPost?: boolean; name?: string; description?: string }): Promise<void>;
   deleteGroup(groupId: number): Promise<boolean>;
+  unsendGroupMessage(messageId: number, senderId: number, groupId: number): Promise<{ success: boolean }>;
+  editGroupMessage(messageId: number, senderId: number, groupId: number, content: string): Promise<{ success: boolean; editedAt: Date | string }>;
+  upsertGroupReaction(groupMessageId: number, userId: number, reaction: string): Promise<{ reactionId: number; updatedAt: string }>;
+  removeGroupReaction(groupMessageId: number, userId: number): Promise<{ success: boolean }>;
+  getGroupReactions(groupMessageId: number, viewerUserId?: number): Promise<ReactionSummary[]>;
+  isGroupMember(groupId: number, userId: number): Promise<boolean>;
 }
 
 // In-memory settings registry for runtime group flags
@@ -366,16 +372,17 @@ export class OracleGroupRepository implements GroupRepository {
     }
   }
 
-  async sendGroupMessage(groupId: number, senderId: number, content: string, attachments?: any[]): Promise<GroupMessage> {
+  async sendGroupMessage(groupId: number, senderId: number, content: string, attachments?: any[], replyToMessageId?: number | null): Promise<GroupMessage> {
     return withTransaction(async (conn: any) => {
       const result = await conn.execute(
-        `INSERT INTO GROUP_MESSAGES (GROUP_ID, SENDER_ID, CONTENT, CREATED_AT)
-         VALUES (:1, :2, :3, SYSTIMESTAMP)
-         RETURNING MESSAGE_ID, CREATED_AT INTO :4, :5`,
+        `INSERT INTO GROUP_MESSAGES (GROUP_ID, SENDER_ID, CONTENT, REPLY_TO_MESSAGE_ID, CREATED_AT)
+         VALUES (:1, :2, :3, :4, SYSTIMESTAMP)
+         RETURNING MESSAGE_ID, CREATED_AT INTO :5, :6`,
         [
           groupId,
           senderId,
           content.trim(),
+          replyToMessageId ?? null,
           { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
           { dir: oracledb.BIND_OUT, type: oracledb.DATE }
         ]
@@ -426,6 +433,7 @@ export class OracleGroupRepository implements GroupRepository {
         groupId,
         senderId,
         content: content.trim(),
+        replyToMessageId: replyToMessageId ?? null,
         attachments: savedAttachments.length > 0 ? savedAttachments : undefined,
         createdAt,
         sender: {
@@ -436,5 +444,86 @@ export class OracleGroupRepository implements GroupRepository {
         }
       };
     });
+  }
+
+    async unsendGroupMessage(messageId: number, senderId: number, groupId: number): Promise<{ success: boolean }> {
+    return withTransaction(async (conn: any) => {
+      const res = await conn.execute(
+        `UPDATE GROUP_MESSAGES SET IS_UNSENT = 1
+         WHERE MESSAGE_ID = :messageId AND SENDER_ID = :senderId AND GROUP_ID = :groupId AND IS_UNSENT = 0`,
+        { messageId, senderId, groupId }
+      );
+      return { success: Boolean(res.rowsAffected && res.rowsAffected > 0) };
+    });
+  }
+  async editGroupMessage(messageId: number, senderId: number, groupId: number, content: string): Promise<{ success: boolean; editedAt: Date | string }> {
+    const trimmed = content.trim();
+    if (!trimmed) throw { statusCode: 400, code: 'INVALID_INPUT', message: 'Content cannot be empty' };
+    return withTransaction(async (conn: any) => {
+      const res = await conn.execute(
+        `UPDATE GROUP_MESSAGES SET CONTENT = :content, EDITED_AT = SYSTIMESTAMP
+         WHERE MESSAGE_ID = :messageId AND SENDER_ID = :senderId AND GROUP_ID = :groupId
+           AND IS_UNSENT = 0 AND SENDER_TYPE = 'user'`,
+        { content: trimmed, messageId, senderId, groupId }
+      );
+      if (!res.rowsAffected) return { success: false, editedAt: new Date() };
+      const ts = await conn.execute(
+        `SELECT EDITED_AT FROM GROUP_MESSAGES WHERE MESSAGE_ID = :messageId`,
+        { messageId }
+      );
+      const row = (ts.rows as any[])?.[0];
+      return { success: true, editedAt: row?.EDITED_AT ?? row?.[0] ?? new Date() };
+    });
+  }
+  async upsertGroupReaction(groupMessageId: number, userId: number, reaction: string): Promise<{ reactionId: number; updatedAt: string }> {
+    return withTransaction(async (conn: any) => {
+      await conn.execute(
+        `MERGE INTO MESSAGE_REACTIONS tgt USING DUAL
+         ON (tgt.GROUP_MESSAGE_ID = :groupMessageId AND tgt.USER_ID = :userId)
+         WHEN MATCHED THEN UPDATE SET REACTION = :reaction, UPDATED_AT = SYSTIMESTAMP
+         WHEN NOT MATCHED THEN INSERT (GROUP_MESSAGE_ID, USER_ID, REACTION, CREATED_AT, UPDATED_AT)
+           VALUES (:groupMessageId, :userId, :reaction, SYSTIMESTAMP, SYSTIMESTAMP)`,
+        { groupMessageId, userId, reaction }
+      );
+      const res = await conn.execute(
+        `SELECT REACTION_ID, UPDATED_AT FROM MESSAGE_REACTIONS WHERE GROUP_MESSAGE_ID = :groupMessageId AND USER_ID = :userId`,
+        { groupMessageId, userId }
+      );
+      const row = (res.rows as any[])?.[0];
+      return {
+        reactionId: Number(row?.REACTION_ID ?? row?.[0] ?? 0),
+        updatedAt: new Date(row?.UPDATED_AT ?? row?.[1] ?? new Date()).toISOString()
+      };
+    });
+  }
+  async removeGroupReaction(groupMessageId: number, userId: number): Promise<{ success: boolean }> {
+    return withTransaction(async (conn: any) => {
+      const res = await conn.execute(
+        `DELETE FROM MESSAGE_REACTIONS WHERE GROUP_MESSAGE_ID = :groupMessageId AND USER_ID = :userId`,
+        { groupMessageId, userId }
+      );
+      return { success: Boolean(res.rowsAffected && res.rowsAffected > 0) };
+    });
+  }
+  async getGroupReactions(groupMessageId: number, viewerUserId?: number): Promise<import('../types/index.js').ReactionSummary[]> {
+    const sql = `
+      SELECT REACTION, COUNT(*) AS CNT,
+             MAX(CASE WHEN USER_ID = :viewerUserId THEN REACTION_ID ELSE NULL END) AS MY_REACTION_ID
+      FROM MESSAGE_REACTIONS
+      WHERE GROUP_MESSAGE_ID = :groupMessageId
+      GROUP BY REACTION ORDER BY CNT DESC
+    `;
+    const res = await executeSql<any>(sql, { groupMessageId, viewerUserId: viewerUserId ?? 0 });
+    return (res.rows || []).map((r: any) => ({
+      reaction: r.REACTION, count: Number(r.CNT),
+      myReactionId: r.MY_REACTION_ID ? Number(r.MY_REACTION_ID) : null
+    }));
+  }
+  async isGroupMember(groupId: number, userId: number): Promise<boolean> {
+    const res = await executeSql(
+      `SELECT 1 FROM GROUP_MEMBERS WHERE GROUP_ID = :groupId AND USER_ID = :userId`,
+      { groupId, userId }
+    );
+    return Boolean((res.rows as any[])?.length);
   }
 }

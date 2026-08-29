@@ -258,7 +258,6 @@ class AiRepositoryTest {
             mainDispatcher = Dispatchers.Unconfined,
             listener = listener
         )
-        cancellable.job.join()
 
         assertNotNull(cancellable)
         assertNull(errorEncountered)
