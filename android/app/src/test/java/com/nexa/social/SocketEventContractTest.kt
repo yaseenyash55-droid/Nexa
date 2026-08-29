@@ -58,7 +58,7 @@ class SocketEventContractTest {
         assertNotNull(groupMsg)
         assertEquals(301, groupMsg.messageId)
         assertEquals(7, groupMsg.groupId)
-        assertEquals("Sarah Connor", groupMsg.sender.displayName)
+        assertEquals("Sarah Connor", groupMsg.sender?.displayName)
     }
 
     @Test

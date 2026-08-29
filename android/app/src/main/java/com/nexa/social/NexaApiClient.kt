@@ -1,12 +1,15 @@
 package com.nexa.social
 
 import android.content.Context
+import com.nexa.social.data.api.AiApi
 import com.nexa.social.data.api.AuthApi
 import com.nexa.social.data.api.AuthInterceptor
 import com.nexa.social.data.api.CallApi
 import com.nexa.social.data.api.GroupApi
 import com.nexa.social.data.api.MessageApi
+import com.nexa.social.data.api.MusicApi
 import com.nexa.social.data.api.PostApi
+import com.nexa.social.data.api.SpotifyApi
 import com.nexa.social.data.api.StoryApi
 import com.nexa.social.data.api.TokenAuthenticator
 import com.nexa.social.data.api.UserApi
@@ -91,6 +94,7 @@ object NexaApiClient {
     val userApi: UserApi by lazy { retrofit.create(UserApi::class.java) }
     val storyApi: StoryApi by lazy { retrofit.create(StoryApi::class.java) }
     val callApi: CallApi by lazy { retrofit.create(CallApi::class.java) }
-    val musicApi: com.nexa.social.data.api.MusicApi by lazy { retrofit.create(com.nexa.social.data.api.MusicApi::class.java) }
-    val spotifyApi: com.nexa.social.data.api.SpotifyApi by lazy { retrofit.create(com.nexa.social.data.api.SpotifyApi::class.java) }
+    val musicApi: MusicApi by lazy { retrofit.create(MusicApi::class.java) }
+    val spotifyApi: SpotifyApi by lazy { retrofit.create(SpotifyApi::class.java) }
+    val aiApi: AiApi by lazy { retrofit.create(AiApi::class.java) }
 }

@@ -42,7 +42,14 @@ class MessagesFragment : Fragment() {
         setupRecyclerView()
         setupSearch()
         setupSwipeRefresh()
+        setupNexaAi()
         observeViewModel()
+    }
+
+    private fun setupNexaAi() {
+        binding.llNexaAiQuickChat.setOnClickListener {
+            startActivity(Intent(requireContext(), com.nexa.social.ui.NexaAiActivity::class.java))
+        }
     }
 
     private fun setupRecyclerView() {

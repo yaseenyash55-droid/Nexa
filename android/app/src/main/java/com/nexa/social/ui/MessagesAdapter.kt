@@ -223,8 +223,13 @@ class MessagesAdapter(
         fun bind(msg: DisplayMessage, theme: ChatTheme) {
             bubbleLayout?.background = theme.createReceivedBubbleDrawable()
             tvContent.setTextColor(theme.receivedTextColor)
-            if (!msg.senderName.isNullOrEmpty()) {
+            if (msg.isAi || msg.aiAgent == "nexa" || msg.senderName == "NEXA AI") {
+                tvSenderName.text = "✨ NEXA AI"
+                tvSenderName.setTextColor(0xFF06B6D4.toInt())
+                tvSenderName.visibility = View.VISIBLE
+            } else if (!msg.senderName.isNullOrEmpty()) {
                 tvSenderName.text = msg.senderName
+                tvSenderName.setTextColor(0xFF94A3B8.toInt())
                 tvSenderName.visibility = View.VISIBLE
             } else {
                 tvSenderName.visibility = View.GONE

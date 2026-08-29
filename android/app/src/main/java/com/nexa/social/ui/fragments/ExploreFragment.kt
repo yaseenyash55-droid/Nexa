@@ -15,6 +15,7 @@ import androidx.navigation.fragment.findNavController
 import com.nexa.social.R
 import com.nexa.social.databinding.FragmentExploreBinding
 import com.nexa.social.ui.MusicActivity
+import com.nexa.social.ui.NexaAiActivity
 import com.nexa.social.ui.adapters.UserAdapter
 import com.nexa.social.ui.viewmodels.ExploreUiState
 import com.nexa.social.ui.viewmodels.ExploreViewModel
@@ -38,8 +39,15 @@ class ExploreFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupRecyclerView()
         setupSearch()
+        setupNexaAi()
         setupMusicLounge()
         observeViewModel()
+    }
+
+    private fun setupNexaAi() {
+        binding.llNexaAi.setOnClickListener {
+            startActivity(Intent(requireContext(), NexaAiActivity::class.java))
+        }
     }
 
     private fun setupMusicLounge() {

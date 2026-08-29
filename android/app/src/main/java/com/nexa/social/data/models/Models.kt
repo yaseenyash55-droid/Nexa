@@ -176,11 +176,13 @@ data class MessageAttachment(
 
 data class Message(
     @SerializedName("messageId") val messageId: Int,
-    @SerializedName("senderId") val senderId: Int,
-    @SerializedName("receiverId") val receiverId: Int,
+    @SerializedName("senderId") val senderId: Int? = null,
+    @SerializedName("receiverId") val receiverId: Int? = null,
     @SerializedName("content") val content: String = "",
     @SerializedName("attachments") val attachments: List<MessageAttachment> = emptyList(),
     @SerializedName("isRead") val isRead: Boolean = false,
+    @SerializedName("aiAgent") val aiAgent: String? = null,
+    @SerializedName("triggerMessageId") val triggerMessageId: Int? = null,
     @SerializedName("createdAt") val createdAt: String? = null
 )
 
@@ -276,10 +278,12 @@ data class GroupSender(
 data class GroupMessage(
     @SerializedName("messageId") val messageId: Int,
     @SerializedName("groupId") val groupId: Int,
-    @SerializedName("senderId") val senderId: Int,
-    @SerializedName("sender") val sender: GroupSender,
+    @SerializedName("senderId") val senderId: Int? = null,
+    @SerializedName("sender") val sender: GroupSender? = null,
     @SerializedName("content") val content: String = "",
     @SerializedName("attachments") val attachments: List<MessageAttachment> = emptyList(),
+    @SerializedName("aiAgent") val aiAgent: String? = null,
+    @SerializedName("triggerMessageId") val triggerMessageId: Int? = null,
     @SerializedName("createdAt") val createdAt: String? = null
 )
 
@@ -337,13 +341,15 @@ data class IceConfiguration(
 
 data class DisplayMessage(
     val id: Int,
-    val senderId: Int,
+    val senderId: Int?,
     val senderName: String?,
     val content: String,
     val isSelf: Boolean,
     val timestamp: String?,
     val isRead: Boolean = false,
-    val attachments: List<MessageAttachment> = emptyList()
+    val attachments: List<MessageAttachment> = emptyList(),
+    val isAi: Boolean = false,
+    val aiAgent: String? = null
 )
 
 data class Comment(

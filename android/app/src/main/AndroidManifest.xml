@@ -196,6 +196,12 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- Native NEXA AI Assistant Activity -->
+        <activity
+            android:name=".ui.NexaAiActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Firebase Cloud Messaging Service -->
         <service
             android:name=".service.NexaFirebaseMessagingService"

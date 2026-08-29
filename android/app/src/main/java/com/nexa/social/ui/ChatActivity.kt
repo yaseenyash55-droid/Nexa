@@ -276,16 +276,19 @@ class ChatActivity : AppCompatActivity() {
         }
         if (chatType == "direct") {
             SocketManager.registerMessageListener { message ->
-                if (message.senderId == targetId) {
+                val isAi = message.aiAgent == "nexa" || message.senderId == null || message.content.startsWith("🤖 **NEXA AI**")
+                if (message.senderId == targetId || isAi) {
                     val displayMsg = DisplayMessage(
                         id = message.messageId,
                         senderId = message.senderId,
-                        senderName = targetName,
+                        senderName = if (isAi) "NEXA AI" else targetName,
                         content = message.content,
                         isSelf = false,
                         timestamp = message.createdAt,
                         isRead = false,
-                        attachments = message.attachments
+                        attachments = message.attachments,
+                        isAi = isAi,
+                        aiAgent = message.aiAgent
                     )
                     adapter.addMessage(displayMsg)
                     localChatStorage.addMessage(currentUserId, targetId, chatType, displayMsg)
@@ -301,16 +304,19 @@ class ChatActivity : AppCompatActivity() {
             }
         } else {
             SocketManager.registerGroupMessageListener { groupMsg ->
-                if (groupMsg.groupId == targetId && groupMsg.senderId != prefManager.userId) {
+                val isAi = groupMsg.aiAgent == "nexa" || groupMsg.senderId == null || groupMsg.content.startsWith("🤖 **NEXA AI**")
+                if (groupMsg.groupId == targetId && (groupMsg.senderId != prefManager.userId || isAi)) {
                     val displayMsg = DisplayMessage(
                         id = groupMsg.messageId,
                         senderId = groupMsg.senderId,
-                        senderName = groupMsg.sender.displayName,
+                        senderName = if (isAi) "NEXA AI" else (groupMsg.sender?.displayName ?: "Member"),
                         content = groupMsg.content,
                         isSelf = false,
                         timestamp = groupMsg.createdAt,
                         isRead = false,
-                        attachments = groupMsg.attachments
+                        attachments = groupMsg.attachments,
+                        isAi = isAi,
+                        aiAgent = groupMsg.aiAgent
                     )
                     adapter.addMessage(displayMsg)
                     localChatStorage.addMessage(currentUserId, targetId, chatType, displayMsg)
@@ -667,15 +673,18 @@ class ChatActivity : AppCompatActivity() {
                     }
                     val rawMessages = res.body()?.data ?: emptyList()
                     val displayList = rawMessages.map { m ->
+                        val isAi = m.aiAgent == "nexa" || m.senderId == null || m.content.startsWith("🤖 **NEXA AI**")
                         DisplayMessage(
                             id = m.messageId,
                             senderId = m.senderId,
-                            senderName = if (m.senderId == currentUserId) null else targetName,
+                            senderName = if (isAi) "NEXA AI" else if (m.senderId == currentUserId) null else targetName,
                             content = m.content,
-                            isSelf = m.senderId == currentUserId,
+                            isSelf = if (isAi) false else (m.senderId == currentUserId),
                             timestamp = m.createdAt,
                             isRead = m.isRead,
-                            attachments = m.attachments
+                            attachments = m.attachments,
+                            isAi = isAi,
+                            aiAgent = m.aiAgent
                         )
                     }
                     localChatStorage.saveMessages(currentUserId, targetId, chatType, displayList)
@@ -696,15 +705,18 @@ class ChatActivity : AppCompatActivity() {
                     }
                     val rawMessages = res.body()?.data ?: emptyList()
                     val displayList = rawMessages.map { m ->
+                        val isAi = m.aiAgent == "nexa" || m.senderId == null || m.content.startsWith("🤖 **NEXA AI**")
                         DisplayMessage(
                             id = m.messageId,
                             senderId = m.senderId,
-                            senderName = m.sender.displayName,
+                            senderName = if (isAi) "NEXA AI" else (m.sender?.displayName ?: "Member"),
                             content = m.content,
-                            isSelf = m.senderId == currentUserId,
+                            isSelf = if (isAi) false else (m.senderId == currentUserId),
                             timestamp = m.createdAt,
                             isRead = false,
-                            attachments = m.attachments
+                            attachments = m.attachments,
+                            isAi = isAi,
+                            aiAgent = m.aiAgent
                         )
                     }
                     localChatStorage.saveMessages(currentUserId, targetId, chatType, displayList)
