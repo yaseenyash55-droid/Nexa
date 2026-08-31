@@ -189,11 +189,12 @@ data class ReplyPreview(
 
 data class Message(
     @SerializedName("messageId") val messageId: Int,
-    @SerializedName("senderId") val senderId: Int? = null,
-    @SerializedName("receiverId") val receiverId: Int? = null,
-    @SerializedName("content") val content: String = "",
-    @SerializedName("attachments") val attachments: List<MessageAttachment> = emptyList(),
+    @SerializedName("senderId") val senderId: Int,
+    @SerializedName("receiverId") val receiverId: Int,
+    @SerializedName("content") val content: String,
     @SerializedName("isRead") val isRead: Boolean = false,
+    @SerializedName("createdAt") val createdAt: String?,
+    @SerializedName("attachments") val attachments: List<MessageAttachment> = emptyList(),
     @SerializedName("senderType") val senderType: String? = null,
     @SerializedName("aiAgent") val aiAgent: String? = null,
     @SerializedName("triggerMessageId") val triggerMessageId: Int? = null,
@@ -201,8 +202,7 @@ data class Message(
     @SerializedName("replyToMessageId") val replyToMessageId: Int? = null,
     @SerializedName("replyPreview") val replyPreview: ReplyPreview? = null,
     @SerializedName("reactions") val reactions: List<ReactionSummary>? = null,
-    @SerializedName("isUnsent") val isUnsent: Boolean? = false,
-    @SerializedName("createdAt") val createdAt: String? = null
+    @SerializedName("isUnsent") val isUnsent: Boolean? = false
 )
 
 data class SendDirectMessageRequest(
@@ -306,9 +306,10 @@ data class GroupSender(
 data class GroupMessage(
     @SerializedName("messageId") val messageId: Int,
     @SerializedName("groupId") val groupId: Int,
-    @SerializedName("senderId") val senderId: Int? = null,
+    @SerializedName("senderId") val senderId: Int,
     @SerializedName("sender") val sender: GroupSender? = null,
-    @SerializedName("content") val content: String = "",
+    @SerializedName("content") val content: String,
+    @SerializedName("createdAt") val createdAt: String?,
     @SerializedName("attachments") val attachments: List<MessageAttachment> = emptyList(),
     @SerializedName("senderType") val senderType: String? = null,
     @SerializedName("aiAgent") val aiAgent: String? = null,
@@ -317,8 +318,7 @@ data class GroupMessage(
     @SerializedName("replyToMessageId") val replyToMessageId: Int? = null,
     @SerializedName("replyPreview") val replyPreview: ReplyPreview? = null,
     @SerializedName("reactions") val reactions: List<ReactionSummary>? = null,
-    @SerializedName("isUnsent") val isUnsent: Boolean? = false,
-    @SerializedName("createdAt") val createdAt: String? = null
+    @SerializedName("isUnsent") val isUnsent: Boolean? = false
 )
 
 data class SendGroupMessageRequest(
